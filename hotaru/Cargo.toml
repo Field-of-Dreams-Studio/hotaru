@@ -1,6 +1,6 @@
 [package]
 name = "hotaru"
-version = "0.7.3" 
+version = "0.7.5" 
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"] 
 description = "Small, sweet, easy framework for full-stack web application" 

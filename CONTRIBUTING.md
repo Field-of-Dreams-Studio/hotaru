@@ -43,8 +43,8 @@ We welcome contributions in the following areas:
 
 ## 📬 Get Involved
 
-- **GitHub Issues**: TODO 
-- **Discussions**: TODO 
+- **GitHub Issues**: https://github.com/Field-of-Dreams-Studio/hotaru/issues 
+- **Discussions**: https://github.com/Field-of-Dreams-Studio/hotaru/discussions 
 - **Email**: redstone@fds.moe
 - **Discord Group**: https://discord.gg/Y6b9KRUCux 
 - **QQ Group**: 860691370  
@@ -126,7 +126,7 @@ We welcome contributions in the following areas:
 
 ## 📄 License
 
-By contributing to Hotaru, you agree that your contributions will be licensed under the MIT License.
+By contributing to Hotaru, you agree that your contributions will be licensed under the GPL-3.0 License.
 
 ## 🙏 Thank You
 

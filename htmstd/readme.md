@@ -1,7 +1,7 @@
 # htmstd - Hotaru Standard Middleware Library
 
 [![Crates.io](https://img.shields.io/crates/v/htmstd)](https://crates.io/crates/htmstd)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GPL-3.0 License](https://img.shields.io/badge/license-GNU-blue.svg)](LICENSE)
 
 Standard middleware collection for the Hotaru web framework, providing common functionality like CORS, sessions, and authentication.
 
@@ -72,11 +72,11 @@ endpoint! {
 
 For complete examples, see:
 - [Session Example](https://github.com/Field-of-Dreams-Studio/sfx)
-- [CORS Example](https://github.com/Redstone-D/hotaru-example)
+- [CORS Example](https://github.com/Field-of-Dreams-Studio/hotaru-example)
 
 ## License
 
-MIT License
+GPL-3.0 License
 
 ## Part of Hotaru Framework
 

@@ -2,7 +2,7 @@
 
 ![Latest Version](https://img.shields.io/badge/version-0.7.3-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GPL-3.0 License](https://img.shields.io/badge/license-GNU-blue.svg)](LICENSE)
 
 > Small, sweet, easy framework for full-stack Rust web applications
 
@@ -10,7 +10,7 @@
 
 Hotaru is a lightweight, intuitive web framework focused on simplicity and productivity. It supports regex-based routing, tree-structured URLs, and integrates seamlessly with the Akari templating system.
 
-**[Example Project](https://github.com/Redstone-D/hotaru-example)**
+**[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
 
 MSRV: 1.86
 
@@ -123,7 +123,7 @@ endpoint! {
 
 ## 📚 Examples
 
-Check out the [example repository](https://github.com/Redstone-D/hotaru-example) for:
+Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hotaru) for:
 - Basic routing and handlers
 - Form processing and file uploads
 - Session management with cookies
@@ -174,11 +174,20 @@ Hotaru is built on a modular architecture:
 
 - **Akari Template Engine**: https://crates.io/crates/akari
 - **Homepage**: https://fds.rs
-- **GitHub**: https://github.com/Redstone-D/hotaru
+- **GitHub**: https://github.com/Field-of-Dreams-Studio/hotaru
 - **Documentation**: https://docs.rs/hotaru
+
+## 📬 Get Involved
+
+- **GitHub Issues**: https://github.com/Field-of-Dreams-Studio/hotaru/issues 
+- **Discussions**: https://github.com/Field-of-Dreams-Studio/hotaru/discussions 
+- **Email**: redstone@fds.moe
+- **Discord Group**: https://discord.gg/Y6b9KRUCux 
+- **QQ Group**: 860691370  
+- **Join FDS**: https://forms.office.com/Pages/ResponsePage.aspx?id=DQSIkWdsW0yxEjajBLZtrQAAAAAAAAAAAAMAAC6BwJ5UQ0lQUzdMTjhGR1g3SElLTFdHQUlJV0hFMS4u 
 
 ## 📄 License
 
-MIT License
+GPL-3.0 License
 
-Copyright (c) 2024 Redstone @ Field of Dreams Studio
+Copyright (c) 2025 @ Field of Dreams Studio
