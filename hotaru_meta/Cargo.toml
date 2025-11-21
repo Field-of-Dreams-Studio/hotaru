@@ -5,7 +5,7 @@ edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"] 
 description = "Core macros for Hotaru" 
 license = "GPL-3.0" 
-repository = "https://github.com/Redstone-D/starberry" 
+repository = "https://github.com/Field-of-Dreams-Studio/hotaru" 
 categories = ["network-programming", "web-programming::http-server" ] 
 keywords = ["hotaru"]   
 
