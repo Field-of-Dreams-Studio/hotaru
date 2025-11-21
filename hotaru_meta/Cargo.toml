@@ -1,0 +1,20 @@
+[package]
+name = "hotaru_meta"
+version = "0.7.1" 
+edition = "2024"
+authors = ["Redstone <redstone@fds.moe>"] 
+description = "Core macros for Hotaru" 
+license = "GPL-3.0" 
+repository = "https://github.com/Redstone-D/starberry" 
+categories = ["network-programming", "web-programming::http-server" ] 
+keywords = ["hotaru"]   
+
+[dependencies] 
+ctor = "0.4.0" 
+hotaru_lib = { version = "0.7.3", path = "../hotaru_lib" }  
+
+[dev-dependencies]
+trybuild = { version = "1.0.49", features = ["diff"] } 
+
+[lib]
+proc-macro = true

@@ -1,0 +1,33 @@
+-[ template "/base.html" ]-
+
+-[ block head ]-
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="My awesome page">
+-[ endblock ]-
+
+-[ block header ]-
+<h1>-[ page_title ]-</h1>
+<nav>
+    <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/about">About</a></li>
+        <li><a href="/contact">Contact</a></li>
+    </ul>
+</nav>
+-[ endblock ]-
+
+-[ block content ]-
+<div class="container">
+    <h2>Welcome to our website</h2>
+    
+    -[ if show_message ]-
+        <div class="message">-[ message ]-</div>
+    -[ endif ]-
+    
+    <ul class="items">
+        -[ for item items ]-
+            <li class="item">-[ item ]-</li>
+        -[ endfor ]-
+    </ul>
+</div>
+-[ endblock ]-

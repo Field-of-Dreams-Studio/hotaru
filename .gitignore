@@ -1,0 +1,88 @@
+# Rust build artifacts
+/target
+**/target/
+debug/
+release/
+
+# Cargo lock file
+Cargo.lock
+
+# Generated documentation
+doc/
+**/doc/
+
+# Backup files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Keys, certificates, and secrets
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.der
+*.cer
+secrets/
+keys/
+.env
+.env.*
+!.env.example
+rsgithub
+rsgithub.pub
+
+# Project-specific
+/templates
+/programfiles
+starberry.toml
+
+# Benchmark results
+bench_results/
+
+# Test coverage
+tarpaulin-report.html
+cobertura.xml
+*.profraw
+*.profdata
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk

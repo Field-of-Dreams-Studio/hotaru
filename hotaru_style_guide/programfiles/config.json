@@ -1,0 +1,15 @@
+{
+    "app_name": "Hotaru Style Guide Example",
+    "version": "1.0.0",
+    "debug": true,
+    "database": {
+        "host": "localhost",
+        "port": 5432,
+        "name": "hotaru_db"
+    },
+    "features": {
+        "authentication": true,
+        "rate_limiting": true,
+        "cors": false
+    }
+}

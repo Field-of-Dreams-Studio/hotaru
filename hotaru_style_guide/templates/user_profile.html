@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .profile-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1.5rem;
+            background: #f9f9f9;
+        }
+        .admin-badge {
+            background: #ff6b6b;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <div class="profile-card">
+        <h2>{{ user_name }}</h2>
+        <p>Email: {{ user_email }}</p>
+        {% if is_admin %}
+        <span class="admin-badge">Admin User</span>
+        {% endif %}
+        <h3>Permissions:</h3>
+        <ul>
+        {% for permission in permissions %}
+            <li>{{ permission }}</li>
+        {% endfor %}
+        </ul>
+        <p>Last login: {{ last_login }}</p>
+    </div>
+</body>
+</html>
