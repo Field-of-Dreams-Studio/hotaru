@@ -42,15 +42,15 @@ pub use hotaru_core::http::safety::HttpSafety;
 
 pub use hotaru_core::extensions::*; 
 
-pub use hotaru_core; 
-pub use akari; 
+pub use hotaru_core;
+pub use akari;
 
-pub use hotaru_meta::endpoint; 
-pub use hotaru_meta::middleware; 
-pub use hotaru_meta::ctor; 
-pub use hotaru_meta; 
+pub use hotaru_meta::endpoint;
+pub use hotaru_meta::middleware;
+// Re-export all hotaru_meta items (including ctor when available)
+pub use hotaru_meta;
 
-pub use ahttpm; 
+pub use ahttpm;
 
 pub use hotaru_lib;
 
