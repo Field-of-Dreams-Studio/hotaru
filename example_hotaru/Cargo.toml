@@ -7,7 +7,6 @@ edition = "2021"
 hotaru = { path = "../hotaru" }
 hotaru_core = { path = "../hotaru_core" }
 htmstd = { path = "../htmstd" }
-ctor = "0.4.0"
 tokio = { version = "1", features = ["full"] }
 akari = "0.2"
 once_cell = "1"

@@ -45,13 +45,12 @@ pub use hotaru_core::extensions::*;
 pub use hotaru_core; 
 pub use akari; 
 
-// pub use sm::log_func_info; 
-// pub use sm::lit_url; 
 pub use hotaru_meta::endpoint; 
 pub use hotaru_meta::middleware; 
-// pub use sm::reg; 
+pub use hotaru_meta::ctor; 
+pub use hotaru_meta; 
 
 pub use ahttpm; 
 
-pub use hotaru_lib; 
+pub use hotaru_lib;
 

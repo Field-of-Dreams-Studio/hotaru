@@ -59,6 +59,23 @@ hotaru = "0.7.3"
 tokio = { version = "1", features = ["full"] }
 ```
 
+### Optional Features
+
+Hotaru supports the following optional features:
+
+- **`debug`**: Enable debug logging for development and troubleshooting
+- **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation
+
+  **Note**: When enabling `external-ctor`, you must also add `ctor` to your dependencies:
+  ```toml
+  [dependencies]
+  hotaru = { version = "0.7.3", features = ["external-ctor"] }
+  ctor = "0.4.0"  # Required when external-ctor feature is enabled
+  tokio = { version = "1", features = ["full"] }
+  ```
+
+  By default, Hotaru uses a built-in constructor implementation that doesn't require any external dependencies.
+
 ## 🎯 Core Concepts
 
 ### Endpoints
