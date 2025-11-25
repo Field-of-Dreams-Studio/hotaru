@@ -18,6 +18,6 @@ members = [
     "hotaru_bench/actix_hello",
     "hotaru_bench/h2per_hello",
     "hotaru_style_guide",
-    "tutorial_examples",
+    "tutorial_examples" 
 ] 
 resolver = "3" 

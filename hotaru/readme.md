@@ -1,6 +1,6 @@
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.7.3-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.7.6-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![GPL-3.0 License](https://img.shields.io/badge/license-GNU-blue.svg)](LICENSE)
 
@@ -10,7 +10,7 @@
 
 Hotaru is a lightweight, intuitive web framework focused on simplicity and productivity. It supports regex-based routing, tree-structured URLs, and integrates seamlessly with the Akari templating system.
 
-**[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
+**[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru)**
 
 MSRV: 1.86
 
@@ -51,6 +51,24 @@ endpoint! {
 
 ## 📦 Installation
 
+### Using the CLI Tool (Recommended)
+
+Install the Hotaru CLI tool:
+
+```bash
+cargo install hotaru
+```
+
+Create a new project:
+
+```bash
+hotaru new my_app
+cd my_app
+cargo run
+```
+
+### Manual Installation
+
 Add to your `Cargo.toml`:
 
 ```toml
@@ -58,6 +76,111 @@ Add to your `Cargo.toml`:
 hotaru = "0.7.3"
 tokio = { version = "1", features = ["full"] }
 ```
+
+### Optional Features
+
+Hotaru supports the following optional features:
+
+- **`debug`**: Enable debug logging for development and troubleshooting
+- **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation
+
+  **Note**: When enabling `external-ctor`, you must also add `ctor` to your dependencies:
+  ```toml
+  [dependencies]
+  hotaru = { version = "0.7.3", features = ["external-ctor"] }
+  ctor = "0.4.0"  # Required when external-ctor feature is enabled
+  tokio = { version = "1", features = ["full"] }
+  ```
+
+  By default, Hotaru uses a built-in constructor implementation that doesn't require any external dependencies.
+
+## 🛠️ Binary Commands
+
+Hotaru provides a CLI tool to help you scaffold and manage projects quickly.
+
+**⚠️ IMPORTANT**: It is **crucial** to use the CLI tool (`hotaru new` or `hotaru init`) when creating a new Hotaru project. The CLI automatically generates essential files including:
+- `build.rs` - Required for asset management and resource copying
+- `resource.rs` - Helper module for locating templates and static files at runtime
+
+Without these files, your project will not be able to properly locate and serve templates or static assets. Manual setup is significantly more complex and error-prone.
+
+### Installation
+
+```bash
+cargo install hotaru
+```
+
+**Note**: After installation, make sure Cargo's bin directory is in your PATH. If the `hotaru` command is not found, add Cargo's bin directory to your PATH:
+
+```bash
+# Linux/macOS
+export PATH="$HOME/.cargo/bin:$PATH"
+
+# Windows (PowerShell)
+$env:Path += ";$env:USERPROFILE\.cargo\bin"
+```
+
+To make this permanent, add the export line to your shell configuration file (`~/.bashrc`, `~/.zshrc`, etc.).
+
+### Available Commands
+
+#### `hotaru new <project_name>`
+
+Create a new Hotaru project with a complete project structure:
+
+```bash
+hotaru new my_app
+```
+
+This generates:
+- `src/main.rs` - Main application entry point with a hello world endpoint
+- `src/resource.rs` - Resource file locator helper module
+- `build.rs` - Build script for asset management
+- `Cargo.toml` - Pre-configured with Hotaru dependencies
+- `templates/` - Directory for Akari HTML templates
+- `programfiles/` - Directory for static assets (CSS, JS, images)
+
+The generated project uses the latest Hotaru features including:
+- `LApp!` macro for clean app initialization
+- `endpoint!` macro for routing
+- Proper resource management with build-time asset copying
+
+#### `hotaru init`
+
+Initialize an existing Cargo project with Hotaru scaffolding:
+
+```bash
+cd my_existing_project
+hotaru init
+```
+
+This command adds the same structure as `hotaru new` but to your current project directory.
+
+### Running Your Project
+
+After creating a project:
+
+```bash
+cd my_app
+cargo run
+```
+
+Your server will start at `http://127.0.0.1:3000` by default, serving a "Hello, world!" response at the root path.
+
+### Project Structure
+
+```
+my_app/
+├── Cargo.toml              # Dependencies and project metadata
+├── build.rs                # Asset copying build script
+├── src/
+│   ├── main.rs            # Application entry point
+│   └── resource.rs        # Resource locator helpers
+├── templates/             # Akari HTML templates
+└── programfiles/          # Static assets (CSS, JS, images)
+```
+
+The build script automatically copies `templates/` and `programfiles/` to the target directory during compilation, making them accessible to your application at runtime.
 
 ## 🎯 Core Concepts
 
@@ -123,7 +246,7 @@ endpoint! {
 
 ## 📚 Examples
 
-Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hotaru) for:
+Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hotaru-example) for:
 - Basic routing and handlers
 - Form processing and file uploads
 - Session management with cookies
@@ -141,6 +264,77 @@ Hotaru is built on a modular architecture:
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
 ## 📋 Changelog
+
+### Bug Fixes & Syntax Sugar added in 0.7.6
+
+##### [1] Now the worker() function for APP is now useful 
+
+The `.worker()` method now properly configures the number of worker threads for the application. Each App instance creates its own independent tokio runtime with the specified worker count when `run()` is called. This setting is independent of any outer runtime configuration.
+
+```rust
+#[tokio::main]
+async fn main() {
+    let app = App::new()
+        .worker(4)  // App runs with 4 dedicated worker threads
+        .binding("127.0.0.1:3000")
+        .build();
+    app.run().await;
+}
+``` 
+
+##### [2] LApp!, LUrl!, and LPattern! macros are available for simplified lazy static declarations 
+
+New convenience macros simplify creating lazy static instances with less boilerplate:
+
+```rust
+use hotaru::prelude::*;
+
+// Old way
+pub static APP: SApp = Lazy::new(|| {
+    App::new().build()
+});
+
+// New way with LApp! macro
+LApp!(APP = App::new().build());
+
+// Also works for URLs and patterns
+LUrl!(HOME_URL = Url::new("/home"));
+LPattern!(API_PATTERN = PathPattern::new("/api/*"));
+```
+
+The `L` prefix stands for "Lazy/Load" - these macros automatically wrap your expression in `Lazy::new(|| ...)` and create a public static with the appropriate type (`SApp`, `SUrl`, `SPattern`).
+
+**Benefits:**
+- Less boilerplate - no manual `Lazy::new(|| ...)` wrapper
+- Clear intent - `LApp!` immediately signals "lazy app instance"
+- Consistent pattern across all lazy static declarations
+- Educational - shows the assignment pattern while hiding ceremony
+
+##### [3] Bug Fixes in `hotaru new` and `hotaru init` commands
+
+Fixed template generation issues in the hotaru CLI tool:
+
+- **Fixed old macro usage**: The generated template now uses the correct `endpoint!` macro syntax instead of the old syntax `#[url]` attribute
+- **Updated to use LApp!**: Generated projects now use `LApp!(APP = App::new().build())` for cleaner initialization
+- **Improved template structure**: The hello world template now follows current best practices with proper imports and macro usage
+
+Generated projects now compile successfully out of the box without manual fixes.
+
+##### [4] Built-in constructor implementation in hotaru_meta
+
+Hotaru now includes its own implementation of the constructor pattern (similar to the `ctor` crate) to ensure projects compile without additional dependencies.
+
+**By default**, Hotaru uses a built-in constructor implementation that supports Linux, macOS, and Windows. This is production-ready and convenient for most use cases.
+
+**If you encounter any issues** or want the battle-tested `ctor` crate instead, you can switch to the external implementation:
+
+```toml
+[dependencies]
+hotaru = { version = "0.7.6", features = ["external-ctor"] }
+ctor = "0.4.0"  # Required when using external-ctor feature
+```
+
+The built-in implementation is provided for convenience and is production-ready for the supported platforms. However, if you experience any platform-specific issues, switching to the external `ctor` crate is recommended. 
 
 ### 0.7.x (Current)
 - Multi-protocol support (HTTP, WebSocket, custom TCP)
@@ -177,17 +371,8 @@ Hotaru is built on a modular architecture:
 - **GitHub**: https://github.com/Field-of-Dreams-Studio/hotaru
 - **Documentation**: https://docs.rs/hotaru
 
-## 📬 Get Involved
-
-- **GitHub Issues**: https://github.com/Field-of-Dreams-Studio/hotaru/issues 
-- **Discussions**: https://github.com/Field-of-Dreams-Studio/hotaru/discussions 
-- **Email**: redstone@fds.moe
-- **Discord Group**: https://discord.gg/Y6b9KRUCux 
-- **QQ Group**: 860691370  
-- **Join FDS**: https://forms.office.com/Pages/ResponsePage.aspx?id=DQSIkWdsW0yxEjajBLZtrQAAAAAAAAAAAAMAAC6BwJ5UQ0lQUzdMTjhGR1g3SElLTFdHQUlJV0hFMS4u 
-
 ## 📄 License
 
 GPL-3.0 License
 
-Copyright (c) 2025 @ Field of Dreams Studio
+Copyright (c) 2024 Redstone @ Field of Dreams Studio

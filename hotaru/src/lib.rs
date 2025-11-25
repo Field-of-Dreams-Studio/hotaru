@@ -47,6 +47,7 @@ pub use akari;
 
 pub use hotaru_meta::endpoint;
 pub use hotaru_meta::middleware;
+pub use hotaru_meta::{LApp, LUrl, LPattern};
 // Re-export all hotaru_meta items (including ctor when available)
 pub use hotaru_meta;
 

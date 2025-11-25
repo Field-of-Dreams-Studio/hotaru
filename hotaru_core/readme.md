@@ -1,7 +1,6 @@
 # hotaru_core
 
 [![Crates.io](https://img.shields.io/crates/v/hotaru_core)](https://crates.io/crates/hotaru_core)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Core framework for building multi-protocol web applications in Rust. Provides HTTP/HTTPS server implementation, URL routing, middleware system, and protocol abstraction layer.
 
@@ -40,7 +39,7 @@ For detailed documentation and examples, see the [Hotaru web framework](https://
 
 ## License
 
-MIT License
+GPL-3 License
 
 ## Part of Hotaru Framework
 

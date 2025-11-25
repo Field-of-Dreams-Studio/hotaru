@@ -1,16 +1,15 @@
 use core::panic;
 use std::any::TypeId;
-// use std::collections::HashMap; 
+// use std::collections::HashMap;
 use tokio::net::{TcpListener, TcpStream};
 
 // use starberry_lib::random_string;
 // use std::future::Future;
-// use std::pin::Pin; 
+// use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::{debug_log, debug_error, debug_warn};
-// use tokio::runtime::Runtime;
 
 use crate::url::{Url, PathPattern, dangling_url}; 
 use crate::app::protocol::{ProtocolHandlerBuilder, ProtocolRegistryBuilder};
@@ -43,8 +42,8 @@ pub struct App {
     pub binding_address: String,
     pub handler: ProtocolRegistryKind, // Changed from listener to binding_address
     pub mode: RunMode,
-    pub worker: usize, // Did not implemented
-    pub max_connection_time: usize, 
+    pub worker: usize, // Number of worker threads for the app's tokio runtime
+    pub max_connection_time: usize,
     pub max_frame_process_time: usize,
     pub config: Params,
     pub statics: Locals,
@@ -111,7 +110,13 @@ impl AppBuilder {
         self
     }
 
-    /// This function is currently useless 
+    /// Set the number of worker threads for the application's tokio runtime
+    ///
+    /// This controls how many threads the App's internal runtime will use for handling
+    /// async tasks and connections. The default is the number of CPU cores.
+    ///
+    /// Note: This setting is independent of any outer tokio runtime. When `run()` is called,
+    /// the App creates its own runtime with this many worker threads.
     pub fn worker(mut self, threads: usize) -> Self {
         self.worker = Some(threads);
         self
@@ -312,16 +317,54 @@ impl App {
         });
     }
 
-    /// Main loop listening for connections - now creates the TcpListener at runtime
-    pub async fn run(self: Arc<Self>) -> Result<(), std::io::Error> {
-        // let runtime = tokio::runtime::Builder::new_multi_thread()
-        // .worker_threads(self.worker)
-        // .enable_all()
-        // .build()
-        // .unwrap();
+    /// Run the application with its own dedicated tokio runtime
+    ///
+    /// This method creates a new multi-threaded tokio runtime with the number of worker threads
+    /// specified by the `worker` field (set via `AppBuilder::worker()`). Each App instance
+    /// runs with its own independent runtime and thread pool.
+    ///
+    /// Note: This can be called from within an async context. The worker thread configuration
+    /// of any outer runtime does not affect the App's internal worker thread count.
+    ///
+    /// Example:
+    /// ```no_run
+    /// use hotaru_core::app::App;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let app = App::new()
+    ///         .worker(4)  // App will use 4 worker threads
+    ///         .build();
+    ///     app.run().await;
+    /// }
+    /// ```
+    pub async fn run(self: Arc<Self>) {
+        let worker_count = self.worker;
+        let app = self.clone();
 
+        // Spawn a blocking task to create and run the runtime
+        // This allows the runtime to be created from within an async context
+        tokio::task::spawn_blocking(move || {
+            // Create a new multi-threaded runtime with the specified worker threads
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(worker_count)
+                .enable_all()
+                .build()
+                .expect("Failed to create tokio runtime");
+
+            // Run the actual server logic within this runtime
+            runtime.block_on(app.run_app_loop());
+        })
+        .await
+        .expect("Runtime task panicked");
+    }
+
+    /// Internal application loop - listens for and handles connections
+    async fn run_app_loop(self: Arc<Self>) {
         // Create TcpListener only when run() is called, within the tokio runtime
-        let listener = TcpListener::bind(&self.binding_address).await?;
+        // This function should directly panic because this is during the stage where APP is getting initialized
+        // This error is unwindable
+        let listener = TcpListener::bind(&self.binding_address).await.unwrap_or_else(|_| panic!("Failed to bind to address"));
 
         debug_log!(
             "Connection established on {}",
@@ -362,8 +405,7 @@ impl App {
         }
 
         tokio::time::sleep(Duration::from_secs(1)).await;
-        debug_log!("Server shutdown complete");
-        Ok(()) 
+        debug_log!("Server shutdown complete"); 
     }
 }
 

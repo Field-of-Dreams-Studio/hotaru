@@ -1,7 +1,6 @@
 # hotaru_meta
 
 [![Crates.io](https://img.shields.io/crates/v/hotaru_meta)](https://crates.io/crates/hotaru_meta)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Procedural macros for the Hotaru web framework, providing declarative syntax for endpoint and middleware definition.
 
@@ -50,7 +49,7 @@ This crate is automatically included when using the Hotaru framework. You typica
 
 ## License
 
-MIT License
+GPL-3.0 License
 
 ## Part of Hotaru Framework
 

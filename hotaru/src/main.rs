@@ -74,7 +74,7 @@ fn init_project() {
     println!("\n[package]");
     println!("build = \"build.rs\"");
     println!("\n[dependencies]");
-    println!("hotaru = \"0.7.0\"");
+    println!("hotaru = \"{VERSION}\"");
     println!("{}", DEPS);
 }
 
@@ -254,19 +254,22 @@ fn main() {
 }
 
 const MAIN_RS_CONTENT: &'static str = r#"use hotaru::prelude::*;
+use hotaru::http::*;
 
 #[tokio::main]
 async fn main() {
     APP.clone().run().await;
 }
 
-pub static APP: SApp = Lazy::new(|| {
-    App::new().build()
-});
+LApp!(APP = App::new().build());
 
-#[url(APP.lit_url("/"))] 
-async fn home_route() -> HttpResponse {
-    text_response("Hello, world!")
+endpoint!{
+    APP.url("/"),
+
+    /// Hello world function
+    pub hello_world <HTTP> {
+        text_response("Hello, world!")
+    }
 }
 "#;  
 
