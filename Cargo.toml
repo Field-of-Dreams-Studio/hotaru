@@ -14,9 +14,6 @@ members = [
     "example_hotaru",
     "hyper_hotaru_example",
     "hotaru_bench",
-    "hotaru_bench/hotaru_hello",
-    "hotaru_bench/actix_hello",
-    "hotaru_bench/h2per_hello",
     "hotaru_style_guide",
     "tutorial_examples" 
 ] 
