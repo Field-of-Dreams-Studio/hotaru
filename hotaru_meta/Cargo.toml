@@ -1,0 +1,25 @@
+[package]
+name = "hotaru_meta"
+version = "0.7.2"
+edition = "2024"
+authors = ["Redstone <redstone@fds.moe>"]
+description = "Core macros for Hotaru"
+license = "GPL-3.0"
+repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
+categories = ["network-programming", "web-programming::http-server" ]
+keywords = ["hotaru"]
+
+[dependencies]
+ctor = { version = "0.4.0", optional = true }
+hotaru_lib = { version = "0.7.3", path = "../hotaru_lib" }
+
+[dev-dependencies]
+trybuild = { version = "1.0.49", features = ["diff"] }
+
+[features]
+default = []
+# Use external ctor crate instead of built-in constructor implementation
+external-ctor = ["ctor"]
+
+[lib]
+proc-macro = true

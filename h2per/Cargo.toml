@@ -1,0 +1,52 @@
+[package]
+name = "h2per"
+version = "0.7.0" 
+edition = "2024"
+authors = ["Redstone <redstone@fds.moe>"] 
+description = "Hyper integration for Hotaru" 
+license = "GPL-3.0" 
+repository = "https://github.com/Field-of-Dreams-Studio/hotaru" 
+homepage = "https://fds.rs" 
+categories = ["network-programming", "web-programming::http-server" ]
+keywords = ["hotaru", "hyper"] 
+readme = "readme.md" 
+
+[dependencies] 
+hotaru_meta = { path = "../hotaru_meta", version="0.7.1"} 
+hotaru_core = { path = "../hotaru_core", version="0.7.5" }
+hotaru_lib = { path = "../hotaru_lib", version="0.7.3", features = ["url_encoding", "compression"]  }
+
+# Hyper and HTTP protocol support
+hyper = { version = "1.6.0", features = ["full", "http1", "http2", "server", "client"] }
+hyper-util = { version = "0.1", features = ["full"] }
+# HTTP/3 dependencies commented out due to compatibility issues
+# h3 = { version = "0.0.6" }  # HTTP/3 support
+# h3-quinn = { version = "0.0.7" }  # QUIC transport for HTTP/3
+# quinn = { version = "0.11" }
+
+# Core dependencies
+tokio = { version = "1.28", features = ["full"] }
+akari = { version = "0.2.6", features = ["full"] }  # Keep for template rendering, Params and Locals
+async-trait = "0.1.89"
+bytes = "1.5"
+http = "1.1"
+http-body = "1.0"
+http-body-util = "0.1"
+tower = { version = "0.5", features = ["util"] }
+tower-service = "0.3"
+pin-project-lite = "0.2"
+futures-util = "0.3"
+tracing = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_urlencoded = "0.7"
+urlencoding = "2.1"
+base64 = "0.22"
+sha1 = "0.10"
+tokio-tungstenite = "0.24"
+tungstenite = "0.24"
+once_cell = "1.19"
+
+[dev-dependencies]
+tokio-test = "0.4"
+

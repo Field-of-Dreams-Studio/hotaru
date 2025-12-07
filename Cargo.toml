@@ -1,0 +1,20 @@
+[workspace]
+members = [
+    "hotaru",
+    "hotaru_meta",
+    "htmstd",
+    "hotaru_core",
+    "hotaru_lib",
+
+    "h2per",
+    "ahttpm",
+    "hotaru_grpc",
+
+    "multi_protocol_example",
+    "example_hotaru",
+    "hyper_hotaru_example",
+    "hotaru_bench",
+    "hotaru_style_guide",
+    "tutorial_examples" 
+] 
+resolver = "3" 

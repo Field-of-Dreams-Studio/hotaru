@@ -1,0 +1,19 @@
+[package]
+name = "ahttpm"
+version = "0.7.0" 
+edition = "2024"
+authors = ["Redstone <redstone@fds.moe>"] 
+description = "Macro crate for starberry" 
+license = "GPL-3.0" 
+repository = "https://github.com/Field-of-Dreams-Studio/hotaru" 
+categories = ["network-programming", "web-programming::http-server" ] 
+keywords = ["starberry"]   
+
+[dependencies] 
+syn = { version = "2.0", features = ["full"] } 
+proc-macro2 = "1.0.89" 
+ctor = "0.4.0" 
+quote = "1.0" 
+
+[lib]
+proc-macro = true 
