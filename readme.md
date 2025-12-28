@@ -362,20 +362,25 @@ The built-in implementation is provided for convenience and is production-ready 
 - File upload handling
 - Form data processing improvements
 
-## 🔮 Roadmap
+## 🔮 Schedule 
 
-- WebSocket support improvements
-- HTTP/2 protocol implementation
-- GraphQL integration
-- Advanced caching strategies
-- Performance benchmarking suite
+| Version No. | Content | Release Date (Approx.) | 
+| --- | --- | --- | 
+| 0.8.0 | HTTP Outbound | Jan.2026 | 
+| 0.8.3 | Using new template engine | Jan.2026 | 
+| 0.8.9 | Bug Fixes | May.2026 | 
 
 ## 📚 Learn More
 
 - **Akari Template Engine**: https://crates.io/crates/akari
-- **Homepage**: https://fds.rs
+- **Homepage**: https://hotaru.rs 
+- **Documentation Home Page**: https://fds.rs
 - **GitHub**: https://github.com/Field-of-Dreams-Studio/hotaru
-- **Documentation**: https://docs.rs/hotaru
+- **Documentation**: https://docs.rs/hotaru 
+
+| Video Resources | URL | 
+| --- | --- | 
+| Quick Tutorial | Youtube: https://www.youtube.com/watch?v=8pV-o04GuKk&t=6s <br> Bilibili: https://www.bilibili.com/video/BV1BamFB7E8n/ | 
 
 ## 🤖 AI Declaration of each Mod
 
