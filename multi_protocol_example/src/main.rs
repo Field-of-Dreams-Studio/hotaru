@@ -1,4 +1,5 @@
-use hotaru::{hotaru_core::{app, http::traits::HTTP}, prelude::*};
+use hotaru::prelude::*;
+use hotaru::http::*;
 use htmstd::Cors; 
 
 pub static APP: SApp = Lazy::new(|| App::new().binding("127.0.0.1:3031").build());
@@ -49,7 +50,7 @@ endpoint! {
     middleware = [Print],
     config = [HttpSafety::default()], 
 
-    pub pattern <Http1Protocol> {
+    pub pattern <HTTP> {
         let id = req.pattern("id").unwrap();
         let app_name = req.pattern("app_name").unwrap();
         json_response(object!({
@@ -62,13 +63,13 @@ endpoint! {
 endpoint! {
     APP.url("/anno"), 
     
-    _ <Http1Protocol> {
+    _ <HTTP> {
         text_response("Hello From Hotaru 0.7!")
     }
 }
 
 middleware! {
-    pub Print <Http1Protocol> {
+    pub Print <HTTP> {
         println!("Request received");
         next(req).await
     }

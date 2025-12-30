@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use hotaru_core::connection::{
     Protocol, Transport, Stream, Message,
     RequestContext, ProtocolRole,
-    TcpConnectionStream,
+    TcpConnectionStream, TcpReader, TcpWriter,
 };
 use hotaru_core::app::application::App;
 
@@ -215,14 +215,10 @@ impl Protocol for TcpChat {
     
     async fn handle(
         &mut self,
-        reader: tokio::io::BufReader<tokio::io::ReadHalf<TcpConnectionStream>>,
-        writer: tokio::io::BufWriter<tokio::io::WriteHalf<TcpConnectionStream>>,
+        mut reader: TcpReader,
+        mut writer: TcpWriter,
         _app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let stream = TcpConnectionStream::from_parts(reader.into_inner(), writer.into_inner());
-        let (read_half, write_half) = stream.split();
-        let mut reader = tokio::io::BufReader::new(read_half);
-        let mut writer = tokio::io::BufWriter::new(write_half);
         
         // Send welcome
         let welcome = "Welcome to TCP Chat! Commands: JOIN <name>, MSG <message>, LIST, HISTORY, LEAVE\n";

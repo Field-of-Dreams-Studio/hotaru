@@ -1,17 +1,17 @@
 use std::fmt::Write;
 
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, BufWriter};
+use tokio::io::{AsyncBufRead, AsyncWrite, AsyncWriteExt};
 
-use crate::connection::error::ConnectionError; 
+use crate::connection::error::ConnectionError;
 
-use super::meta::HttpMeta; 
-use super::body::HttpBody; 
-use super::safety::HttpSafety; 
+use super::meta::HttpMeta;
+use super::body::HttpBody;
+use super::safety::HttpSafety;
 
-pub async fn parse_lazy<R: AsyncRead + Unpin>(
-    stream: &mut BufReader<R>, 
-    config: &HttpSafety, 
-    is_request: bool, 
+pub async fn parse_lazy<R: AsyncBufRead + Unpin>(
+    stream: &mut R,
+    config: &HttpSafety,
+    is_request: bool,
     print_raw: bool
 ) -> Result<(HttpMeta, HttpBody), ConnectionError> { 
 
@@ -32,7 +32,7 @@ pub async fn parse_lazy<R: AsyncRead + Unpin>(
     Ok((meta, body)) 
 } 
 
-pub async fn send<W: AsyncWrite +  Unpin>(mut meta: HttpMeta, body: HttpBody, writer: &mut BufWriter<W>) -> std::io::Result<()> {
+pub async fn send<W: AsyncWrite + Unpin>(mut meta: HttpMeta, body: HttpBody, writer: &mut W) -> std::io::Result<()> {
     let mut headers = String::with_capacity(256); 
 
     // Add the values such as content length into header 

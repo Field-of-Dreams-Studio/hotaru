@@ -11,10 +11,10 @@ use std::time::Duration;
 
 use crate::{debug_log, debug_error, debug_warn};
 
-use crate::url::{Url, PathPattern, dangling_url}; 
+use crate::url::{Url, dangling_url}; 
 use crate::app::protocol::{ProtocolHandlerBuilder, ProtocolRegistryBuilder};
 use crate::connection::TcpConnectionStream;
-use crate::connection::{Protocol, RequestContext};
+use crate::connection::Protocol;
 
 use crate::extensions::{Params, Locals}; 
 use crate::http::context::HttpReqCtx;

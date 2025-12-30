@@ -7,14 +7,13 @@ use std::error::Error;
 use std::any::Any;
 use std::path::Path;
 use async_trait::async_trait;
-use tokio::io::{BufReader, BufWriter, ReadHalf, WriteHalf};
 use tokio_tungstenite::{WebSocketStream, tungstenite};
 use tungstenite::protocol::Message as WsMessage;
 use futures_util::{StreamExt, SinkExt};
 
 use hotaru_core::{
     app::application::App,
-    connection::{Protocol, ProtocolRole, TcpConnectionStream, Message, Transport},
+    connection::{Protocol, ProtocolRole, TcpReader, TcpWriter, Message, Transport},
 };
 
 use crate::context::HyperContext;
@@ -224,25 +223,21 @@ impl Protocol for WebSocketProtocol {
     
     async fn handle(
         &mut self,
-        reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        _reader: TcpReader,
+        _writer: TcpWriter,
         _app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        println!("🔌 WebSocket protocol handler started!");
-        
-        // Reunite the reader and writer into a single stream
-        let stream = reader.into_inner().unsplit(writer.into_inner());
-        
-        // Create WebSocket stream from the TCP connection
-        // Note: This assumes the upgrade handshake has already been completed
-        let ws_stream = WebSocketStream::from_raw_socket(
-            stream,
-            tungstenite::protocol::Role::Server,
-            None,
-        ).await;
-        
-        // Handle WebSocket messages
-        self.handle_websocket(ws_stream).await
+        // WebSocket connections are typically handled through HTTP upgrade,
+        // not directly through the Protocol::handle method.
+        // Use handle_websocket_upgrade() after an HTTP upgrade instead.
+        //
+        // The TcpReader/TcpWriter types don't expose the raw stream needed
+        // for WebSocket framing. For direct WebSocket handling, the upgrade
+        // path via Hyper's Upgraded type should be used.
+        unimplemented!(
+            "WebSocket should be handled via HTTP upgrade path. \
+             Use handle_websocket_upgrade() after upgrading from HTTP/1.1"
+        )
     }
 }
 

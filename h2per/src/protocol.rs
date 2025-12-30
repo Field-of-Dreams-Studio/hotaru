@@ -10,10 +10,9 @@ use hotaru_core::{
     app::application::App,
     connection::{
         Protocol, Transport, Stream, Message,
-        ProtocolRole, TcpConnectionStream,
+        ProtocolRole, TcpReader, TcpWriter,
     },
 };
-use tokio::io::{BufReader, BufWriter, ReadHalf, WriteHalf};
 
 use crate::transport::{HyperTransport, Http2Transport, Http3Transport};
 use crate::stream::{Http2Stream, Http3Stream};
@@ -70,16 +69,15 @@ impl Protocol for HyperHttp1 {
     
     async fn handle(
         &mut self,
-        reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        reader: TcpReader,
+        writer: TcpWriter,
         app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self.role {
             ProtocolRole::Server => {
-                // Use buffered readers directly to preserve peeked data
-                // Wrap for hyper compatibility while preserving buffered data
+                // Wrap TcpReader/TcpWriter for hyper compatibility
                 let io = TokioIo::new(HyperIoCompat::new_buffered(reader, writer));
-                
+
                 // Create the service that will handle HTTP requests
                 let service = HotaruService::<HyperHttp1>::new(app, self.role);
                 
@@ -150,16 +148,15 @@ impl Protocol for HyperHttp2 {
     
     async fn handle(
         &mut self,
-        reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        reader: TcpReader,
+        writer: TcpWriter,
         app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self.role {
             ProtocolRole::Server => {
-                // Use buffered readers directly to preserve peeked data
-                // Wrap for hyper compatibility while preserving buffered data
+                // Wrap TcpReader/TcpWriter for hyper compatibility
                 let io = TokioIo::new(HyperIoCompat::new_buffered(reader, writer));
-                
+
                 // Create the service that will handle HTTP/2 requests
                 let service = HotaruService::<HyperHttp2>::new(app, self.role);
                 
@@ -235,8 +232,8 @@ impl Protocol for HyperHttp3 {
     
     async fn handle(
         &mut self,
-        _reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        _writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        _reader: TcpReader,
+        _writer: TcpWriter,
         _app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         // TODO: Implement HTTP/3 with QUIC transport

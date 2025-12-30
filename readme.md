@@ -30,6 +30,7 @@ MSRV: 1.86
 - **Middleware Support**: Create reusable request processing chains
 - **Multi-Protocol Support**: Handle HTTP/HTTPS, WebSocket, and custom TCP protocols
 - **Security**: Built-in request validation, size limits, and safety controls
+- **Client Information**: Access client IP addresses and connection details directly from handlers
 
 ## 🚀 Quick Start
 
@@ -250,6 +251,37 @@ endpoint! {
 }
 ```
 
+### Client Information
+
+Access client IP addresses and connection details directly from your handlers:
+
+```rust
+endpoint! {
+    APP.url("/api/whoami"),
+    pub whoami<HTTP> {
+        // Get client's full socket address (IP + port)
+        match req.client_ip() {
+            Some(addr) => text_response(format!("Your address: {}", addr)),
+            None => text_response("Unknown client"),
+        }
+    }
+}
+```
+
+**Available Methods:**
+
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `client_ip()` | `Option<SocketAddr>` | Client's socket address (IP + port) |
+| `client_ip_or_default()` | `SocketAddr` | Returns `0.0.0.0:0` if unknown |
+| `client_ip_only()` | `Option<IpAddr>` | Just the IP address, no port |
+| `client_ip_only_or_default()` | `IpAddr` | Returns `0.0.0.0` if unknown |
+| `server_addr()` | `Option<SocketAddr>` | Server's bound address |
+| `remote_addr()` | `Option<SocketAddr>` | Alias for `client_ip()` |
+| `local_addr()` | `Option<SocketAddr>` | Alias for `server_addr()` |
+
+**Note**: When behind a reverse proxy, `client_ip()` returns the proxy's address. Use headers like `X-Forwarded-For` or `X-Real-IP` to get the original client IP.
+
 ## 📚 Examples
 
 Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hotaru-example) for:
@@ -269,78 +301,7 @@ Hotaru is built on a modular architecture:
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
-## 📋 Changelog
-
-### Bug Fixes & Syntax Sugar added in 0.7.6
-
-##### [1] Now the worker() function for APP is now useful 
-
-The `.worker()` method now properly configures the number of worker threads for the application. Each App instance creates its own independent tokio runtime with the specified worker count when `run()` is called. This setting is independent of any outer runtime configuration.
-
-```rust
-#[tokio::main]
-async fn main() {
-    let app = App::new()
-        .worker(4)  // App runs with 4 dedicated worker threads
-        .binding("127.0.0.1:3000")
-        .build();
-    app.run().await;
-}
-``` 
-
-##### [2] LApp!, LUrl!, and LPattern! macros are available for simplified lazy static declarations 
-
-New convenience macros simplify creating lazy static instances with less boilerplate:
-
-```rust
-use hotaru::prelude::*;
-
-// Old way
-pub static APP: SApp = Lazy::new(|| {
-    App::new().build()
-});
-
-// New way with LApp! macro
-LApp!(APP = App::new().build());
-
-// Also works for URLs and patterns
-LUrl!(HOME_URL = Url::new("/home"));
-LPattern!(API_PATTERN = PathPattern::new("/api/*"));
-```
-
-The `L` prefix stands for "Lazy/Load" - these macros automatically wrap your expression in `Lazy::new(|| ...)` and create a public static with the appropriate type (`SApp`, `SUrl`, `SPattern`).
-
-**Benefits:**
-- Less boilerplate - no manual `Lazy::new(|| ...)` wrapper
-- Clear intent - `LApp!` immediately signals "lazy app instance"
-- Consistent pattern across all lazy static declarations
-- Educational - shows the assignment pattern while hiding ceremony
-
-##### [3] Bug Fixes in `hotaru new` and `hotaru init` commands
-
-Fixed template generation issues in the hotaru CLI tool:
-
-- **Fixed old macro usage**: The generated template now uses the correct `endpoint!` macro syntax instead of the old syntax `#[url]` attribute
-- **Updated to use LApp!**: Generated projects now use `LApp!(APP = App::new().build())` for cleaner initialization
-- **Improved template structure**: The hello world template now follows current best practices with proper imports and macro usage
-
-Generated projects now compile successfully out of the box without manual fixes.
-
-##### [4] Built-in constructor implementation in hotaru_meta
-
-Hotaru now includes its own implementation of the constructor pattern (similar to the `ctor` crate) to ensure projects compile without additional dependencies.
-
-**By default**, Hotaru uses a built-in constructor implementation that supports Linux, macOS, and Windows. This is production-ready and convenient for most use cases.
-
-**If you encounter any issues** or want the battle-tested `ctor` crate instead, you can switch to the external implementation:
-
-```toml
-[dependencies]
-hotaru = { version = "0.7.6", features = ["external-ctor"] }
-ctor = "0.4.0"  # Required when using external-ctor feature
-```
-
-The built-in implementation is provided for convenience and is production-ready for the supported platforms. However, if you experience any platform-specific issues, switching to the external `ctor` crate is recommended. 
+## 📋 Changelog 
 
 ### 0.7.x (Current)
 - Multi-protocol support (HTTP, WebSocket, custom TCP)
@@ -348,6 +309,11 @@ The built-in implementation is provided for convenience and is production-ready 
 - Improved middleware system with protocol inheritance
 - Performance optimizations in URL routing
 - Comprehensive security testing
+- `.worker()` method now properly configures dedicated worker threads per App instance
+- New `LApp!`, `LUrl!`, `LPattern!` macros for simplified lazy static declarations
+- Fixed `hotaru new` and `hotaru init` to generate correct `endpoint!` macro syntax
+- Built-in constructor implementation (no external `ctor` dependency required) 
+- **Client IP access**: `ctx.client_ip()` and related methods for accessing socket addresses in handlers
 
 ### 0.6.x
 - Protocol abstraction layer

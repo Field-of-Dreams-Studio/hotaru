@@ -2,7 +2,7 @@ use super::application::App;
 use crate::{
     app::middleware::{AsyncMiddleware, AsyncMiddlewareChain},
     connection::{
-        Protocol, ProtocolRole, TcpConnectionStream,
+        Protocol, ProtocolRole, TcpConnectionStream, TcpReader, TcpWriter, split_connection,
     },
     debug_log, debug_error,
     extensions::ParamsClone,
@@ -15,7 +15,7 @@ use std::{
     pin::Pin,
     sync::{Arc, RwLock},
 };
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter, ReadHalf, WriteHalf};
+use tokio::io::AsyncBufReadExt;
 
 /// Concrete handler for a specific protocol
 struct ProtocolHandler<P: Protocol + Clone> {
@@ -42,16 +42,16 @@ pub trait ProtocolHandlerTrait: Send + Sync {
     fn handle(
         &self,
         app: Arc<App>,
-        reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        reader: TcpReader,
+        writer: TcpWriter,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
 
     /// Handle an upgrade from another protocol
     fn handle_upgrade(
         &self,
         app: Arc<App>,
-        reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        reader: TcpReader,
+        writer: TcpWriter,
         params: RwLock<Params>,
         locals: RwLock<Locals>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
@@ -72,11 +72,11 @@ impl<P: Protocol + Clone + 'static> ProtocolHandlerTrait for ProtocolHandler<P> 
     fn handle(
         &self,
         app: Arc<App>,
-        reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        reader: TcpReader,
+        writer: TcpWriter,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
         let mut protocol = self.protocol.clone();
-        
+
         Box::pin(async move {
             // Pass buffered readers directly to preserve peeked data
             if let Err(e) = protocol.handle(reader, writer, app).await {
@@ -88,8 +88,8 @@ impl<P: Protocol + Clone + 'static> ProtocolHandlerTrait for ProtocolHandler<P> 
     fn handle_upgrade(
         &self,
         app: Arc<App>,
-        reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        reader: TcpReader,
+        writer: TcpWriter,
         _params: RwLock<Params>,
         _locals: RwLock<Locals>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
@@ -137,14 +137,12 @@ impl ProtocolRegistry {
 
     /// Run protocol detection and handling
     pub async fn run_multi(&self, app: Arc<App>, conn: TcpConnectionStream) {
-        let (read_half, write_half) = conn.split();
-        let mut reader = BufReader::new(read_half);
-        let mut writer = BufWriter::new(write_half);
+        let (mut reader, mut writer) = split_connection(conn);
 
         // Peek at initial bytes
         let buf = reader.fill_buf().await.unwrap_or(&[]);
         let n = buf.len();
-        
+
         debug_log!("Protocol detection: {} bytes: {:?}", n, String::from_utf8_lossy(&buf[..n.min(50)]));
 
         // Find matching protocol
@@ -156,7 +154,7 @@ impl ProtocolRegistry {
                 return;
             }
         }
-        
+
         debug_log!("No protocol matched!");
 
         // No protocol matched
@@ -261,9 +259,7 @@ impl ProtocolRegistryKind {
     pub async fn run(&self, app: Arc<App>, conn: TcpConnectionStream) {
         match self {
             ProtocolRegistryKind::Single(handler) => {
-                let (read_half, write_half) = conn.split();
-                let reader = BufReader::new(read_half);
-                let writer = BufWriter::new(write_half);
+                let (reader, writer) = split_connection(conn);
                 handler.handle(app, reader, writer).await;
             }
             ProtocolRegistryKind::Multi(registry) => {

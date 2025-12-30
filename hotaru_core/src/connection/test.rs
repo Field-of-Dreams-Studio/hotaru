@@ -32,7 +32,7 @@ async fn test_https_connection() {
 /// TCP Echo Protocol test - demonstrates custom Protocol implementation
 #[cfg(test)]
 mod tcp_echo_tests {
-    use crate::connection::{Protocol, Transport, Stream, Message, RequestContext, ProtocolRole, TcpConnectionStream};
+    use crate::connection::{Protocol, Transport, Stream, Message, RequestContext, ProtocolRole, TcpConnectionStream, TcpReader, TcpWriter};
     use crate::app::application::App;
     use std::error::Error;
     use async_trait::async_trait;
@@ -239,20 +239,12 @@ mod tcp_echo_tests {
 
         async fn handle(
             &mut self,
-            reader: tokio::io::BufReader<tokio::io::ReadHalf<TcpConnectionStream>>,
-            writer: tokio::io::BufWriter<tokio::io::WriteHalf<TcpConnectionStream>>,
+            mut reader: TcpReader,
+            mut writer: TcpWriter,
             _app: Arc<App>,
         ) -> Result<(), Box<dyn Error + Send + Sync>> {
-
-            // Reconstruct the stream from the buffered readers
-            let stream = TcpConnectionStream::from_parts(reader.into_inner(), writer.into_inner());
-
             match self.role {
                 ProtocolRole::Server => {
-                    let (read_half, write_half) = stream.split();
-                    let mut reader = tokio::io::BufReader::new(read_half);
-                    let mut writer = tokio::io::BufWriter::new(write_half);
-
                     let mut buffer = [0u8; 1024];
 
                     loop {
@@ -400,9 +392,7 @@ mod tcp_echo_tests {
             let app = App::new().build();
 
             let tcp_stream = TcpConnectionStream::Tcp(stream);
-            let (read_half, write_half) = tcp_stream.split();
-            let reader = tokio::io::BufReader::new(read_half);
-            let writer = tokio::io::BufWriter::new(write_half);
+            let (reader, writer) = crate::connection::split_connection(tcp_stream);
 
             let _ = protocol.handle(reader, writer, app).await;
         });

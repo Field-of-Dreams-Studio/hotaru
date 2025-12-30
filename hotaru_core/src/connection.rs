@@ -8,7 +8,7 @@ pub mod test;
 pub use self::builder::ConnectionBuilder;  
 // TODO: Rename builder::Protocol to ConnectionProtocol or ClientProtocol
 // pub use self::builder::Protocol; 
-pub use self::stream::TcpConnectionStream; 
+pub use self::stream::{TcpConnectionStream, TcpReader, TcpWriter, split_connection};
 pub use self::error::Result; 
 
 // New protocol traits

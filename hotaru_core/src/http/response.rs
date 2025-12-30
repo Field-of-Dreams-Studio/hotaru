@@ -8,7 +8,7 @@ use super::meta::HttpMeta;
 use super::net;
 use super::start_line::{HttpStartLine, ResponseStartLine};
 use std::collections::HashMap;
-use tokio::io::{AsyncRead, AsyncWrite, BufReader, BufWriter};
+use tokio::io::{AsyncBufRead, AsyncWrite};
 
 #[derive(Debug, Clone)]
 pub struct HttpResponse {
@@ -21,8 +21,8 @@ impl HttpResponse {
         Self { meta, body }
     }
 
-    pub async fn parse_lazy<R: AsyncRead + Unpin>(
-        stream: &mut BufReader<R>,
+    pub async fn parse_lazy<R: AsyncBufRead + Unpin>(
+        stream: &mut R,
         config: &HttpSafety,
         print_raw: bool,
     ) -> Self {
@@ -79,7 +79,7 @@ impl HttpResponse {
     /// When this method is changed, please also check Request::send()
     pub async fn send<W: AsyncWrite + Unpin>(
         self,
-        writer: &mut BufWriter<W>,
+        writer: &mut W,
     ) -> std::io::Result<()> {
         net::send(self.meta, self.body, writer).await
     }

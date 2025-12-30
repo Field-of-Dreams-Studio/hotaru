@@ -7,7 +7,7 @@ use super::cookie::{Cookie, CookieMap};
 use super::http_value::*; 
 use super::start_line::HttpStartLine; 
 use std::collections::{HashMap, HashSet}; 
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader}; 
+use tokio::io::{AsyncBufRead, AsyncBufReadExt}; 
 use std::str; 
 
 /// RequestHeader is a struct that represents the headers of an HTTP request. 
@@ -542,8 +542,8 @@ impl HttpMeta {
         }
     } 
 
-    pub async fn from_stream<R: AsyncRead + Unpin>(
-        buf_reader: &mut BufReader<R>,
+    pub async fn from_stream<R: AsyncBufRead + Unpin>(
+        buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,
         is_request: bool,
@@ -575,22 +575,24 @@ impl HttpMeta {
         Ok(HttpMeta::new(start_line, header))
     } 
 
-    async fn header_lines_raw_from_stream<R: AsyncRead + Unpin>(
-        buf_reader: &mut BufReader<R>,
+    async fn header_lines_raw_from_stream<R: AsyncBufRead + Unpin>(
+        buf_reader: &mut R,
         config: &HttpSafety,
-        print_raw: bool, 
+        print_raw: bool,
     ) -> Result<Vec<String>, ConnectionError> { 
         let mut headers = Vec::new();
         let mut total_header_size = 0;
-        
+
         // Try to fill the buffer with a single read first
-        buf_reader.fill_buf().await.map_err(|_| ConnectionError::InternalServerError(
+        let buffer = buf_reader.fill_buf().await.map_err(|_| ConnectionError::InternalServerError(
             format!("Failed to fill buffer")
         ))?;
 
         // Fast path: Check if we got all headers in one go
-        let buffer = buf_reader.buffer();
-        if let Some((header_lines, headers_end)) = Self::extract_headers_from_buffer(buffer, config) {
+        // Extract result first, then drop buffer borrow before calling consume
+        let fast_path_result = Self::extract_headers_from_buffer(buffer, config);
+
+        if let Some((header_lines, headers_end)) = fast_path_result {
             // We found the complete headers in the buffer
             if print_raw {
                 println!("Fast path: got all headers in single read");
@@ -730,19 +732,19 @@ impl HttpMeta {
     }
     
     // Expose the specific methods that call the shared implementation
-    pub async fn from_request_stream<R: AsyncRead + Unpin>(
-        buf_reader: &mut BufReader<R>,
-        config: &HttpSafety, 
-        print_raw: bool, 
+    pub async fn from_request_stream<R: AsyncBufRead + Unpin>(
+        buf_reader: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
     ) -> Result<HttpMeta, ConnectionError> {
-        Self::from_stream(buf_reader, config, print_raw, true).await 
+        Self::from_stream(buf_reader, config, print_raw, true).await
     } 
 
-    pub async fn append_from_request_stream<R: AsyncRead + Unpin>( 
-        &mut self, 
-        buf_reader: &mut BufReader<R>,
-        config: &HttpSafety, 
-        print_raw: bool, 
+    pub async fn append_from_request_stream<R: AsyncBufRead + Unpin>(
+        &mut self,
+        buf_reader: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
     ) -> Result<(), ConnectionError> {
         let mut headers = Self::header_lines_raw_from_stream(buf_reader, config, print_raw).await?;
         
@@ -767,12 +769,12 @@ impl HttpMeta {
         Ok(()) 
     } 
     
-    pub async fn from_response_stream<R: AsyncRead + Unpin>(
-        buf_reader: &mut BufReader<R>,
-        config: &HttpSafety, 
-        print_raw: bool, 
+    pub async fn from_response_stream<R: AsyncBufRead + Unpin>(
+        buf_reader: &mut R,
+        config: &HttpSafety,
+        print_raw: bool,
     ) -> Result<HttpMeta, ConnectionError> {
-        Self::from_stream(buf_reader, config, print_raw, false).await 
+        Self::from_stream(buf_reader, config, print_raw, false).await
     }  
     
     /// Helper function to extract complete headers from a buffer if possible

@@ -4,10 +4,9 @@ use crate::http::safety::HttpSafety;
 use super::{http_value::*, net}; 
 use super::body::HttpBody;
 use super::meta::HttpMeta;
-use super::start_line::{HttpStartLine};
-use super::form::UrlEncodedForm;
+use super::start_line::{HttpStartLine}; 
 use std::collections::HashMap;  
-use tokio::io::{AsyncRead, AsyncWrite, BufReader, BufWriter}; 
+use tokio::io::{AsyncBufRead, AsyncWrite}; 
 
 /// Represents an HTTP request with metadata and body.
 /// 
@@ -28,10 +27,10 @@ impl HttpRequest {
         &self.meta 
     } 
 
-    /// Parses the HTTP request from a stream, returning an `HttpRequest` instance. 
-    /// The stream is expected to be a `BufReader` wrapping a `TcpStream`. 
-    /// Body will not be parsed 
-    pub async fn parse_lazy<R: AsyncRead + Unpin>(stream: &mut BufReader<R>, config: &HttpSafety, print_raw: bool) -> Self {
+    /// Parses the HTTP request from a stream, returning an `HttpRequest` instance.
+    /// The stream should implement AsyncBufRead (e.g., BufReader or TcpReader).
+    /// Body will not be parsed.
+    pub async fn parse_lazy<R: AsyncBufRead + Unpin>(stream: &mut R, config: &HttpSafety, print_raw: bool) -> Self {
         match net::parse_lazy(stream, config, true, print_raw).await { 
             Ok((meta, body)) => Self::new(meta, body), 
             Err(_) => Self::default() 
@@ -68,8 +67,8 @@ impl HttpRequest {
         self 
     } 
     
-    pub async fn send<W: AsyncWrite + Unpin>(self, writer: &mut BufWriter<W>) -> std::io::Result<()> { 
-        net::send(self.meta, self.body, writer).await 
+    pub async fn send<W: AsyncWrite + Unpin>(self, writer: &mut W) -> std::io::Result<()> {
+        net::send(self.meta, self.body, writer).await
     } 
 }
 

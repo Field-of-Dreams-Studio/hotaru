@@ -22,6 +22,7 @@ middleware! {
 pub static APP: SApp = Lazy::new(|| {
     App::new()
         .binding("127.0.0.1:3003")
+        .set_config("This is a String Config")
         .single_protocol(
             ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
                 .append_middleware::<GlobalLogger>()
@@ -140,3 +141,4 @@ endpoint! {
         }))
     }
 }
+mod resource;

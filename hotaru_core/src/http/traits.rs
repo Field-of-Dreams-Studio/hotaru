@@ -3,12 +3,11 @@
 //! This replaces the old Rx/Tx based implementation with the new
 //! unified protocol system.
 
-use std::any::Any;
+use std::{any::Any, net::SocketAddr};
 use std::sync::Arc;
 use std::error::Error;
 use bytes::BytesMut;
 use async_trait::async_trait;
-use tokio::io::{AsyncWriteExt, BufReader, BufWriter, ReadHalf, WriteHalf};
 use futures::executor::block_on;
 
 use crate::{
@@ -16,20 +15,19 @@ use crate::{
     connection::{
         Protocol,
         Transport,
-        Stream,
+        // Stream,
         Message,
-        RequestContext,
+        // RequestContext,
         ProtocolRole,
-        TcpConnectionStream,
+        TcpReader,
+        TcpWriter,
     },
     http::{
         request::HttpRequest,
         response::HttpResponse,
         safety::HttpSafety,
-        context::HttpContext,
-        http_value::StatusCode,
-    },
-    url::Url,
+        context::HttpContext, 
+    } 
 };
 
 // ============================================================================
@@ -58,7 +56,13 @@ pub struct HttpTransport {
     id: i128,
     
     /// Whether this connection supports keep-alive
-    pub keep_alive: bool,
+    pub keep_alive: bool, 
+
+    /// Local address of the connection 
+    pub local_addr: SocketAddr, 
+
+    /// Remote address of the connection 
+    pub remote_addr: SocketAddr, 
     
     /// Number of requests processed on this connection
     pub request_count: u64,
@@ -70,15 +74,39 @@ pub struct HttpTransport {
     pub role: ProtocolRole,
 }
 
+/// Placeholder address for uninitialized connections.
+const UNSET_ADDR: SocketAddr = SocketAddr::new(
+    std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
+    0,
+);
+
 impl HttpTransport {
-    /// Creates a new HTTP/1.1 transport.
-    pub fn new(role: ProtocolRole, safety: HttpSafety) -> Self {
+    /// Creates a new HTTP/1.1 transport with socket addresses.
+    pub fn new(role: ProtocolRole, safety: HttpSafety, local_addr: SocketAddr, remote_addr: SocketAddr) -> Self {
         Self {
             id: generate_connection_id(),
             keep_alive: true,
+            local_addr,
+            remote_addr,
             request_count: 0,
             safety,
             role,
+        }
+    }
+
+    /// Creates a new HTTP/1.1 transport without socket addresses.
+    /// Addresses should be set via set_addresses() when available.
+    pub fn new_unbound(role: ProtocolRole, safety: HttpSafety) -> Self {
+        Self::new(role, safety, UNSET_ADDR, UNSET_ADDR)
+    }
+
+    /// Sets the socket addresses from connection metadata.
+    pub fn set_addresses(&mut self, local: Option<SocketAddr>, remote: Option<SocketAddr>) {
+        if let Some(addr) = local {
+            self.local_addr = addr;
+        }
+        if let Some(addr) = remote {
+            self.remote_addr = addr;
         }
     }
     
@@ -203,15 +231,15 @@ impl Http1Protocol {
     /// Creates a new HTTP/1.1 protocol handler for server role.
     pub fn server(safety: HttpSafety) -> Self {
         Self {
-            transport: HttpTransport::new(ProtocolRole::Server, safety),
+            transport: HttpTransport::new_unbound(ProtocolRole::Server, safety),
             app: None,
         }
     }
-    
+
     /// Creates a new HTTP/1.1 protocol handler for client role.
     pub fn client(safety: HttpSafety) -> Self {
         Self {
-            transport: HttpTransport::new(ProtocolRole::Client, safety),
+            transport: HttpTransport::new_unbound(ProtocolRole::Client, safety),
             app: None,
         }
     }
@@ -243,13 +271,16 @@ impl Protocol for Http1Protocol {
     
     async fn handle(
         &mut self,
-        reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        reader: TcpReader,
+        writer: TcpWriter,
         app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         // Store app reference
         self.app = Some(app.clone());
-        
+
+        // Set socket addresses from reader
+        self.transport.set_addresses(reader.local_addr(), reader.remote_addr());
+
         match self.role() {
             ProtocolRole::Server => {
                 self.handle_server(reader, writer, app).await
@@ -265,14 +296,14 @@ impl Http1Protocol {
     /// Handles server-side HTTP/1.1 connections.
     async fn handle_server(
         &mut self,
-        mut reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        mut writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        mut reader: TcpReader,
+        mut writer: TcpWriter,
         app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         // Get the root handler from the App's protocol registry
         let root_handler = app.handler.url::<Http1Protocol>()
             .ok_or("No HTTP/1.1 handler registered in the application")?;
-        
+
         loop {
             // Parse request using existing logic
             let request = HttpRequest::parse_lazy(
@@ -280,48 +311,50 @@ impl Http1Protocol {
                 &self.transport.safety,
                 false  // Not in build mode
             ).await;
-            
+
             // Check if request is empty/default (parsing failed)
             if request.meta.path().is_empty() && request.meta.header.is_empty() {
                 break;
             }
-            
+
             // Update keep-alive status
             self.transport.update_keep_alive(&request);
             self.transport.increment_requests();
-            
+
             // Walk the URL tree to find the matching endpoint
             let path = request.meta.path();
             let endpoint = root_handler.clone().walk_str(&path).await;
-            
+
             // Create the context with the found endpoint
             let ctx = HttpContext::new_server(
                 app.clone(),
                 endpoint,
-                request
+                request,
+                reader.remote_addr(),
+                reader.local_addr(),
             );
-            
+
             // Run the handler and get response
             let (response, _status) = ctx.run().await?;
-            
+
             // Send response
             response.send(&mut writer).await?;
             writer.flush().await?;
-            
+
             // Check if we should close the connection
             if !self.transport.should_keep_alive() {
                 break;
             }
         }
-        
+
         Ok(())
     }
     
     /// Handles client-side HTTP/1.1 connections.
     async fn handle_client(
         &mut self,
-        _reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        _writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        _reader: TcpReader,
+        _writer: TcpWriter,
         _app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         // Client implementation will be added when we create the Client App
@@ -352,9 +385,9 @@ mod tests {
     
     #[test]
     fn test_transport_keep_alive() {
-        let mut transport = HttpTransport::new(ProtocolRole::Server, HttpSafety::default());
+        let mut transport = HttpTransport::new_unbound(ProtocolRole::Server, HttpSafety::default());
         assert!(transport.keep_alive);
-        
+
         transport.keep_alive = false;
         assert!(!transport.should_keep_alive());
     }

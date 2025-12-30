@@ -36,6 +36,19 @@ endpoint! {
         println!("Channel 2: 3");
         text_response("Async Test Page 2")
     }
+} 
+
+endpoint!{ 
+    APP.url("/async/whoami"),
+    
+    /// Return the IP address of the client 
+    pub whoami<HTTP> {
+        // Get client's full socket address (IP + port)
+        match req.client_ip() {
+            Some(addr) => text_response(format!("Your address: {}", addr)),
+            None => text_response("Unknown client"),
+        }
+    }
 }
 
 endpoint! {

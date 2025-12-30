@@ -6,11 +6,10 @@
 use std::{any::Any, fmt, sync::Arc, error::Error};
 use bytes::BytesMut;
 use async_trait::async_trait;
-use tokio::io::{BufReader, BufWriter, ReadHalf, WriteHalf};
 
 use crate::{
     app::application::App,
-    connection::TcpConnectionStream,
+    connection::{TcpReader, TcpWriter},
 };
 
 // ============================================================================
@@ -245,16 +244,16 @@ pub trait Protocol: Clone + Send + Sync + 'static {
         Self: Sized;
     
     /// Handles a connection with this protocol.
-    /// 
+    ///
     /// This is where all protocol logic lives. The implementation should
     /// check `self.role()` to determine whether to act as client or server.
-    /// 
-    /// The method receives buffered readers/writers to preserve any data
-    /// that was peeked during protocol detection.
+    ///
+    /// The method receives TcpReader/TcpWriter which provide buffered I/O
+    /// and connection metadata (socket addresses).
     async fn handle(
         &mut self,
-        reader: BufReader<ReadHalf<TcpConnectionStream>>,
-        writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+        reader: TcpReader,
+        writer: TcpWriter,
         app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>>;
     

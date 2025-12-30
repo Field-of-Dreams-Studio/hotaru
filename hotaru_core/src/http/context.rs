@@ -3,6 +3,7 @@ use crate::connection::error::ConnectionError;
 use crate::connection::{
     ConnectionBuilder, ConnectionStatus, ProtocolRole, RequestContext, TcpConnectionStream,
 };
+use std::net::{IpAddr, SocketAddr};
 use crate::debug_log;
 use crate::extensions::{Locals, Params};
 use crate::http::cookie::{Cookie, CookieMap};
@@ -16,13 +17,11 @@ use crate::http::{
     response::HttpResponse,
 };
 use crate::url::Url;
-use akari::Value;
-use async_trait::async_trait;
+use akari::Value; 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter, ReadHalf, WriteHalf};
-use tokio::net::TcpStream;
+use std::sync::Arc;
+use tokio::io::{BufReader, BufWriter, ReadHalf, WriteHalf};
 
 use super::http_value::StatusCode;
 use super::response::response_templates;
@@ -53,6 +52,10 @@ pub struct HttpContext {
     pub host: Option<String>, // Used by client for target host
     pub safety: HttpSafety,
 
+    // Socket addresses
+    remote_addr: Option<SocketAddr>,
+    local_addr: Option<SocketAddr>,
+
     // Shared fields for middleware/handlers
     pub params: Params,
     pub locals: Locals,
@@ -61,12 +64,21 @@ pub struct HttpContext {
 // Type alias for backward compatibility
 pub type HttpReqCtx = HttpContext;
 
+/// Placeholder address for uninitialized or unknown connections.
+/// `0.0.0.0:0` indicates that no socket address information is available.
+const UNSET_ADDR: SocketAddr = SocketAddr::new(
+    std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
+    0,
+);
+
 impl HttpContext {
-    /// Creates a new server context
+    /// Creates a new server context with socket addresses.
     pub fn new_server(
         app: Arc<App>,
         endpoint: Arc<Url<HttpContext>>,
         request: HttpRequest,
+        remote_addr: Option<SocketAddr>,
+        local_addr: Option<SocketAddr>,
     ) -> Self {
         Self {
             request,
@@ -74,6 +86,8 @@ impl HttpContext {
             executable: Executable::Request { app, endpoint },
             host: None,
             safety: HttpSafety::default(),
+            remote_addr,
+            local_addr,
             params: Default::default(),
             locals: Default::default(),
         }
@@ -87,25 +101,101 @@ impl HttpContext {
             executable: Executable::Response,
             host: Some(host),
             safety,
+            remote_addr: None,
+            local_addr: None,
             params: Default::default(),
             locals: Default::default(),
         }
     }
 
-    /// Creates a new Request Context (backward compatibility)
-    pub fn new(app: Arc<App>, endpoint: Arc<Url<HttpContext>>, request: HttpRequest) -> Self {
-        Self::new_server(app, endpoint, request)
+    // /// Creates a new Request Context (backward compatibility)
+    // #[deprecated(note = "Use new_server() with socket addresses instead")]
+    // pub fn new(app: Arc<App>, endpoint: Arc<Url<HttpContext>>, request: HttpRequest) -> Self {
+    //     Self::new_server(app, endpoint, request, UNSET_ADDR, UNSET_ADDR)
+    // }
+
+    // /// Handles the request by parsing it and creating a new `HttpContext`.
+    // #[deprecated(note = "Use new_server() with socket addresses instead")]
+    // pub async fn handle(
+    //     app: Arc<App>,
+    //     root_handler: Arc<Url<HttpContext>>,
+    //     request: HttpRequest,
+    // ) -> Self {
+    //     let endpoint = root_handler.walk_str(&request.meta.path()).await;
+    //     Self::new(app.clone(), endpoint.clone(), request)
+    // }
+
+    // =========================================================================
+    // Socket Address Accessors
+    // =========================================================================
+
+    /// Returns the client's socket address (IP and port).
+    /// For server context, this is the remote peer that connected.
+    /// For client context, this is the server we connected to.
+    /// If unknown, this returns `None`.
+    #[inline]
+    pub fn client_ip(&self) -> Option<SocketAddr> {
+        self.remote_addr
     }
 
-    /// Handles the request by parsing it and creating a new `HttpContext`.
-    pub async fn handle(
-        app: Arc<App>,
-        root_handler: Arc<Url<HttpContext>>,
-        request: HttpRequest,
-    ) -> Self {
-        let endpoint = root_handler.walk_str(&request.meta.path()).await;
-        // let endpoint = dangling_url();
-        Self::new(app.clone(), endpoint.clone(), request)
+    /// Returns the client's socket address (IP and port), or `0.0.0.0:0` if unknown.
+    #[inline]
+    pub fn client_ip_or_default(&self) -> SocketAddr {
+        self.remote_addr.unwrap_or(UNSET_ADDR)
+    }
+
+    /// Returns just the client's IP address without the port.
+    /// If unknown, this returns `None`.
+    #[inline]
+    pub fn client_ip_only(&self) -> Option<IpAddr> {
+        self.remote_addr.map(|addr| addr.ip())
+    }
+
+    /// Returns just the client's IP address without the port, or `0.0.0.0` if unknown.
+    #[inline]
+    pub fn client_ip_only_or_default(&self) -> IpAddr {
+        self.remote_addr.map(|addr| addr.ip()).unwrap_or(UNSET_ADDR.ip())
+    }
+
+    /// Returns the server's bound socket address.
+    /// For server context, this is the local address we're listening on.
+    /// For client context, this is our local ephemeral port.
+    /// If unknown, this returns `None`.
+    #[inline]
+    pub fn server_addr(&self) -> Option<SocketAddr> {
+        self.local_addr
+    }
+
+    /// Returns the server's bound socket address, or `0.0.0.0:0` if unknown.
+    #[inline]
+    pub fn server_addr_or_default(&self) -> SocketAddr {
+        self.local_addr.unwrap_or(UNSET_ADDR)
+    }
+
+    /// Returns the remote socket address (alias for client_ip in server context).
+    /// If unknown, this returns `None`.
+    #[inline]
+    pub fn remote_addr(&self) -> Option<SocketAddr> {
+        self.remote_addr
+    }
+
+    /// Returns the remote socket address, or `0.0.0.0:0` if unknown.
+    #[inline]
+    pub fn remote_addr_or_default(&self) -> SocketAddr {
+        self.remote_addr.unwrap_or(UNSET_ADDR)
+    }
+
+    /// Returns the local socket address (alias for server_addr).
+    /// If unknown, this returns `None`.
+    #[inline]
+    pub fn local_addr(&self) -> Option<SocketAddr> {
+        self.local_addr
+    }
+
+    /// Returns the local socket address, or `0.0.0.0:0` if unknown.
+    #[inline]
+    pub fn local_addr_or_default(&self) -> SocketAddr {
+        self.local_addr.unwrap_or(UNSET_ADDR)
     }
 
     pub async fn read_request(
@@ -199,7 +289,7 @@ impl HttpContext {
     /// The automatic parsing is not recommended, as it can lead to performance issues and security vulnerabilities.
     /// If you didn't parse body, the body will be `HttpBody::Unparsed`.
     pub async fn parse_body(&mut self) {
-        let mut safety_settings = if let Some(endpoint) = self.endpoint() {
+        let safety_settings = if let Some(endpoint) = self.endpoint() {
             let mut settings = endpoint.get_params::<HttpSafety>().unwrap_or_default();
             settings.update(&endpoint.get_params::<HttpSafety>().unwrap_or_default());
             settings
@@ -555,13 +645,146 @@ impl HttpContext {
 #[cfg(test)]
 mod test {
     use crate::{
-        connection::{ConnectionBuilder, Protocol},
         http::{
             context::HttpResCtx,
-            request::request_templates::{self, get_request},
+            request::request_templates::get_request,
             safety::HttpSafety,
         },
     };
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    // =========================================================================
+    // Socket Address Accessor Tests
+    // =========================================================================
+
+    #[test]
+    fn test_client_ip_with_address() {
+        use crate::app::application::App;
+        use crate::http::request::HttpRequest;
+        use crate::url::Url;
+        use std::sync::Arc;
+
+        let app = App::new().build();
+        let endpoint = Arc::new(Url::<super::HttpContext>::default());
+        let request = HttpRequest::default();
+        let remote = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 54321);
+        let local = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8080);
+
+        let ctx = super::HttpContext::new_server(
+            app,
+            endpoint,
+            request,
+            Some(remote),
+            Some(local),
+        );
+
+        // Test client_ip()
+        assert_eq!(ctx.client_ip(), Some(remote));
+        assert_eq!(ctx.client_ip_or_default(), remote);
+
+        // Test client_ip_only()
+        assert_eq!(ctx.client_ip_only(), Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100))));
+        assert_eq!(ctx.client_ip_only_or_default(), IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)));
+
+        // Test server_addr()
+        assert_eq!(ctx.server_addr(), Some(local));
+        assert_eq!(ctx.server_addr_or_default(), local);
+
+        // Test aliases
+        assert_eq!(ctx.remote_addr(), Some(remote));
+        assert_eq!(ctx.remote_addr_or_default(), remote);
+        assert_eq!(ctx.local_addr(), Some(local));
+        assert_eq!(ctx.local_addr_or_default(), local);
+    }
+
+    #[test]
+    fn test_client_ip_without_address() {
+        use crate::app::application::App;
+        use crate::http::request::HttpRequest;
+        use crate::url::Url;
+        use std::sync::Arc;
+
+        let app = App::new().build();
+        let endpoint = Arc::new(Url::<super::HttpContext>::default());
+        let request = HttpRequest::default();
+
+        let ctx = super::HttpContext::new_server(
+            app,
+            endpoint,
+            request,
+            None,  // No remote address
+            None,  // No local address
+        );
+
+        let unset = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
+
+        // Test client_ip() returns None
+        assert_eq!(ctx.client_ip(), None);
+        assert_eq!(ctx.client_ip_or_default(), unset);
+
+        // Test client_ip_only() returns None
+        assert_eq!(ctx.client_ip_only(), None);
+        assert_eq!(ctx.client_ip_only_or_default(), IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)));
+
+        // Test server_addr() returns None
+        assert_eq!(ctx.server_addr(), None);
+        assert_eq!(ctx.server_addr_or_default(), unset);
+
+        // Test aliases
+        assert_eq!(ctx.remote_addr(), None);
+        assert_eq!(ctx.remote_addr_or_default(), unset);
+        assert_eq!(ctx.local_addr(), None);
+        assert_eq!(ctx.local_addr_or_default(), unset);
+    }
+
+    #[test]
+    fn test_client_context_has_no_addresses() {
+        let ctx = super::HttpContext::new_client(
+            "example.com".to_string(),
+            HttpSafety::default(),
+        );
+
+        // Client contexts start with no addresses
+        assert_eq!(ctx.client_ip(), None);
+        assert_eq!(ctx.server_addr(), None);
+    }
+
+    #[test]
+    fn test_ipv6_address() {
+        use crate::app::application::App;
+        use crate::http::request::HttpRequest;
+        use crate::url::Url;
+        use std::net::Ipv6Addr;
+        use std::sync::Arc;
+
+        let app = App::new().build();
+        let endpoint = Arc::new(Url::<super::HttpContext>::default());
+        let request = HttpRequest::default();
+        let remote = SocketAddr::new(
+            IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
+            54321
+        );
+        let local = SocketAddr::new(
+            IpAddr::V6(Ipv6Addr::LOCALHOST),
+            8080
+        );
+
+        let ctx = super::HttpContext::new_server(
+            app,
+            endpoint,
+            request,
+            Some(remote),
+            Some(local),
+        );
+
+        assert_eq!(ctx.client_ip(), Some(remote));
+        assert_eq!(ctx.client_ip_only(), Some(IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1))));
+        assert_eq!(ctx.server_addr(), Some(local));
+    }
+
+    // =========================================================================
+    // HTTP Client Tests
+    // =========================================================================
 
     // #[tokio::test]
     // async fn request_a_page() {

@@ -3,8 +3,8 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::io;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf, BufReader, BufWriter, ReadHalf, WriteHalf};
-use hotaru_core::connection::TcpConnectionStream;
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use hotaru_core::connection::{TcpConnectionStream, TcpReader, TcpWriter};
 use hyper::rt::{Read, Write};
 
 /// Wrapper to make TcpConnectionStream compatible with Hyper's IO traits
@@ -12,10 +12,10 @@ pub struct HyperIoCompat {
     inner: TcpConnectionStream,
 }
 
-/// Hyper compatibility wrapper for buffered streams that directly uses buffered readers
+/// Hyper compatibility wrapper for buffered streams using TcpReader/TcpWriter
 pub struct BufferedHyperIoCompat {
-    reader: BufReader<ReadHalf<TcpConnectionStream>>,
-    writer: BufWriter<WriteHalf<TcpConnectionStream>>,
+    reader: TcpReader,
+    writer: TcpWriter,
 }
 
 impl HyperIoCompat {
@@ -23,7 +23,7 @@ impl HyperIoCompat {
         Self { inner: stream }
     }
     
-    pub fn new_buffered(reader: BufReader<ReadHalf<TcpConnectionStream>>, writer: BufWriter<WriteHalf<TcpConnectionStream>>) -> BufferedHyperIoCompat {
+    pub fn new_buffered(reader: TcpReader, writer: TcpWriter) -> BufferedHyperIoCompat {
         BufferedHyperIoCompat { reader, writer }
     }
 }

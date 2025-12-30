@@ -5,7 +5,7 @@ use super::form::*;
 use super::http_value::*;
 use super::meta::HttpMeta; 
 use akari::Value;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncBufReadExt};
+use tokio::io::{AsyncBufRead, AsyncReadExt, AsyncBufReadExt};
 
 static EMPTY: Vec<u8> = Vec::new();
 
@@ -27,10 +27,10 @@ pub enum HttpBody {
 } 
 
 impl HttpBody { 
-    pub async fn read_buffer<R: AsyncRead + Unpin>(
-        buf_reader: &mut tokio::io::BufReader<R>,
+    pub async fn read_buffer<R: AsyncBufRead + Unpin>(
+        buf_reader: &mut R,
         header: &mut HttpMeta,
-        parse_config: &HttpSafety 
+        parse_config: &HttpSafety,
     ) -> std::io::Result<Self> {
         Ok(Self::Buffer { 
             data: Self::read_binary_info(buf_reader, header, parse_config).await?, 
@@ -70,11 +70,11 @@ impl HttpBody {
         }
     } 
 
-    /// Parse the HTTP body directly from a TCP Stream 
-    pub async fn direct_parse<R: AsyncRead + Unpin>(
-        buf_reader: &mut tokio::io::BufReader<R>,
-        header: &mut HttpMeta, 
-        parse_config: &HttpSafety 
+    /// Parse the HTTP body directly from a TCP Stream
+    pub async fn direct_parse<R: AsyncBufRead + Unpin>(
+        buf_reader: &mut R,
+        header: &mut HttpMeta,
+        parse_config: &HttpSafety,
     ) -> Self { 
         // Create a Buffer variant first
         let buffer = Self::read_buffer(buf_reader, header, parse_config).await.unwrap_or(Self::Unparsed);
@@ -83,19 +83,19 @@ impl HttpBody {
         buffer.parse_buffer(parse_config) 
     }
 
-    pub async fn read_binary_info<R: AsyncRead + Unpin>(
-        buf_reader: &mut tokio::io::BufReader<R>, 
-        header: &mut HttpMeta, 
-        parse_config: &HttpSafety, 
-    ) -> std::io::Result<Vec<u8>> { 
+    pub async fn read_binary_info<R: AsyncBufRead + Unpin>(
+        buf_reader: &mut R,
+        header: &mut HttpMeta,
+        parse_config: &HttpSafety,
+    ) -> std::io::Result<Vec<u8>> {
 
         /// Reads body with Content-Length
-        async fn read_content_length_body<R: AsyncRead + Unpin>(
-            buf_reader: &mut tokio::io::BufReader<R>,
+        async fn read_content_length_body<R: AsyncBufRead + Unpin>(
+            buf_reader: &mut R,
             safety_setting: &HttpSafety,
-            content_length: usize, 
-        ) -> std::io::Result<Vec<u8>> { 
-            let effective_content_length = std::cmp::min(content_length, safety_setting.effective_body_size()); 
+            content_length: usize,
+        ) -> std::io::Result<Vec<u8>> {
+            let effective_content_length = std::cmp::min(content_length, safety_setting.effective_body_size());
             let mut body_buffer = vec![0; effective_content_length];
             buf_reader.read_exact(&mut body_buffer).await?;
             Ok(body_buffer)
@@ -127,8 +127,8 @@ impl HttpBody {
         /// Malformed but size-compliant data will be caught at the application layer or cause
         /// predictable failures without security impact. This saves energy while maintaining
         /// equivalent security to exhaustive validation.
-        async fn read_chunked_body<R: AsyncRead + Unpin>(
-            buf_reader: &mut tokio::io::BufReader<R>,
+        async fn read_chunked_body<R: AsyncBufRead + Unpin>(
+            buf_reader: &mut R,
             header: &mut HttpMeta,
             safety_setting: &HttpSafety,
         ) -> std::io::Result<Vec<u8>> {
