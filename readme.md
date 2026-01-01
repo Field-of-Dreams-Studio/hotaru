@@ -6,6 +6,8 @@
 
 > Small, sweet, easy framework for full-stack Rust web applications
 
+License note: currently GPL-3.0; we are considering a change to LGPL or MIT (not decided).
+
 ## Former Codebase 
 
 We rebased our code since July this year. Please refer to the following link if you are interested in our history of building the framework 
@@ -204,6 +206,13 @@ endpoint! {
     }
 }
 ```
+
+### Macro Notes
+
+- `endpoint!` and `middleware!` auto-register at startup (constructor-based), so there is no manual `router.register()` step.
+- Always use brace syntax `{}` and place doc comments inside the macro block.
+- Our philosophy is to wrap anything into macros to keep endpoints and middleware self-contained; see `macro_ra.md` for the minimal syntax and rationale.
+- Analyzer support is planned via custom analyzer tools.
 
 ### Middleware
 
