@@ -33,6 +33,17 @@ endpoint! {
 }
 ```
 
+Optional fn-style (request naming):
+
+```rust
+endpoint! {
+    APP.url("/example"),
+    pub fn example(req: HTTP) {
+        text_response("Hello")
+    }
+}
+```
+
 ### Request Access
 
 ```rust

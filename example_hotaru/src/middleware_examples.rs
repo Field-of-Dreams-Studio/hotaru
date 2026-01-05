@@ -17,7 +17,7 @@ middleware! {
 
 middleware! {
     /// Logs the end of request processing
-    pub LogEnd <HTTP> {
+    pub fn LogEnd(req: HTTP) {
         let path = req.path().to_owned();
         let result = next(req).await;
         println!("Middleware: Processed request for {}, end processing", path);

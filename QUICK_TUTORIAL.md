@@ -41,6 +41,17 @@ async fn main() {
 }
 ```
 
+Optional fn-style (request naming):
+
+```rust
+endpoint! {
+    APP.url("/"),
+    pub fn hello_world(req: HTTP) {
+        text_response("Hello, Hotaru!")
+    }
+}
+```
+
 ### Basic Routing
 
 ```rust
@@ -479,6 +490,22 @@ Middleware in Hotaru are functions that intercept requests before they reach end
 - Add headers to responses
 - Track metrics
 - Handle cross-cutting concerns
+
+Syntax:
+
+```rust
+middleware! {
+    pub Logger <HTTP> {
+        next(req).await
+    }
+}
+
+middleware! {
+    pub fn Logger(req: HTTP) {
+        next(req).await
+    }
+}
+```
 
 ### Global Middleware
 

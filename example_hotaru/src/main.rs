@@ -68,6 +68,18 @@ endpoint! {
             ]
         )
     }
+} 
+
+endpoint! { 
+    APP.url("/new_syntax/<arg>"), 
+    middleware: [..],
+    config: ["ConfigString"], 
+
+    /// Example endpoint using new syntax 
+    pub fn new_syntax_endpoint(context: HTTP) { 
+        let args = context.pattern("arg"); 
+        text_response(format!("New syntax endpoint called with arg: {}", args.unwrap_or_default())) 
+    }
 }
 
 endpoint! {

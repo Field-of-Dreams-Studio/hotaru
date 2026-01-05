@@ -61,6 +61,14 @@ endpoint! {
 }
 ```
 
+Alternative fn-style (request naming):
+```rust
+endpoint! {
+    <url expr>,
+    pub fn handler_name(req: Protocol) { ... }
+}
+```
+
 Notes:
 - Use brace syntax `{}` for both `endpoint!` and `middleware!` (no parentheses).
 - `middleware` and `config` are optional and must appear before the handler.
@@ -78,6 +86,16 @@ middleware! {
         let start = std::time::Instant::now();
         let req = next(req).await;
         println!("Completed in {:?}", start.elapsed());
+        req
+    }
+}
+```
+
+Alternative fn-style (request naming):
+```rust
+middleware! {
+    pub fn LogRequest(req: HTTP) {
+        let req = next(req).await;
         req
     }
 }

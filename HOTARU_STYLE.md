@@ -122,6 +122,23 @@ middleware! {
 }
 ```
 
+#### Optional fn-style (request naming)
+```rust
+endpoint! {
+    APP.url("/users"),
+    pub fn get_users(req: HTTP) {
+        json_response(fetch_users())
+    }
+}
+
+middleware! {
+    pub fn Logger(req: HTTP) {
+        println!("Request: {}", req.path());
+        next(req).await
+    }
+}
+```
+
 #### ❌ Incorrect (Parenthesis Syntax)
 ```rust
 // DO NOT USE THIS STYLE

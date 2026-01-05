@@ -211,6 +211,7 @@ endpoint! {
 
 - `endpoint!` and `middleware!` auto-register at startup (constructor-based), so there is no manual `router.register()` step.
 - Always use brace syntax `{}` and place doc comments inside the macro block.
+- Optional fn-style: `pub fn name(req: HTTP) { ... }`; angle-bracket form defaults to `req`.
 - Our philosophy is to wrap anything into macros to keep endpoints and middleware self-contained; see `macro_ra.md` for the minimal syntax and rationale.
 - Analyzer support is planned via custom analyzer tools.
 

@@ -21,6 +21,19 @@ endpoint! {
 }
 ```
 
+Fn-style lets you name the request variable:
+
+```rust
+use hotaru_meta::endpoint;
+
+endpoint! {
+    APP.url("/api/users"),
+    pub fn handle_users(req: HTTP) {
+        text_response("User list")
+    }
+}
+```
+
 ### `middleware!`
 
 Define middleware with clean syntax:
@@ -30,6 +43,18 @@ use hotaru_meta::middleware;
 
 middleware! {
     pub AuthMiddleware<HTTP> {
+        // Middleware implementation
+    }
+}
+```
+
+Fn-style lets you name the request variable:
+
+```rust
+use hotaru_meta::middleware;
+
+middleware! {
+    pub fn AuthMiddleware(req: HTTP) {
         // Middleware implementation
     }
 }
