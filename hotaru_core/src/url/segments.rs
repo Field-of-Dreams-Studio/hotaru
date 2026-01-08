@@ -248,7 +248,14 @@ impl<C: RequestContext + 'static> Url<C> {
 
         // Get the current segment to match
         let this_segment = match path.next() {
-            Some(s) => *s,
+            Some(s) => {
+                // Test whether Self is a AnyPath segment, if so directly return the current node 
+                if self.path.is_any_path() {
+                    debug_trace!("walk: AnyPath segment detected: '{}', returning self", s);
+                    return Box::pin(async move { Some(self) });
+                } 
+                *s
+            },
             None => {
                 // No more path segments - this node is the destination
                 debug_trace!("walk: No more segments, returning self");

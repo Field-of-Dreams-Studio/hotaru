@@ -21,7 +21,11 @@ impl PathPattern{
 
     pub fn any_path() -> Self {
         Self::AnyPath
-    }
+    } 
+
+    pub fn is_any_path(&self) -> bool {
+        matches!(self, PathPattern::AnyPath)
+    } 
 
     /// Check if this pattern matches the given segment
     pub fn matches(&self, segment: &str) -> bool {

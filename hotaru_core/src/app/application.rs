@@ -340,7 +340,9 @@ impl App {
     /// ```
     pub async fn run(self: Arc<Self>) {
         let worker_count = self.worker;
-        let app = self.clone();
+        let app = self.clone(); 
+
+        println!("Starting Hotaru server on {}", self.binding_address); 
 
         // Spawn a blocking task to create and run the runtime
         // This allows the runtime to be created from within an async context
@@ -368,7 +370,10 @@ impl App {
 
         debug_log!(
             "Connection established on {}",
-            listener.local_addr().unwrap_or_else(|_| "unknown")
+            match listener.local_addr() { 
+                Ok(addr) => addr.to_string(),
+                Err(e) => "error".to_string() + &e.to_string(),
+            } 
         );
 
         // Create a signal handler for clean shutdown
