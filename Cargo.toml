@@ -2,6 +2,7 @@
 members = [
     "hotaru",
     "hotaru_meta",
+    "hotaru_trans",
     "htmstd",
     "hotaru_core",
     "hotaru_lib",

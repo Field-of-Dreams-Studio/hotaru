@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_meta"
-version = "0.7.3"
+version = "0.8.0"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "Core macros for Hotaru"
