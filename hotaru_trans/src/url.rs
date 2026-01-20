@@ -3,11 +3,11 @@ use std::iter::Peekable;
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
-use crate::helper::generate_compile_error; 
+use crate::{helper::*, outer_attr}; 
 use crate::ctor::gen_ctor; 
 
 /// Arguments for the `url` macro.
-struct UrlArgs {
+pub struct UrlArgs {
     pub url_expr: TokenStream,
     pub config: Option<Vec<TokenStream>>,
     pub middlewares: Option<Vec<TokenStream>>,
@@ -29,7 +29,7 @@ impl UrlArgs {
         }
     }
 
-     pub fn reg_func(&self) -> TokenStream {
+    pub fn reg_func(&self) -> TokenStream {
         // Generate constructor attributes using gen_ctor()
         let ctor_attrs = gen_ctor();
 
@@ -304,25 +304,33 @@ impl UrlArgs {
 
         tokens
     }
+
+    pub fn expand(&self) -> TokenStream {
+        let mut tokens = TokenStream::new();
+        tokens.extend(self.op.generate_function());
+        tokens.extend(self.op.wrapper_function());
+        tokens.extend(self.reg_func()); 
+        tokens
+    } 
 }
 
-struct UrlFunc {
+pub struct UrlFunc {
     pub is_pub: bool,
-    pub fn_name: String,
+    pub fn_name: Ident,
     pub protocol: Ident,
     pub req_var_name: Ident, 
     pub fn_cont: TokenStream,
-    pub attrs: Vec<TokenStream>,
+    pub attrs: OuterAttr,
 }
 
 impl UrlFunc {
     pub fn new(
         is_pub: bool,
-        fn_name: String,
+        fn_name: Ident,
         protocol: Ident, 
         req_var_name: Ident, 
         fn_cont: TokenStream,
-        attrs: Vec<TokenStream>,
+        attrs: OuterAttr,
     ) -> Self {
         Self {
             is_pub,
@@ -354,9 +362,7 @@ impl UrlFunc {
         let mut tokens = TokenStream::new();
 
         // Re-emit captured attributes (includes #[doc = "..."] if provided)
-        for a in &self.attrs {
-            tokens.extend(a.clone());
-        }
+        tokens.extend(self.attrs.reform());
 
         if self.is_pub {
             tokens.extend(vec![TokenTree::Ident(Ident::new("pub", Span::call_site()))]);
@@ -364,7 +370,7 @@ impl UrlFunc {
         tokens.extend(vec![
             TokenTree::Ident(Ident::new("async", Span::call_site())),
             TokenTree::Ident(Ident::new("fn", Span::call_site())),
-            TokenTree::Ident(Ident::new(&self.fn_name, Span::call_site())),
+            TokenTree::Ident(self.fn_name.clone()),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, arguments)),
             TokenTree::Punct(Punct::new('-', Spacing::Joint)),
             TokenTree::Punct(Punct::new('>', Spacing::Alone)),
@@ -415,7 +421,7 @@ impl UrlFunc {
             TokenTree::Ident(Ident::new("let", Span::call_site())),
             TokenTree::Ident(Ident::new("response", Span::call_site())),
             TokenTree::Punct(Punct::new('=', Spacing::Alone)),
-            TokenTree::Ident(Ident::new(&self.fn_name, Span::call_site())),
+            TokenTree::Ident(self.fn_name.clone()),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, internal_args)),
             TokenTree::Punct(Punct::new('.', Spacing::Alone)),
             TokenTree::Ident(Ident::new("await", Span::call_site())),
@@ -454,440 +460,105 @@ impl UrlFunc {
     }
 }
 
-/// TODO 
 /// Parse the attribute input into UrlAttr 
-pub fn parse(args: TokenStream) -> Result<Self, TokenStream> {
-    fn split_top_level_until_comma(input: TokenStream) -> Vec<TokenStream> {
-        let mut tokens = input.into_iter();
-        let mut vec = vec![];
-        let mut next_stream = TokenStream::new();
-        loop {
-            match tokens.next() {
-                Some(TokenTree::Punct(punct)) if punct.as_char() == ',' => {
-                    vec.push(next_stream);
-                    next_stream = TokenStream::new();
-                }
-                Some(tt) => {
-                    next_stream.extend(std::iter::once(tt));
-                }
-                None => break,
-            }
-        }
-        vec.push(next_stream);
-        vec
+pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {  
+    /// Parse the function definition into UrlFunc 
+    fn parse_inner(tokens: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<UrlFunc, TokenStream> {
+        let attrs = parse_outer_attrs(tokens)?; 
+        let mut is_pub = match_ident_consume(tokens, "pub");  
+        let mut fn_name = match match_punct_consume(tokens, "_"){ 
+            true => {
+                let random_name = format!("auto_generated_{}", random_alpha_string(8));
+                Ident::new(&random_name, Span::call_site()) 
+            }, 
+            false => expect_any_ident(tokens, "Expected function name")? 
+        }; 
+        let _ = expect_punct_consume(tokens, "<", "Expected '<' after function name")?; 
+        let protocol = expect_any_ident(tokens, "Expected protocol identifier after '<'")?;
+        let _ = expect_punct_consume(tokens, ">", "Expected '>' after protocol identifier")?; 
+        let fn_cont = expect_group_consume_return_inner(tokens, Delimiter::Brace, "Expected function body inside braces")?; 
+
+        Ok(UrlFunc::new(
+            is_pub,
+            fn_name,
+            protocol,
+            Ident::new("req", Span::call_site()),
+            fn_cont,
+            attrs,
+        ))
     }
 
-    fn expect_punct(
-        tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-        ch: char,
-    ) -> Result<(), TokenStream> {
-        match tokens.next() {
-            Some(TokenTree::Punct(p)) if p.as_char() == ch => Ok(()),
-            Some(tt) => Err(generate_compile_error(
-                tt.span(),
-                &format!("expected '{}'", ch),
-            )),
-            None => Err(generate_compile_error(
-                Span::call_site(),
-                &format!("expected '{}'", ch),
-            )),
-        }
-    }
-
-    fn parse_array(
-        tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-    ) -> Result<Vec<TokenStream>, TokenStream> {
-        match tokens.peek() {
-            Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Bracket => {
-                let mut array = Vec::new();
-                let mut current = TokenStream::new();
-                let mut inside_tokens = group.stream().into_iter();
-                loop {
-                    match inside_tokens.next() {
-                        Some(TokenTree::Punct(punct)) if punct.as_char() == ',' => {
-                            array.push(current);
-                            current = TokenStream::new();
-                        }
-                        Some(token) => current.extend(std::iter::once(token)),
-                        None => {
-                            array.push(current);
-                            break;
-                        }
-                    }
-                }
-                // dbg!(array.clone());
-                return Ok(array);
-            }
-            Some(tt) => {
-                return Err(generate_compile_error(
-                    tt.span(),
-                    "Expect an [] after the attribute",
-                ));
-            }
-            None => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expect something after an attribute",
-                ));
-            }
-        }
-    }
-
-    let mut tokens = split_top_level_until_comma(args);
-    let op = match tokens.pop() {
-        Some(ts) => ts,
-        None => {
-            return Err(generate_compile_error(
-                Span::call_site(),
-                "The last token should be the operations",
-            ));
-        }
-    };
-
-    let mut tokens = tokens.into_iter();
-
-    let url_expr = match tokens.next() {
-        Some(ts) => ts,
-        None => {
-            return Err(generate_compile_error(
-                Span::call_site(),
-                "There should be a token repr the endpoint",
-            ));
-        }
-    };
+    let mut tokens = into_peekable_iter(args); 
+    let url_expr = expect_stream_before_comma_consume(&mut tokens, true, "Expected a comma after the operations")?; 
 
     let mut middlewares = None;
-    let mut config = None;
+    let mut config = None; 
 
-    // Read the Middleware or Configs, middleware and configs should be
-    // #[url(<UrlExpr>, middleware=[...], config=[...])]
-    while let Some(ts) = tokens.next() {
-        let mut internal_tokens = ts.into_iter().peekable();
-        match internal_tokens.next() {
-            Some(TokenTree::Ident(ident)) if ident.to_string() == "middleware" => {
-                internal_tokens.next(); // Consume the `=` 
-                middlewares = Some(parse_array(&mut internal_tokens)?);
-            }
-            Some(TokenTree::Ident(ident)) if ident.to_string() == "config" => {
-                internal_tokens.next(); // Consume the `=`  
-                config = Some(parse_array(&mut internal_tokens)?);
-            }
-            Some(tt) => {
-                return Err(generate_compile_error(
-                    tt.span(),
-                    "Expect `middleware` or `config`",
-                ));
-            }
-            _ => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expect `middleware` or `config`",
-                ));
-            }
-        }
-    }
+    if match_ident_consume(&mut tokens, "middleware") { 
+        tokens.next(); // Consume the `=` 
+        middlewares = Some(expect_array_consume(&mut tokens, "Expected an array for middleware")?); 
+    } 
 
-    return Ok(Self::new(
+    if match_ident_consume(&mut tokens, "config") { 
+        tokens.next(); // Consume the `=`  
+        config = Some(expect_array_consume(&mut tokens, "Expected an array for config")?); 
+    } 
+
+    return Ok(UrlArgs::new(
         url_expr,
         config,
         middlewares,
-        UrlFunc::parse(op)?,
+        parse_inner(&mut tokens)?,
     ));
-}
+} 
 
-/// TODO 
-/// Parse the function definition into UrlFunc 
-pub fn parse(function: TokenStream) -> Result<Self, TokenStream> {
-    /// Return: ((is_pub, is_fn_style, fn_name), TokenStream) 
-    /// Second value = True if use (pub)? fn xxx(req: XXX) style, False if use (pub)? xxx <XXX> style
-    fn process_name(
-        tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-    ) -> Result<(bool, bool, String), TokenStream> {
-        // Whether it is a pub endpoint or not 
-        let mut is_pub = false;
-        match tokens.peek() {
-            Some(TokenTree::Ident(ident)) if ident.to_string() == "pub" => {
-                tokens.next();
-                is_pub = true;
-            }
-            Some(_) => {}
-            None => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expected Function Name but found EOF",
-                ));
-            }
-        }; 
+/// Expect to be in the following format: 
+/// #[endpoint] 
+/// #[url(APP.url("..."))] 
+/// #[config([ ... ])] // Optional 
+/// #[middleware([ ... ])] // Optional 
+/// pub fn endpoint_name(req: Protocol) { 
+///    ... 
+/// }
+pub fn parse_semi_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {  
+    let mut tokens = into_peekable_iter(args); 
+    
+    let mut outer_attrs = parse_outer_attrs(&mut tokens)?; 
+    let url_expr_raw = outer_attrs.remove("url").ok_or(generate_compile_error(Span::call_site(), "Missing required 'url' attribute"))?; 
+    let url_expr = OuterAttr::get_inners(url_expr_raw, "Expected url(...)")?; 
+    let config = outer_attrs.remove("config").map(|ts| expect_array_consume(&mut into_peekable_iter(OuterAttr::get_inners(ts, "Expected config([...])")?), "Expected an array for config")).unwrap_or(Ok(vec![]))?; 
+    let middleware = outer_attrs.remove("middleware").map(|ts| expect_array_consume(&mut into_peekable_iter(OuterAttr::get_inners(ts, "Expected middleware([...])")?), "Expected an array for middleware")).unwrap_or(Ok(vec![]))?; 
+    
+    let is_pub = match_ident_consume(&mut tokens, "pub"); 
+    let _ = expect_ident_consume(&mut tokens, "fn", "Expected 'fn' keyword for function definition")?; 
+    let fn_name = match match_punct_consume(&mut tokens, "_"){ 
+        true => {
+            let random_name = format!("auto_generated_{}", random_alpha_string(8));
+            Ident::new(&random_name, Span::call_site()) 
+        }, 
+        false => expect_any_ident(&mut tokens, "Expected function name")? 
+    }; 
+    let _ = expect_punct_consume(&mut tokens, "<", "Expected '<' after function name")?; 
+    let protocol = expect_any_ident(&mut tokens, "Expected protocol identifier after '<'")?;
+    let _ = expect_punct_consume(&mut tokens, ">", "Expected '>' after protocol identifier")?;
+    let mut group = into_peekable_iter(expect_group_consume_return_inner(&mut tokens, Delimiter::Parenthesis, "Expected function parameters inside parentheses")?); 
+    let req_var_name = match expect_any_ident(&mut group, "Expected request variable name as first parameter") { 
+        Ok(id) => id, 
+        Err(_) => Ident::new("req", Span::call_site()), 
+    }; 
+    let fn_cont = expect_group_consume_return_inner(&mut tokens, Delimiter::Brace, "Expected function body inside braces")?; 
 
-        // Peek the function keyword and branch accordingly 
-        let mut is_fn_style = false; 
-        match tokens.peek() {
-            Some(TokenTree::Ident(ident)) if ident.to_string() == "fn" => { 
-                tokens.next(); 
-                is_fn_style = true; 
-            } 
-            _ => {} 
-        } 
-
-        // Get the function name 
-        match tokens.next() {
-            Some(TokenTree::Ident(ident)) if ident.to_string() == "_" => {
-                return Ok((is_pub, is_fn_style, random_alpha_string(32)));
-            }
-            Some(TokenTree::Ident(ident)) => {
-                return Ok((is_pub, is_fn_style, ident.to_string()));
-            }
-            Some(token) => {
-                return Err(generate_compile_error(
-                    token.span(),
-                    &format!("Expected Function Name or `fn` Keyword, but found {}", token.to_string()),
-                ));
-            }
-            None => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expected Function Name or `fn` keyword. but found EOF",
-                ));
-            }
-        }
-    }
-
-    fn process_protocol(
-        tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-    ) -> Result<Ident, TokenStream> {
-        // Expect "<>" around the protocol type
-        match tokens.next() {
-            Some(TokenTree::Punct(punct)) if punct == '<' => {}
-            Some(tt) => {
-                return Err(generate_compile_error(
-                    tt.span(),
-                    "Expect '< PROTOCOL >' around the protocol type after the function name",
-                ));
-            }
-            None => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expoect some tokens after function name",
-                ));
-            }
-        }
-
-        let protocol;
-        match tokens.next() {
-            Some(TokenTree::Ident(ident)) => protocol = ident,
-            Some(tt) => {
-                return Err(generate_compile_error(
-                    tt.span(),
-                    "Protocol Identifier is Expected",
-                ));
-            }
-            None => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expected Something",
-                ));
-            }
-        }
-
-        match tokens.next() {
-            Some(TokenTree::Punct(punct)) if punct == '>' => {}
-            Some(tt) => {
-                return Err(generate_compile_error(
-                    tt.span(),
-                    "Expect '>' after the protocol type",
-                ));
-            }
-            None => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expoect some tokens after function name",
-                ));
-            }
-        }
-
-        return Ok(protocol);
-    } 
-
-    /// pub fn endpoint_name(req: Protocol) 
-    /// Return: (Protocol, req_var_name) 
-    fn process_arguments(
-        tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-    ) -> Result<(Ident, Ident), TokenStream> { 
-        match tokens.next() { 
-            Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis => { 
-                let mut inside_tokens = group.stream().into_iter().peekable(); 
-
-                // Expect the request variable name 
-                let req_var_name = match inside_tokens.next() { 
-                    Some(TokenTree::Ident(ident)) => ident, 
-                    Some(tt) => { 
-                        return Err(generate_compile_error( 
-                            tt.span(), 
-                            "Expected request variable name", 
-                        )); 
-                    } 
-                    None => { 
-                        return Err(generate_compile_error( 
-                            Span::call_site(), 
-                            "Expected something inside the parentheses", 
-                        )); 
-                    } 
-                }; 
-
-                // Expect ':' 
-                match inside_tokens.next() { 
-                    Some(TokenTree::Punct(punct)) if punct.as_char() == ':' => {} 
-                    Some(tt) => { 
-                        return Err(generate_compile_error( 
-                            tt.span(), 
-                            "Expected ':' after request variable name", 
-                        )); 
-                    } 
-                    None => { 
-                        return Err(generate_compile_error( 
-                            Span::call_site(), 
-                            "Expected ':' after request variable name", 
-                        )); 
-                    } 
-                }; 
-
-                // Expect Protocol type 
-                let protocol = match inside_tokens.next() { 
-                    Some(TokenTree::Ident(ident)) => ident, 
-                    Some(tt) => { 
-                        return Err(generate_compile_error( 
-                            tt.span(), 
-                            "Expected Protocol type after ':'", 
-                        )); 
-                    } 
-                    None => { 
-                        return Err(generate_compile_error( 
-                            Span::call_site(), 
-                            "Expected Protocol type after ':'", 
-                        )); 
-                    } 
-                }; 
-
-                // Ensure no extra tokens inside parentheses
-                if let Some(tt) = inside_tokens.next() { 
-                    return Err(generate_compile_error( 
-                        tt.span(), 
-                        "Unexpected token inside parentheses", 
-                    )); 
-                } 
-
-                Ok((protocol, req_var_name))  
-            }
-            Some(_) => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expected function arguments in parentheses",
-                ));
-            }
-            None => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expected function arguments after function name",
-                ));
-            } 
-        }
-    }
-
-    fn process_func_content(
-        tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-    ) -> Result<TokenStream, TokenStream> {
-        match tokens.next() {
-            Some(TokenTree::Group(group)) => {
-                if group.delimiter() == Delimiter::Brace {
-                    return Ok(group.stream());
-                } else {
-                    return Err(generate_compile_error(
-                        group.span(),
-                        "Expected Code Segment",
-                    ));
-                }
-            }
-            Some(tt) => return Err(generate_compile_error(tt.span(), "Expected Code Segment")),
-            None => {
-                return Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expected Code Segment",
-                ));
-            }
-        }
-    }
-
-    fn parse_outer_attrs(
-        tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-    ) -> Result<Vec<TokenStream>, TokenStream> {
-        let mut attrs = Vec::new();
-
-        loop {
-            match tokens.peek() {
-                Some(TokenTree::Punct(p)) if p.as_char() == '#' => {
-                    // consume '#'
-                    tokens.next();
-
-                    match tokens.next() {
-                        Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Bracket => {
-                            // Reject inner attributes: #![...]
-                            let mut inside = g.stream().into_iter().peekable();
-                            if let Some(TokenTree::Punct(p)) = inside.peek() {
-                                if p.as_char() == '!' {
-                                    return Err(generate_compile_error(
-                                        g.span(),
-                                        "inner attributes (#![...]) are not supported here",
-                                    ));
-                                }
-                            }
-
-                            // Rebuild as "#[ ... ]" so we can re-emit verbatim later
-                            let mut attr = TokenStream::new();
-                            attr.extend(std::iter::once(TokenTree::Punct(Punct::new(
-                                '#',
-                                Spacing::Alone,
-                            ))));
-                            attr.extend(std::iter::once(TokenTree::Group(Group::new(
-                                Delimiter::Bracket,
-                                g.stream(),
-                            ))));
-                            attrs.push(attr);
-                        }
-                        Some(tt) => {
-                            return Err(generate_compile_error(
-                                tt.span(),
-                                "expected attribute group after '#'",
-                            ));
-                        }
-                        None => {
-                            return Err(generate_compile_error(
-                                Span::call_site(),
-                                "expected attribute group after '#'",
-                            ));
-                        }
-                    }
-                }
-                _ => break,
-            }
-        }
-
-        Ok(attrs)
-    }
-
-    let mut tokens = function.clone().into_iter().peekable();
-
-    // Collect leading #[...] attributes
-    let attrs = parse_outer_attrs(&mut tokens)?;
-
-    let (is_pub, fn_style, fn_name) = process_name(&mut tokens)?; 
-    let (protocol, req_var_name) = if fn_style { 
-        process_arguments(&mut tokens)? 
-    } else { 
-        let protocol = process_protocol(&mut tokens)?;
-        (protocol, Ident::new("req", Span::call_site()))
-    };
-    let func_cont = process_func_content(&mut tokens)?;
-
-    Ok(Self::new(is_pub, fn_name, protocol, req_var_name, func_cont, attrs))
-}
-
+    return Ok(UrlArgs::new(
+        url_expr,
+        Some(config),
+        Some(middleware),
+        UrlFunc::new(
+            is_pub, 
+            fn_name, 
+            protocol,
+            req_var_name,
+            fn_cont,
+            outer_attrs
+        ),
+    )); 
+} 

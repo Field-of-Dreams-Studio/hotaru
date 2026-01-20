@@ -3,25 +3,25 @@ use std::iter::Peekable;
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
-use crate::helper::generate_compile_error; 
+use crate::helper::*;
 
-struct MiddleWare {
+pub struct MWFunc {
     pub is_pub: bool,
     pub name: Ident,
-    pub protocol: Ident, 
-    pub req_var_name: Ident, 
+    pub protocol: Ident,
+    pub req_var_name: Ident,
     pub cont: TokenStream,
-    pub attrs: Vec<TokenStream>,
+    pub attrs: OuterAttr,
 }
 
-impl MiddleWare {
+impl MWFunc {
     pub fn new(
         is_pub: bool,
         name: Ident,
         protocol: Ident,
-        req_var_name: Ident, 
+        req_var_name: Ident,
         cont: TokenStream,
-        attrs: Vec<TokenStream>,
+        attrs: OuterAttr,
     ) -> Self {
         Self {
             name,
@@ -31,287 +31,6 @@ impl MiddleWare {
             is_pub,
             attrs,
         }
-    }
-
-    pub fn parse(input: TokenStream) -> Result<Self, TokenStream> {
-        fn parse_outer_attrs(
-            tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-        ) -> Result<Vec<TokenStream>, TokenStream> {
-            let mut attrs = Vec::new();
-
-            loop {
-                match tokens.peek() {
-                    Some(TokenTree::Punct(p)) if p.as_char() == '#' => {
-                        // consume '#'
-                        tokens.next();
-
-                        match tokens.next() {
-                            Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Bracket => {
-                                // Reject inner attributes: #![...]
-                                let mut inside = g.stream().into_iter().peekable();
-                                if let Some(TokenTree::Punct(p)) = inside.peek() {
-                                    if p.as_char() == '!' {
-                                        return Err(generate_compile_error(
-                                            g.span(),
-                                            "inner attributes (#![...] ) are not supported here",
-                                        ));
-                                    }
-                                }
-
-                                // Rebuild as "#[ ... ]" so we can re-emit verbatim later
-                                let mut attr = TokenStream::new();
-                                attr.extend(std::iter::once(TokenTree::Punct(Punct::new(
-                                    '#',
-                                    Spacing::Alone,
-                                ))));
-                                attr.extend(std::iter::once(TokenTree::Group(Group::new(
-                                    Delimiter::Bracket,
-                                    g.stream(),
-                                ))));
-                                attrs.push(attr);
-                            }
-                            Some(tt) => {
-                                return Err(generate_compile_error(
-                                    tt.span(),
-                                    "expected attribute group after '#'",
-                                ));
-                            }
-                            None => {
-                                return Err(generate_compile_error(
-                                    Span::call_site(),
-                                    "expected attribute group after '#'",
-                                ));
-                            }
-                        }
-                    }
-                    _ => break,
-                }
-            }
-
-            Ok(attrs)
-        }
-
-        /// Return: (is_pub, is_fn_style, Ident) 
-        fn process_name(
-            tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-        ) -> Result<(bool, bool, Ident), TokenStream> {
-            let mut is_pub = false;
-            match tokens.peek() {
-                Some(TokenTree::Ident(ident)) if ident.to_string() == "pub" => {
-                    tokens.next();
-                    is_pub = true;
-                }
-                Some(_) => {}
-                None => {
-                    return Err(generate_compile_error(
-                        Span::call_site(),
-                        "Expected middleware name but found EOF",
-                    ));
-                }
-            };
-
-            let mut is_fn_style = false;
-            match tokens.peek() {
-                Some(TokenTree::Ident(ident)) if ident.to_string() == "fn" => {
-                    tokens.next();
-                    is_fn_style = true;
-                }
-                _ => {}
-            }
-
-            match tokens.next() {
-                Some(TokenTree::Ident(ident)) if ident.to_string() == "_" => {
-                    return Ok((
-                        is_pub,
-                        is_fn_style,
-                        Ident::new(&random_alpha_string(32), Span::call_site()),
-                    ));
-                }
-                Some(TokenTree::Ident(ident)) => Ok((is_pub, is_fn_style, ident)),
-                Some(token) => Err(generate_compile_error(
-                    token.span(),
-                    &format!(
-                        "Expected middleware name or `fn` keyword, but found {}",
-                        token.to_string()
-                    ),
-                )),
-                None => Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expected middleware name or `fn` keyword but found EOF",
-                )),
-            }
-        }
-
-        fn process_protocol(
-            tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-        ) -> Result<Ident, TokenStream> {
-            match tokens.next() {
-                Some(TokenTree::Punct(punct)) if punct.as_char() == '<' => {}
-                Some(tt) => {
-                    return Err(generate_compile_error(
-                        tt.span(),
-                        "Expect '< PROTOCOL >' around the protocol type after the middleware name",
-                    ));
-                }
-                None => {
-                    return Err(generate_compile_error(
-                        Span::call_site(),
-                        "Expoect some tokens after middleware name",
-                    ));
-                }
-            }
-
-            let protocol;
-            match tokens.next() {
-                Some(TokenTree::Ident(ident)) => protocol = ident,
-                Some(tt) => {
-                    return Err(generate_compile_error(
-                        tt.span(),
-                        "Protocol Identifier is Expected",
-                    ));
-                }
-                None => {
-                    return Err(generate_compile_error(
-                        Span::call_site(),
-                        "Expected Something",
-                    ));
-                }
-            }
-
-            match tokens.next() {
-                Some(TokenTree::Punct(punct)) if punct.as_char() == '>' => {}
-                Some(tt) => {
-                    return Err(generate_compile_error(
-                        tt.span(),
-                        "Expect '>' after the protocol type",
-                    ));
-                }
-                None => {
-                    return Err(generate_compile_error(
-                        Span::call_site(),
-                        "Expoect some tokens after middleware name",
-                    ));
-                }
-            }
-
-            Ok(protocol)
-        }
-
-        /// fn middleware_name(req: Protocol)
-        /// Return: (Protocol, req_var_name) 
-        fn process_arguments(
-            tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-        ) -> Result<(Ident, Ident), TokenStream> {
-            match tokens.next() {
-                Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis => {
-                    let mut inside_tokens = group.stream().into_iter().peekable();
-
-                    let req_var_name = match inside_tokens.next() {
-                        Some(TokenTree::Ident(ident)) => ident,
-                        Some(tt) => {
-                            return Err(generate_compile_error(
-                                tt.span(),
-                                "Expected request variable name",
-                            ));
-                        }
-                        None => {
-                            return Err(generate_compile_error(
-                                Span::call_site(),
-                                "Expected something inside the parentheses",
-                            ));
-                        }
-                    };
-
-                    match inside_tokens.next() {
-                        Some(TokenTree::Punct(punct)) if punct.as_char() == ':' => {}
-                        Some(tt) => {
-                            return Err(generate_compile_error(
-                                tt.span(),
-                                "Expected ':' after request variable name",
-                            ));
-                        }
-                        None => {
-                            return Err(generate_compile_error(
-                                Span::call_site(),
-                                "Expected ':' after request variable name",
-                            ));
-                        }
-                    };
-
-                    let protocol = match inside_tokens.next() {
-                        Some(TokenTree::Ident(ident)) => ident,
-                        Some(tt) => {
-                            return Err(generate_compile_error(
-                                tt.span(),
-                                "Expected Protocol type after ':'",
-                            ));
-                        }
-                        None => {
-                            return Err(generate_compile_error(
-                                Span::call_site(),
-                                "Expected Protocol type after ':'",
-                            ));
-                        }
-                    };
-
-                    if let Some(tt) = inside_tokens.next() {
-                        return Err(generate_compile_error(
-                            tt.span(),
-                            "Unexpected token inside parentheses",
-                        ));
-                    }
-
-                    Ok((protocol, req_var_name))
-                }
-                Some(_) => Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expected function arguments in parentheses",
-                )),
-                None => Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expected function arguments after middleware name",
-                )),
-            }
-        }
-
-        fn process_func_content(
-            tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-        ) -> Result<TokenStream, TokenStream> {
-            match tokens.next() {
-                Some(TokenTree::Group(group)) => {
-                    if group.delimiter() == Delimiter::Brace {
-                        Ok(group.stream())
-                    } else {
-                        Err(generate_compile_error(group.span(), "Expect middleware content"))
-                    }
-                }
-                Some(tt) => Err(generate_compile_error(tt.span(), "Expect middleware content")),
-                None => Err(generate_compile_error(
-                    Span::call_site(),
-                    "Expect some tokens",
-                )),
-            }
-        }
-
-        let mut tokens = input.into_iter().peekable();
-        let attrs = parse_outer_attrs(&mut tokens)?;
-        let (is_pub, fn_style, name) = process_name(&mut tokens)?;
-        let (protocol, req_var_name) = if fn_style {
-            process_arguments(&mut tokens)?
-        } else {
-            let protocol = process_protocol(&mut tokens)?;
-            (protocol, Ident::new("req", Span::call_site()))
-        };
-        let cont = process_func_content(&mut tokens)?;
-
-        Ok(Self::new(
-            is_pub,
-            name,
-            protocol,
-            req_var_name,
-            cont,
-            attrs,
-        ))
     }
 
     pub fn expand(&self) -> TokenStream {
@@ -337,9 +56,27 @@ impl MiddleWare {
 
         // #[...] pub struct <Name>;
         let mut struct_decl = TokenStream::new();
-        for a in &self.attrs {
-            struct_decl.extend(a.clone());
-        }
+        struct_decl.extend(self.attrs.reform());
+
+        // #[allow(non_camel_case_types)]
+        let mut inner = TokenStream::new(); 
+        inner.extend(vec![
+            TokenTree::Ident(Ident::new("allow", Span::call_site())),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, {
+                let mut g = TokenStream::new();
+                g.extend(std::iter::once(TokenTree::Ident(Ident::new(
+                    "non_camel_case_types",
+                    Span::call_site(),
+                ))));
+                g
+            })),
+        ]);
+        struct_decl.extend(vec![
+            TokenTree::Punct(Punct::new('#', Spacing::Alone)),
+            TokenTree::Group(Group::new(Delimiter::Bracket, inner)),
+        ]);
+
+        // pub struct name
         struct_decl.extend(vec![
             TokenTree::Ident(Ident::new("pub", Span::call_site())),
             TokenTree::Ident(Ident::new("struct", Span::call_site())),
@@ -710,3 +447,67 @@ impl MiddleWare {
     }
 }
 
+pub fn parse_trans(input: TokenStream) -> Result<MWFunc, TokenStream> {
+    let mut tokens = into_peekable_iter(input);
+    let attrs = parse_outer_attrs(&mut tokens)?;
+    let is_pub = match_ident_consume(&mut tokens, "pub");
+    let name = expect_any_ident(&mut tokens, "Expect middleware name")?;
+    let _ = expect_punct_consume(&mut tokens, "<", "Expect '<' before the protocol type")?;
+    let protocol = expect_any_ident(&mut tokens, "Protocol Identifier is Expected")?;
+    let _ = expect_punct_consume(&mut tokens, ">", "Expect '>' after the protocol type")?;
+    let cont = expect_group_consume_return_inner(
+        &mut tokens,
+        Delimiter::Brace,
+        "Expect '{' for middleware content",
+    )?;
+    Ok(MWFunc::new(
+        is_pub,
+        name,
+        protocol,
+        Ident::new("req", Span::call_site()),
+        cont,
+        attrs,
+    ))
+}
+
+/// Parse middleware declaration by using proc_macro_attribute-like syntax
+/// e.g.
+/// #[middleware]
+/// pub fn my_middleware(req: Protocol) {
+///    // middleware body
+/// }
+pub fn parse_semi_trans_or_attr(input: TokenStream) -> Result<MWFunc, TokenStream> {
+    let mut tokens = into_peekable_iter(input);
+    let attrs = parse_outer_attrs(&mut tokens)?;
+    let is_pub = match_ident_consume(&mut tokens, "pub");
+    let _ = expect_ident_consume(&mut tokens, "fn", "Expect 'fn' for middleware function")?;
+    let name = expect_any_ident(&mut tokens, "Expect middleware function name")?;
+    let _ = expect_punct_consume(&mut tokens, "<", "Expected '<' after function name")?;
+    let protocol = expect_any_ident(&mut tokens, "Expected protocol identifier after '<'")?;
+    let _ = expect_punct_consume(&mut tokens, ">", "Expected '>' after protocol identifier")?;
+    let mut group = into_peekable_iter(expect_group_consume_return_inner(
+        &mut tokens,
+        Delimiter::Parenthesis,
+        "Expected function parameters inside parentheses",
+    )?);
+    let req_var_name = match expect_any_ident(
+        &mut group,
+        "Expected request variable name as first parameter",
+    ) {
+        Ok(id) => id,
+        Err(_) => Ident::new("req", Span::call_site()),
+    };
+    let cont = expect_group_consume_return_inner(
+        &mut tokens,
+        Delimiter::Brace,
+        "Expect '{' for middleware content",
+    )?;
+    Ok(MWFunc::new(
+        is_pub,
+        name,
+        protocol,
+        req_var_name,
+        cont,
+        attrs,
+    ))
+}

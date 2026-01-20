@@ -1,0 +1,11 @@
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hotaru = { path = "../hotaru" }
+htmstd = { path = "../htmstd" }
+tokio = { version = "1", features = ["full"] }
+akari = "0.2"
+once_cell = "1"

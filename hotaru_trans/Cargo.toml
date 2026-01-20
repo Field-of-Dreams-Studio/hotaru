@@ -10,13 +10,19 @@ categories = ["network-programming", "web-programming::http-server"]
 keywords = ["hotaru", "macros"]
 
 [dependencies]
-hotaru_meta = { version = "0.8.0", path = "../hotaru_meta" } 
 hotaru_lib = { version = "0.7.3" } 
+cfg-if = "1.0" 
 ctor = { version = "0.4.0", optional = true }
 
+[dev-dependencies]
+proc-macro2 = "1"
+
 [features]
-default = []
-external-ctor = ["ctor"]
+default = ["semi-trans"] 
+external-ctor = ["ctor"] 
+trans = [] 
+semi-trans = [] 
+attr = [] 
 
 [lib]
 proc-macro = true

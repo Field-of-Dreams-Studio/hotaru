@@ -1,7 +1,7 @@
-use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
 /// Generate constructor attribute for automatic registration
-/// By default uses built-in #[hotaru::hotaru_meta::ctor]
+/// By default uses built-in #[hotaru::hotaru_trans::ctor]
 /// Enable "external-ctor" feature to use #[ctor::ctor] from ctor crate instead
 pub fn gen_ctor() -> TokenStream {
     #[cfg(feature = "external-ctor")]
@@ -26,7 +26,7 @@ pub fn gen_ctor() -> TokenStream {
 
     #[cfg(not(feature = "external-ctor"))]
     {
-        // Use built-in hotaru::hotaru_meta::ctor
+        // Use built-in hotaru::::ctor
         let mut ctor_macro = TokenStream::new();
         ctor_macro.extend(vec![
             TokenTree::Punct(Punct::new('#', Spacing::Alone)),
@@ -36,7 +36,7 @@ pub fn gen_ctor() -> TokenStream {
                     TokenTree::Ident(Ident::new("hotaru", Span::call_site())),
                     TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                     TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("hotaru_meta", Span::call_site())),
+                    TokenTree::Ident(Ident::new("hrt", Span::call_site())),
                     TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                     TokenTree::Punct(Punct::new(':', Spacing::Alone)),
                     TokenTree::Ident(Ident::new("ctor", Span::call_site())),

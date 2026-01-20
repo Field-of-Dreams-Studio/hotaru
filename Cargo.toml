@@ -7,7 +7,7 @@ members = [
     "hotaru_core",
     "hotaru_lib",
 
-    "h2per",
+    # "h2per",
     "ahttpm",
     "hotaru_grpc",
 
