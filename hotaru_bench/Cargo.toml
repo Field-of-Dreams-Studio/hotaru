@@ -5,15 +5,45 @@ edition = "2024"
 
 [features]
 default = []
-hotaru_server = ["hotaru", "hotaru_core", "akari", "ctor"]
-actix_server = ["actix-web", "actix-rt"]
-axum_server = ["axum", "tower"]
-rocket_server = ["rocket"]
+hotaru_server = [
+    "hotaru",
+    "hotaru_core",
+    "akari",
+    "ctor",
+    "tokio-postgres",
+    "deadpool-postgres",
+    "moka",
+]
+actix_server = [
+    "actix-web",
+    "actix-rt",
+    "tokio-postgres",
+    "deadpool-postgres",
+    "moka",
+    "askama",
+]
+axum_server = [
+    "axum",
+    "tower",
+    "tokio-postgres",
+    "deadpool-postgres",
+    "moka",
+    "askama",
+]
+rocket_server = [
+    "rocket",
+    "rocket_dyn_templates",
+    "tokio-postgres",
+    "deadpool-postgres",
+    "moka",
+]
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+rand = { version = "0.8", features = ["small_rng"] }
+httpdate = "1"
 
 # Hotaru dependencies
 hotaru = { path = "../hotaru", optional = true }
@@ -21,9 +51,15 @@ hotaru_core = { path = "../hotaru_core", optional = true }
 akari = { version = "0.2.6", optional = true }
 ctor = { version = "0.4", optional = true }
 
+# Database
+tokio-postgres = { version = "0.7", optional = true }
+deadpool-postgres = { version = "0.14", optional = true }
+moka = { version = "0.12", features = ["sync"], optional = true }
+
 # Actix dependencies
 actix-web = { version = "4", optional = true }
 actix-rt = { version = "2", optional = true }
+askama = { version = "0.12", optional = true }
 
 # Axum dependencies
 axum = { version = "0.8.7", optional = true }
@@ -31,3 +67,4 @@ tower = { version = "0.5.2", optional = true }
 
 # Rocket dependencies
 rocket = { version = "0.5", features = ["json"], optional = true }
+rocket_dyn_templates = { version = "0.1", features = ["tera"], optional = true }
