@@ -43,15 +43,15 @@ pub use hotaru_core::http::safety::HttpSafety;
 pub use hotaru_core::extensions::*; 
 
 pub use hotaru_core;
-pub use akari;
+pub use akari; 
 
-pub use hotaru_meta::endpoint;
-pub use hotaru_meta::middleware;
-pub use hotaru_meta::{LApp, LUrl, LPattern};
-// Re-export all hotaru_meta items (including ctor when available)
-pub use hotaru_meta;
+pub use hotaru_trans as hrt; 
+pub use hrt::endpoint;
+pub use hrt::middleware;
+pub use hrt::{LApp, LUrl, LPattern}; 
+pub use hrt::ctor as hrt_ctor; 
 
-pub use ahttpm;
+pub use ahttpm; 
 
 pub use hotaru_lib;
 
