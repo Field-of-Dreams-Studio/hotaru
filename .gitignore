@@ -26,6 +26,7 @@ doc/
 .settings/
 *.sublime-project
 *.sublime-workspace
+.vs/
 
 # Keys, certificates, and secrets
 *.pem

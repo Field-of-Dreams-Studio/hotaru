@@ -1,6 +1,6 @@
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.7.6-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.7.7-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![GPL-3.0 License](https://img.shields.io/badge/license-GNU-blue.svg)](LICENSE)
 
@@ -82,7 +82,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.7.3"
+hotaru = "0.7.7"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -96,7 +96,7 @@ Hotaru supports the following optional features:
   **Note**: When enabling `external-ctor`, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.7.3", features = ["external-ctor"] }
+  hotaru = { version = "0.7.7", features = ["external-ctor"] }
   ctor = "0.4.0"  # Required when external-ctor feature is enabled
   tokio = { version = "1", features = ["full"] }
   ```
@@ -211,7 +211,7 @@ endpoint! {
 
 - `endpoint!` and `middleware!` auto-register at startup (constructor-based), so there is no manual `router.register()` step.
 - Always use brace syntax `{}` and place doc comments inside the macro block.
-- Optional fn-style: `pub fn name(req: HTTP) { ... }`; angle-bracket form defaults to `req`.
+- Optional fn-style: `pub fn name(req: HTTP) { ... }` (new in 0.7.7); angle-bracket form (hotaru blocks) defaults to `req`.
 - Our philosophy is to wrap anything into macros to keep endpoints and middleware self-contained; see `macro_ra.md` for the minimal syntax and rationale.
 - Analyzer support is planned via custom analyzer tools.
 
@@ -313,7 +313,12 @@ Hotaru is built on a modular architecture:
 
 ## 📋 Changelog 
 
-### 0.7.x (Current)
+### 0.7.7 (Current)
+- **Fn-style blocks**: New syntax `pub fn name(req: HTTP) { ... }` for `endpoint!` and `middleware!` macros (original hotaru blocks syntax preserved)
+- **Client IP access**: `req.client_ip()`, `req.client_ip_only()`, `req.server_addr()` and related methods for accessing socket addresses in handlers
+- Bug fix for URL routing
+
+### 0.7.x
 - Multi-protocol support (HTTP, WebSocket, custom TCP)
 - Enhanced security controls with HttpSafety
 - Improved middleware system with protocol inheritance
@@ -322,8 +327,7 @@ Hotaru is built on a modular architecture:
 - `.worker()` method now properly configures dedicated worker threads per App instance
 - New `LApp!`, `LUrl!`, `LPattern!` macros for simplified lazy static declarations
 - Fixed `hotaru new` and `hotaru init` to generate correct `endpoint!` macro syntax
-- Built-in constructor implementation (no external `ctor` dependency required) 
-- **Client IP access**: `ctx.client_ip()` and related methods for accessing socket addresses in handlers
+- Built-in constructor implementation (no external `ctor` dependency required)
 
 ### 0.6.x
 - Protocol abstraction layer
@@ -336,15 +340,7 @@ Hotaru is built on a modular architecture:
 - Akari templating integration
 - Cookie manipulation APIs
 - File upload handling
-- Form data processing improvements
-
-## 🔮 Schedule 
-
-| Version No. | Content | Release Date (Approx.) | 
-| --- | --- | --- | 
-| 0.8.0 | HTTP Outbound | Jan.2026 | 
-| 0.8.3 | Using new template engine | Jan.2026 | 
-| 0.8.9 | Bug Fixes | May.2026 | 
+- Form data processing improvements 
 
 ## 📚 Learn More
 

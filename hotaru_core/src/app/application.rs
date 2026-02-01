@@ -238,6 +238,27 @@ impl App {
         &self.statics
     } 
 
+    pub fn get_config<T: Clone + Send + Sync + 'static>(self: &Arc<Self>) -> Option<T> {
+        self.config.get::<T>().cloned()
+    }
+
+    pub fn get_static<T: Clone + Send + Sync + 'static>(self: &Arc<Self>, key: &str) -> Option<T> {
+        self.statics.get::<T>(key).cloned()
+    }
+
+    pub fn get_config_or_default<T: Clone + Default + Send + Sync + 'static>(
+        self: &Arc<Self>,
+    ) -> T {
+        self.config.get::<T>().cloned().unwrap_or_default()
+    }
+
+    pub fn get_static_or_default<T: Clone + Default + Send + Sync + 'static>(
+        self: &Arc<Self>,
+        key: &str,
+    ) -> T {
+        self.statics.get::<T>(key).cloned().unwrap_or_default()
+    }
+
     /// Get the default protocol type (first registered protocol)
     pub fn default_protocol_type(self: &Arc<Self>) -> TypeId {
         // Return the first protocol's TypeId from registry

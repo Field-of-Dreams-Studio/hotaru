@@ -1,6 +1,6 @@
 [package]
 name = "hotaru"
-version = "0.7.6"
+version = "0.7.7"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "Small, sweet, easy framework for full-stack web application"
@@ -19,7 +19,7 @@ futures = "0.3"
 once_cell = "1.17.2"
 # hotaru_meta = { path = "../hotaru_meta", version="0.8.0"}
 hotaru_trans = { path = "../hotaru_trans", version="0.8.0" } 
-hotaru_core = { path = "../hotaru_core", version="0.7.6" }
+hotaru_core = { path = "../hotaru_core", version="0.7.8" }
 ahttpm = { path = "../ahttpm", version="0.7.0" }
 hotaru_lib = { path = "../hotaru_lib", version="0.7.3", features = ["url_encoding", "compression"]  }
 # ctor is only needed when external-ctor feature is enabled

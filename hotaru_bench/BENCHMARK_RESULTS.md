@@ -25,6 +25,26 @@ Test Parameters: 4 threads, 16 connections, 10 seconds duration
 | Actix-web | 150,724 | 100.98µs | 16.53 MB/s |
 | Axum | 149,677 | 101.89µs | 16.42 MB/s |
 
+### Single Database Query Test (`/db`)
+
+Results pending - database tests not yet benchmarked.
+
+### Multiple Queries Test (`/queries`)
+
+Results pending - database tests not yet benchmarked.
+
+### Updates Test (`/updates`)
+
+Results pending - database tests not yet benchmarked.
+
+### Cached Queries Test (`/cached-worlds`)
+
+Results pending - database tests not yet benchmarked.
+
+### Fortunes Test (`/fortunes`)
+
+Results pending - database tests not yet benchmarked.
+
 ## 🏆 Performance Rankings
 
 ### JSON Endpoint
