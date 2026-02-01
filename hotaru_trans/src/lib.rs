@@ -29,8 +29,8 @@ cfg_if::cfg_if! {
         } 
     } else if #[cfg(feature = "attr")] {
         #[proc_macro_attribute] 
-        pub fn endpoint(_attr: TokenStream, input: TokenStream) -> TokenStream {
-            match url::parse_semi_trans(input) { 
+        pub fn endpoint(attr: TokenStream, input: TokenStream) -> TokenStream {
+            match url::parse_attr(attr, input) { 
                 Ok(url_args) => url_args.expand(),
                 Err(err) => err, 
             }
@@ -196,4 +196,4 @@ pub fn LUrl(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn LPattern(input: TokenStream) -> TokenStream {
     generate_lazy_static!("SPattern")(input)
-}
+} 

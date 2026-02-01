@@ -212,7 +212,46 @@ pub fn expect_stream_before_comma_consume<T: AsRef<str>>(
             }
         }
     }
-}
+} 
+
+/// Expect the next token in the stream to be a literal. 
+/// If it is, consume it and return it. 
+/// If it is not, return a compile error TokenStream with the given error message. 
+pub fn expect_literal_consume<T: AsRef<str>>(
+    stream: &mut Peekable<impl Iterator<Item = TokenTree>>, 
+    error: T
+) -> Result<Literal, TokenStream> { 
+    match stream.peek() {
+        Some(TokenTree::Literal(lit)) => {
+            let lit = lit.clone(); // Preserve the literal before consuming 
+            stream.next(); 
+            Ok(lit.clone()) 
+        } 
+        Some(tt) => Err(generate_compile_error(
+            tt.span(), 
+            error.as_ref()
+        )), 
+        None => Err(generate_compile_error(
+            Span::call_site(), 
+            error.as_ref()
+        )), 
+    } 
+} 
+
+/// If the next token in the stream is a literal, consume it and return it. 
+/// Otherwise, return None without consuming anything. 
+pub fn match_any_literal_consume(
+    stream: &mut Peekable<impl Iterator<Item = TokenTree>>, 
+) -> Option<Literal> { 
+    match stream.peek() {
+        Some(TokenTree::Literal(lit)) => {
+            let lit = lit.clone(); // Preserve the literal before consuming 
+            stream.next(); 
+            Some(lit.clone()) 
+        } 
+        _ => None, 
+    } 
+} 
 
 pub fn into_peekable_iter(
     tokens: TokenStream

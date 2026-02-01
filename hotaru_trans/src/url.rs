@@ -8,7 +8,7 @@ use crate::ctor::gen_ctor;
 
 /// Arguments for the `url` macro.
 pub struct UrlArgs {
-    pub url_expr: TokenStream,
+    pub url_expr: UrlExpr,
     pub config: Option<Vec<TokenStream>>,
     pub middlewares: Option<Vec<TokenStream>>,
     pub op: UrlFunc,
@@ -16,7 +16,7 @@ pub struct UrlArgs {
 
 impl UrlArgs {
     pub fn new(
-        url_expr: TokenStream,
+        url_expr: UrlExpr,
         config: Option<Vec<TokenStream>>,
         middlewares: Option<Vec<TokenStream>>,
         op: UrlFunc,
@@ -59,29 +59,7 @@ impl UrlArgs {
         // endpoint.set_method(std::sync::Arc::new(__wrapper_xxx));
         
         // Modify url_expr to inject the protocol type parameter
-        let mut modified_url_expr = TokenStream::new();
-        let mut url_tokens = self.url_expr.clone().into_iter().peekable();
-        
-        // Process the url expression to inject type parameter after .url
-        while let Some(token) = url_tokens.next() {
-            modified_url_expr.extend(std::iter::once(token.clone()));
-            
-            // Check if this is the "url" identifier
-            if let TokenTree::Ident(ident) = &token {
-                if ident.to_string() == "url" {
-                    // Inject the type parameter ::<Protocol, _>
-                    modified_url_expr.extend(vec![
-                        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                        TokenTree::Punct(Punct::new('<', Spacing::Alone)),
-                        TokenTree::Ident(self.op.protocol.clone()),
-                        TokenTree::Punct(Punct::new(',', Spacing::Alone)),
-                        TokenTree::Ident(Ident::new("_", Span::call_site())),
-                        TokenTree::Punct(Punct::new('>', Spacing::Alone)),
-                    ]);
-                }
-            }
-        }
+        let modified_url_expr = self.url_expr.expand(self.op.protocol.clone()); 
         
         let mut cont = TokenStream::new();
         cont.extend(vec![
@@ -458,15 +436,120 @@ impl UrlFunc {
         ]);
         tokens
     }
+}  
+
+pub struct UrlExpr { 
+    app: Ident, 
+    method: Ident, 
+    literal: Literal, 
+} 
+
+impl UrlExpr { 
+    /// Accepts any of the following forms: 
+    /// APP_IDENTIFIER("path") 
+    /// APP_IDENTIFIER: "path" 
+    /// APP_IDENTIFIER.[url|lit_url]("path")
+    /// "path" // Defaults to APP 
+    /// TODO: Check the Url Literal format? 
+    pub fn from_tokens(input: TokenStream) -> Result<Self, TokenStream> { 
+        let mut tokens = into_peekable_iter(input); 
+        match tokens.peek() { 
+            Some(TokenTree::Ident(app_ident)) => { 
+                let app = app_ident.clone(); 
+                tokens.next(); // Consume app identifier 
+                match tokens.peek() { 
+                    Some(TokenTree::Punct(punct)) if punct.as_char() == ':' => { 
+                        tokens.next(); // Consume ':' 
+                        match tokens.next() { 
+                            Some(TokenTree::Literal(lit)) => { 
+                                Ok(UrlExpr { 
+                                    app, 
+                                    method: Ident::new("url", Span::call_site()), 
+                                    literal: lit, 
+                                }) 
+                            } 
+                            _ => Err(generate_compile_error(Span::call_site(), "Expected a string literal after ':'")), 
+                        } 
+                    } 
+                    Some(TokenTree::Punct(punct)) if punct.as_char() == '.' => { 
+                        tokens.next(); // Consume '.' 
+                        match tokens.next() { 
+                            Some(TokenTree::Ident(method_ident)) if method_ident.to_string() == "url" || method_ident.to_string() == "lit_url" => { 
+                                let method = method_ident.clone(); 
+                                match tokens.next() { 
+                                    Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis => { 
+                                        let mut inner_tokens = group.stream().into_iter(); 
+                                        match inner_tokens.next() { 
+                                            Some(TokenTree::Literal(lit)) => { 
+                                                Ok(UrlExpr { 
+                                                    app, 
+                                                    method, 
+                                                    literal: lit, 
+                                                }) 
+                                            } 
+                                            _ => Err(generate_compile_error(Span::call_site(), "Expected a string literal inside the parentheses")), 
+                                        } 
+                                    } 
+                                    _ => Err(generate_compile_error(Span::call_site(), "Expected parentheses after method identifier")), 
+                                } 
+                            } 
+                            _ => Err(generate_compile_error(Span::call_site(), "Expected 'url' or 'lit_url' method identifier after '.'")), 
+                        } 
+                    } 
+                    _ => Err(generate_compile_error(Span::call_site(), "Expected ':' or '.' after application identifier")),
+                }
+            } 
+            Some(TokenTree::Literal(lit)) => { 
+                Ok(UrlExpr { 
+                    app: Ident::new("APP", Span::call_site()), 
+                    method: Ident::new("url", Span::call_site()), 
+                    literal: lit.clone(), 
+                }) 
+            } 
+            _ => Err(generate_compile_error(Span::call_site(), "Expected an application identifier or a string literal for URL")), 
+        }
+    } 
+
+    pub fn expand(&self, protocol: Ident) -> TokenStream { 
+        let mut tokens = TokenStream::new(); 
+        tokens.extend(vec![ 
+            TokenTree::Ident(self.app.clone()), 
+            TokenTree::Punct(Punct::new('.', Spacing::Alone)), 
+            TokenTree::Ident(self.method.clone()), 
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+            TokenTree::Ident(protocol),
+            TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("_", Span::call_site())),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, { 
+                let mut g = TokenStream::new(); 
+                g.extend(vec![TokenTree::Literal(self.literal.clone())]); 
+                g 
+            })), 
+        ]); 
+        tokens 
+    } 
 }
 
 /// Parse the attribute input into UrlAttr 
+/// endpoint! { 
+///   <url-expr>,
+///   middleware = [ ... ],  // Optional
+///   config = [ ... ], // Optional
+///   endpoint_name<Protocol> {
+///     ...
+///  }
+/// }
+/// Only enabled when trans feature is enabled 
+#[allow(dead_code)]
 pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {  
     /// Parse the function definition into UrlFunc 
     fn parse_inner(tokens: &mut Peekable<impl Iterator<Item = TokenTree>>) -> Result<UrlFunc, TokenStream> {
         let attrs = parse_outer_attrs(tokens)?; 
-        let mut is_pub = match_ident_consume(tokens, "pub");  
-        let mut fn_name = match match_punct_consume(tokens, "_"){ 
+        let is_pub = match_ident_consume(tokens, "pub");  
+        let fn_name = match match_punct_consume(tokens, "_"){ 
             true => {
                 let random_name = format!("auto_generated_{}", random_alpha_string(8));
                 Ident::new(&random_name, Span::call_site()) 
@@ -505,7 +588,7 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
     } 
 
     return Ok(UrlArgs::new(
-        url_expr,
+        UrlExpr::from_tokens(url_expr)?,
         config,
         middlewares,
         parse_inner(&mut tokens)?,
@@ -514,12 +597,14 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
 
 /// Expect to be in the following format: 
 /// #[endpoint] 
-/// #[url(APP.url("..."))] 
+/// #[url(...)] // Required, Refer to UrlExpr struct 
 /// #[config([ ... ])] // Optional 
 /// #[middleware([ ... ])] // Optional 
-/// pub fn endpoint_name(req: Protocol) { 
+/// pub fn endpoint_name<Protocol>() { 
 ///    ... 
-/// }
+/// } 
+/// Only enabled when semi_trans feature is enabled 
+#[allow(dead_code)]
 pub fn parse_semi_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {  
     let mut tokens = into_peekable_iter(args); 
     
@@ -549,7 +634,7 @@ pub fn parse_semi_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
     let fn_cont = expect_group_consume_return_inner(&mut tokens, Delimiter::Brace, "Expected function body inside braces")?; 
 
     return Ok(UrlArgs::new(
-        url_expr,
+        UrlExpr::from_tokens(url_expr)?,
         Some(config),
         Some(middleware),
         UrlFunc::new(
@@ -560,5 +645,64 @@ pub fn parse_semi_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
             fn_cont,
             outer_attrs
         ),
+    )); 
+} 
+
+/// Expect to be in the following format: 
+/// #[endpoint(UrlExpr, config = [...], middleware = [...])] 
+/// pub fn endpoint_name<Protocol>() { 
+///    ... 
+/// } 
+/// Only enabled when attr feature is enabled 
+#[allow(dead_code)] 
+pub fn parse_attr(attr: TokenStream, args: TokenStream) -> Result<UrlArgs, TokenStream> { 
+    let mut attr = into_peekable_iter(attr);
+    let mut tokens = into_peekable_iter(args); 
+
+    // Parse attribute arguments 
+    let url_expr = expect_stream_before_comma_consume(&mut attr, false, "Expected URL Pattern")?; 
+    let mut middlewares = None; 
+    let mut config = None; 
+    if match_ident_consume(&mut attr, "middleware") { 
+        attr.next(); // Consume the `=` 
+        middlewares = Some(expect_array_consume(&mut attr, "Expected an array for middleware")?);
+    }  
+    if match_ident_consume(&mut attr, "config") { 
+        attr.next(); // Consume the `=`  
+        config = Some(expect_array_consume(&mut attr, "Expected an array for config")?); 
+    } 
+
+    let outer_attrs = parse_outer_attrs(&mut tokens)?; 
+    let is_pub = match_ident_consume(&mut tokens, "pub"); 
+    let _ = expect_ident_consume(&mut tokens, "fn", "Expected 'fn' keyword for function definition")?; 
+    let fn_name = match match_punct_consume(&mut tokens, "_"){ 
+        true => {
+            let random_name = format!("auto_generated_{}", random_alpha_string(8));
+            Ident::new(&random_name, Span::call_site()) 
+        }, 
+        false => expect_any_ident(&mut tokens, "Expected function name")? 
+    }; 
+    let _ = expect_punct_consume(&mut tokens, "<", "Expected '<' after function name")?; 
+    let protocol = expect_any_ident(&mut tokens, "Expected protocol identifier after '<'")?;
+    let _ = expect_punct_consume(&mut tokens, ">", "Expected '>' after protocol identifier")?;
+    let mut group = into_peekable_iter(expect_group_consume_return_inner(&mut tokens, Delimiter::Parenthesis, "Expected function parameters inside parentheses")?); 
+    let req_var_name = match expect_any_ident(&mut group, "Expected request variable name as first parameter") { 
+        Ok(id) => id, 
+        Err(_) => Ident::new("req", Span::call_site()), 
+    }; 
+    let fn_cont = expect_group_consume_return_inner(&mut tokens, Delimiter::Brace, "Expected function body inside braces")?; 
+
+    return Ok(UrlArgs::new(
+        UrlExpr::from_tokens(url_expr)?,
+        config,
+        middlewares,
+        UrlFunc::new(
+            is_pub, 
+            fn_name, 
+            protocol,
+            req_var_name,
+            fn_cont,
+            outer_attrs
+        ), 
     )); 
 } 
