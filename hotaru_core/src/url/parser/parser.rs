@@ -495,7 +495,7 @@ mod tests {
 
     #[test]
     fn error_anypath_mixed_with_literal() {
-        let tokens = tokenize("/files-<**path>");
+        let tokens = tokenize("/files\\<**path>");
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(pats, vec![PathPattern::Literal("files<**path>".into())]);
         assert_eq!(names, vec![None]);
