@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -72,7 +73,13 @@ impl HttpClientContext {
         key: K,
         value: V,
     ) -> Self {
-        self.locals.set(key, value);
+        let key = key.into();
+        if let Some(s) = (&value as &dyn Any).downcast_ref::<&'static str>().copied() {
+            self.locals.set(key.clone(), s);
+            self.locals.set(key, s.to_string());
+        } else {
+            self.locals.set(key, value);
+        }
         self
     }
 
@@ -209,7 +216,7 @@ mod test {
 
         let ctx = HttpClientContext::new(client)
             .set_config(crate::http::safety::HttpSafety::default())
-            .set_local("auth_token", "xyz");
+            .set_local("auth_token", "xyz".to_string());
 
         assert!(ctx.get_config::<crate::http::safety::HttpSafety>().is_some());
         assert_eq!(ctx.get_local::<String>("auth_token").unwrap(), "xyz");
