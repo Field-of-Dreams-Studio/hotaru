@@ -3,11 +3,12 @@ pub mod stream;
 pub mod error; 
 pub mod builder; 
 pub mod protocol; 
+pub mod compat;
 pub mod test; 
 
 pub use self::builder::ConnectionBuilder;  
-// TODO: Rename builder::Protocol to ConnectionProtocol or ClientProtocol
-// pub use self::builder::Protocol; 
+#[allow(deprecated)]
+pub use self::compat::{LegacyConnectionBuilder, LegacyProtocol};
 pub use self::stream::{TcpConnectionStream, TcpReader, TcpWriter, split_connection};
 pub use self::error::Result; 
 
@@ -28,5 +29,3 @@ pub use self::protocol::{
 // Alias for generic connection stream for compatibility
 pub use self::stream::TcpConnectionStream as Connection; 
 pub use self::connection::ConnectionStatus;
-
-

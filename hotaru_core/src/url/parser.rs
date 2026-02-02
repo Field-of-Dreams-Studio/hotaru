@@ -1,4 +1,5 @@
 use crate::url::{parser::parser::PatternError, PathPattern};
+use std::collections::HashMap;
 
 pub(self) mod lexer; 
 pub(self) mod parser; 
@@ -106,3 +107,89 @@ pub(self) mod parser;
 pub fn parse<T: AsRef<str>>(input: T) -> Result<(Vec<PathPattern>, Vec<Option<String>>), PatternError> {
     parser::tokens_to_patterns(&lexer::tokenize(input.as_ref())) 
 } 
+
+/// Substitute parameters into a parsed URL pattern to generate a final URL path.
+pub fn substitute(
+    patterns: &[PathPattern],
+    names: &[Option<String>],
+    params: &HashMap<String, String>,
+) -> Result<String, String> {
+    if patterns.len() != names.len() {
+        return Err("Pattern and name list length mismatch".to_string());
+    }
+
+    let mut segments: Vec<String> = Vec::with_capacity(patterns.len());
+
+    for (idx, pattern) in patterns.iter().enumerate() {
+        match pattern {
+            PathPattern::Literal(lit) => {
+                segments.push(lit.clone());
+            }
+            PathPattern::Any | PathPattern::Regex(_) => {
+                let name = names
+                    .get(idx)
+                    .and_then(|opt| opt.as_ref())
+                    .ok_or_else(|| format!("Missing parameter name at index {}", idx))?;
+                let value = params
+                    .get(name)
+                    .ok_or_else(|| format!("Missing parameter: {}", name))?;
+                segments.push(value.clone());
+            }
+            PathPattern::AnyPath => {
+                let name = names
+                    .get(idx)
+                    .and_then(|opt| opt.as_ref())
+                    .ok_or_else(|| format!("Missing parameter name at index {}", idx))?;
+                let value = params
+                    .get(name)
+                    .ok_or_else(|| format!("Missing parameter: {}", name))?;
+                segments.push(value.trim_start_matches('/').to_string());
+                break;
+            }
+        }
+    }
+
+    let path = segments.join("/");
+    if path.is_empty() {
+        Ok("/".to_string())
+    } else {
+        Ok(format!("/{}", path))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{parse, substitute};
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_url_substitution() {
+        let (patterns, names) = parse("/users/<id>/posts/<post_id>").unwrap();
+        let mut params = HashMap::new();
+        params.insert("id".to_string(), "123".to_string());
+        params.insert("post_id".to_string(), "456".to_string());
+
+        assert_eq!(
+            substitute(&patterns, &names, &params).unwrap(),
+            "/users/123/posts/456"
+        );
+    }
+
+    #[test]
+    fn test_url_substitution_missing_param() {
+        let (patterns, names) = parse("/users/<id>").unwrap();
+        let params: HashMap<String, String> = HashMap::new();
+        assert!(substitute(&patterns, &names, &params).is_err());
+    }
+
+    #[test]
+    fn test_url_substitution_typed_params() {
+        let (patterns, names) = parse("/page-<uint:page>").unwrap();
+        let mut params = HashMap::new();
+        params.insert("page".to_string(), "page-42".to_string());
+        assert_eq!(
+            substitute(&patterns, &names, &params).unwrap(),
+            "/page-42"
+        );
+    }
+}

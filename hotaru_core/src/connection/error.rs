@@ -12,6 +12,7 @@ pub enum ConnectionError {
     ConnectionClosed,
     ProtocolError(String),
     PoolExhausted,
+    PortRequired,
 
     PayloadTooLarge, 
     InvalidFrameFormat, 
@@ -37,6 +38,7 @@ impl fmt::Display for ConnectionError {
             Self::ConnectionClosed => write!(f, "Connection closed unexpectedly"),
             Self::ProtocolError(err) => write!(f, "Protocol error: {}", err),
             Self::PoolExhausted => write!(f, "Connection pool exhausted"),
+            Self::PortRequired => write!(f, "Port is required but was not provided"),
 
             Self::PayloadTooLarge => write!(f, "Payload too large"), 
             Self::InvalidFrameFormat => write!(f, "Invalid frame format"), 

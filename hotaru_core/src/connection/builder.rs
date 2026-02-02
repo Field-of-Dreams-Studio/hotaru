@@ -1,4 +1,4 @@
-use std::fmt;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 use rustls_pemfile::Item;
@@ -12,37 +12,13 @@ use crate::debug_log;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::connection::error::{ConnectionError, Result}; 
+use super::protocol::Protocol;
 use super::stream::TcpConnectionStream; 
 
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read};
 use std::path::Path;
-
-/// Protocol to use for database connections
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Protocol {
-    Postgres,
-    MySQL, 
-    MongoDB,
-    Redis,
-    HTTP, 
-    WebSocket, 
-    Custom,
-} 
-
-impl fmt::Display for Protocol {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Postgres => write!(f, "postgres"), // PostgreSQL protocol 
-            Self::MySQL => write!(f, "mysql"), // MySQL protocol 
-            Self::MongoDB => write!(f, "mongodb"), // MongoDB protocol 
-            Self::Redis => write!(f, "redis"), // Redis protocol 
-            Self::HTTP => write!(f, "http"), // HTTP scheme 
-            Self::WebSocket => write!(f, "ws"),  // WebSocket schemes 
-            Self::Custom => write!(f, "custom"),
-        }
-    }
-} 
+use av::ver;
 
 /// Authentication options for database connections
 #[derive(Debug, Clone)]
@@ -56,11 +32,11 @@ pub enum Authentication {
 
 /// Builder for creating database connections
 #[derive(Debug, Clone)]
-pub struct ConnectionBuilder {
+pub struct ConnectionBuilder<P: Protocol> {
     host: String,
-    port: u16,
+    port: Option<u16>,
     use_tls: bool,
-    protocol: Protocol,
+    _protocol: PhantomData<P>,
     auth: Authentication,
     database: Option<String>,
     max_connection_time: Duration,
@@ -72,14 +48,15 @@ pub struct ConnectionBuilder {
     root_cert_pem: Option<Vec<u8>>,
 } 
 
-impl ConnectionBuilder { 
+impl<P: Protocol> ConnectionBuilder<P> { 
     /// Create a new connection builder with default settings
-    pub fn new(host: impl Into<String>, port: u16) -> Self {
+    #[ver(update, since = "0.8.0", note = "Generic ConnectionBuilder with protocol default ports")]
+    pub fn new(host: impl Into<String>) -> Self {
         Self {
             host: host.into(),
-            port,
+            port: None,
             use_tls: false,
-            protocol: Protocol::Custom,
+            _protocol: PhantomData,
             auth: Authentication::None,
             database: None,
             max_connection_time: Duration::from_secs(30),
@@ -92,26 +69,16 @@ impl ConnectionBuilder {
         }
     } 
 
+    /// Set a specific port for the connection
+    #[ver(update, since = "0.8.0", note = "Explicit port setter for generic builder")]
+    pub fn port(mut self, port: u16) -> Self {
+        self.port = Some(port);
+        self
+    }
 
     /// Enable or disable TLS encryption
     pub fn tls(mut self, enable: bool) -> Self {
         self.use_tls = enable;
-        self
-    }
-
-    /// Set the protocol to use
-    pub fn protocol(mut self, protocol: Protocol) -> Self {
-        self.protocol = protocol;
-        // Automatically set default port if not specified
-        match protocol {
-            Protocol::Postgres if self.port == 0 => self.port = 5432,
-            Protocol::MySQL if self.port == 0 => self.port = 3306,
-            Protocol::MongoDB if self.port == 0 => self.port = 27017,
-            Protocol::Redis if self.port == 0 => self.port = 6379,
-            Protocol::HTTP if self.port == 0 => self.port = if self.use_tls { 443 } else { 80 },
-            Protocol::WebSocket if self.port == 0 => self.port = if self.use_tls { 443 } else { 80 }, 
-            _ => {}
-        }
         self
     }
 
@@ -182,52 +149,20 @@ impl ConnectionBuilder {
         Ok(self)
     }
 
-    /// Create connection URL based on config
-    pub fn url(&self) -> String {
-        let auth_str = match &self.auth {
-            Authentication::UsernamePassword(user, pass) => format!("{}:{}@", user, pass),
-            Authentication::Token(token) => format!("token:{}@", token),
-            _ => String::new(),
-        };
-        
-        // Get the schem string 
-        let scheme = match self.protocol {
-            Protocol::Postgres => if self.use_tls { "postgresql+ssl" } else { "postgresql" },
-            Protocol::MySQL => if self.use_tls { "mysql+ssl" } else { "mysql" },
-            Protocol::MongoDB => if self.use_tls { "mongodb+ssl" } else { "mongodb" },
-            Protocol::Redis => if self.use_tls { "redis+ssl" } else { "redis" },
-            Protocol::HTTP => if self.use_tls { "https" } else { "http" },
-            Protocol::WebSocket => if self.use_tls { "wss" } else { "ws" }, 
-            Protocol::Custom => if self.use_tls { "tls" } else { "tcp" },
-        };
-        
-        // Path or database construction based on protocol type
-        let path_or_db = match self.protocol {
-            Protocol::HTTP | Protocol::WebSocket => &self.path, // Both HTTP and WebSocket use paths
-            _ => self.database.as_ref().map_or("", |db| db),    // Database protocols use database names
-        }; 
-
-        let mut params = String::new();
-        if !self.additional_params.is_empty() {
-            params.push('?');
-            for (i, (k, v)) in self.additional_params.iter().enumerate() {
-                if i > 0 {
-                    params.push('&');
-                }
-                params.push_str(&format!("{}={}", k, v));
-            }
-        }
-        
-        format!("{}://{}{}:{}{}{}", scheme, auth_str, self.host, self.port, path_or_db, params)
+    fn resolved_port(&self) -> Result<u16> {
+        self.port
+            .or_else(|| P::default_port(self.use_tls))
+            .ok_or(ConnectionError::PortRequired)
     }
 
     /// Establish a connection with retry logic
     pub async fn connect(&self) -> Result<TcpConnectionStream> {
+        let port = self.resolved_port()?;
         let mut attempts = 0;
         let mut last_error = None;
 
         while attempts <= self.retry_attempts {
-            match self.try_connect().await {
+            match self.try_connect(port).await {
                 Ok(conn) => return Ok(conn),
                 Err(e) => {
                     last_error = Some(e);
@@ -245,9 +180,9 @@ impl ConnectionBuilder {
     } 
 
         
-    async fn try_connect(&self) -> Result<TcpConnectionStream> {
+    async fn try_connect(&self, port: u16) -> Result<TcpConnectionStream> {
         // 1) TCP
-        let addr = format!("{}:{}", self.host, self.port);
+        let addr = format!("{}:{}", self.host, port);
         let tcp = tokio::time::timeout(
             self.max_connection_time, TcpStream::connect(&addr)
         )

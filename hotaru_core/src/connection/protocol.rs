@@ -6,6 +6,7 @@
 use std::{any::Any, fmt, sync::Arc, error::Error};
 use bytes::BytesMut;
 use async_trait::async_trait;
+use av::ver;
 
 use crate::{
     app::application::App,
@@ -237,6 +238,20 @@ pub trait Protocol: Clone + Send + Sync + 'static {
     
     /// Returns the role of this protocol handler.
     fn role(&self) -> ProtocolRole;
+
+    /// Returns the default port for this protocol, if one exists.
+    ///
+    /// Returns None if the protocol has no standard default port.
+    ///
+    /// # Arguments
+    /// * `use_tls` - Whether TLS/SSL is enabled (affects port for some protocols).
+    #[ver(update, since = "0.8.0", note = "Protocol default port hook for client connections")]
+    fn default_port(_use_tls: bool) -> Option<u16>
+    where
+        Self: Sized,
+    {
+        None
+    }
     
     /// Detects if this protocol can handle the connection.
     fn detect(initial_bytes: &[u8]) -> bool 

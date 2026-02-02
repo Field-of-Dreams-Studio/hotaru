@@ -1,6 +1,7 @@
 #[tokio::test]
 async fn test_https_connection() {
-    use super::{ConnectionBuilder, builder::Protocol, Result, TcpConnectionStream};
+    use super::{ConnectionBuilder, Result, TcpConnectionStream};
+    use crate::http::traits::HTTP;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[allow(dead_code)]
@@ -16,8 +17,8 @@ async fn test_https_connection() {
         Ok(String::from_utf8_lossy(&response).into())
     }
 
-    let builder = ConnectionBuilder::new(TEST_HTTPS_SERVER, 443)
-        .protocol(Protocol::HTTP)
+    let builder = ConnectionBuilder::<HTTP>::new(TEST_HTTPS_SERVER)
+        .port(443)
         .tls(true);
 
     let mut conn = builder.connect().await.unwrap();

@@ -4,6 +4,7 @@ use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenSt
 // Entry points will be moved here from hotaru_trans
 pub(crate) mod url; 
 pub(crate) mod middleware; 
+pub(crate) mod outpoint;
 
 pub(crate) mod outer_attr; 
 pub(crate) mod helper; 
@@ -45,6 +46,52 @@ cfg_if::cfg_if! {
         }  
     }
 } 
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "trans")] {
+        #[proc_macro]
+        pub fn outpoint(input: TokenStream) -> TokenStream {
+            match outpoint::parse_trans(input) {
+                Ok(args) => {
+                    let mut tokens = TokenStream::new();
+                    tokens.extend(args.op.generate_function());
+                    tokens.extend(args.op.wrapper_function());
+                    tokens.extend(args.reg_func());
+                    tokens
+                }
+                Err(err) => err,
+            }
+        }
+    } else if #[cfg(feature = "attr")] {
+        #[proc_macro_attribute]
+        pub fn outpoint(attr: TokenStream, input: TokenStream) -> TokenStream {
+            match outpoint::parse_attr(attr, input) {
+                Ok(args) => {
+                    let mut tokens = TokenStream::new();
+                    tokens.extend(args.op.generate_function());
+                    tokens.extend(args.op.wrapper_function());
+                    tokens.extend(args.reg_func());
+                    tokens
+                }
+                Err(err) => err,
+            }
+        }
+    } else {
+        #[proc_macro_attribute]
+        pub fn outpoint(_attr: TokenStream, input: TokenStream) -> TokenStream {
+            match outpoint::parse_semi_trans(input) {
+                Ok(args) => {
+                    let mut tokens = TokenStream::new();
+                    tokens.extend(args.op.generate_function());
+                    tokens.extend(args.op.wrapper_function());
+                    tokens.extend(args.reg_func());
+                    tokens
+                }
+                Err(err) => err,
+            }
+        }
+    }
+}
 
 
 cfg_if::cfg_if! {
@@ -162,6 +209,23 @@ macro_rules! generate_lazy_static {
 #[proc_macro]
 pub fn LApp(input: TokenStream) -> TokenStream {
     generate_lazy_static!("SApp")(input)
+}
+
+/// `LClient!` - Creates a lazy static Client instance
+///
+/// # Usage
+/// ```rust
+/// LClient!(CLIENT = Client::new().build());
+/// ```
+///
+/// # Expansion
+/// ```rust
+/// pub static CLIENT: SClient = Lazy::new(|| Client::new().build());
+/// ```
+#[allow(non_snake_case)]
+#[proc_macro]
+pub fn LClient(input: TokenStream) -> TokenStream {
+    generate_lazy_static!("SClient")(input)
 }
 
 /// `LUrl!` - Creates a lazy static Url instance

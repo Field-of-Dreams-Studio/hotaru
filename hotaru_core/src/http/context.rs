@@ -9,6 +9,7 @@ use crate::extensions::{Locals, Params};
 use crate::http::cookie::{Cookie, CookieMap};
 use crate::http::request::HttpRequest;
 use crate::http::safety::HttpSafety;
+use crate::http::traits::HTTP;
 use crate::http::{
     body::HttpBody,
     form::{MultiForm, UrlEncodedForm},
@@ -595,8 +596,8 @@ impl HttpContext {
             }
         }
 
-        let (read, write) = ConnectionBuilder::new(host_part, port)
-            .protocol(crate::connection::builder::Protocol::HTTP)
+        let (read, write) = ConnectionBuilder::<HTTP>::new(host_part)
+            .port(port)
             .tls(is_https)
             .connect()
             .await?
@@ -788,8 +789,8 @@ mod test {
 
     // #[tokio::test]
     // async fn request_a_page() {
-    //     let builder = ConnectionBuilder::new("example.com", 443)
-    //         .protocol(Protocol::HTTP)
+    //     let builder = ConnectionBuilder::<HTTP>::new("example.com")
+    //         .port(443)
     //         .tls(true);
     //     let connection = builder.connect().await.unwrap();
     //     let mut request = HttpResCtx::new(

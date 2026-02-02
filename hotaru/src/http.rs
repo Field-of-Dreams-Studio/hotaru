@@ -6,7 +6,7 @@
 //! ```
 
 // Re-export HTTP protocol and context
-pub use crate::{HTTP, HttpContext};
+pub use crate::{HTTP, HTTP_CLIENT, HttpContext, HttpClientContext};
 // Re-export type alias for backward compatibility
 pub use hotaru_core::http::context::HttpReqCtx;
 // HttpResCtx was for client-side in old Starberry - use HttpContext for both now
