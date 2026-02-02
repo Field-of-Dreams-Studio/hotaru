@@ -26,9 +26,8 @@ use crate::{
         request::HttpRequest,
         response::HttpResponse,
         safety::HttpSafety,
-        context::HttpContext, 
-        client_context::HttpClientContext,
-    } 
+        context::HttpContext,
+    }
 };
 
 // ============================================================================
@@ -39,10 +38,6 @@ use crate::{
 /// This provides a simpler name for user-facing code while maintaining
 /// version-specific naming in the implementation.
 pub type HTTP = Http1Protocol;
-
-/// Client-only HTTP protocol for outpoints.
-#[allow(non_camel_case_types)]
-pub type HTTP_CLIENT = HttpClientProtocol;
 
 // ============================================================================
 // HttpTransport - Connection state for HTTP
@@ -377,46 +372,6 @@ fn generate_connection_id() -> i128 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos() as i128
-}
-
-// ============================================================================
-// HttpClientProtocol - Client-only protocol for outpoints
-// ============================================================================
-
-/// HTTP client protocol wrapper used by outpoints.
-#[derive(Clone)]
-pub struct HttpClientProtocol;
-
-#[async_trait]
-impl Protocol for HttpClientProtocol {
-    type Transport = HttpTransport;
-    type Stream = ();
-    type Message = HttpMessage;
-    type Context = HttpClientContext;
-
-    fn role(&self) -> ProtocolRole {
-        ProtocolRole::Client
-    }
-
-    fn default_port(use_tls: bool) -> Option<u16> {
-        Some(if use_tls { 443 } else { 80 })
-    }
-
-    fn detect(initial_bytes: &[u8]) -> bool
-    where
-        Self: Sized,
-    {
-        Http1Protocol::detect(initial_bytes)
-    }
-
-    async fn handle(
-        &mut self,
-        _reader: TcpReader,
-        _writer: TcpWriter,
-        _app: Arc<App>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        Err("HttpClientProtocol does not handle server connections".into())
-    }
 }
 
 #[cfg(test)]

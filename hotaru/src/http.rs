@@ -1,16 +1,14 @@
 //! HTTP-specific re-exports for standard Hotaru HTTP implementation
-//! 
+//!
 //! Use this module when working with the standard HTTP protocol:
 //! ```rust
 //! use hotaru::http::*;
 //! ```
 
 // Re-export HTTP protocol and context
-pub use crate::{HTTP, HTTP_CLIENT, HttpContext, HttpClientContext};
+pub use crate::{HTTP, HttpContext, HttpResCtx};
 // Re-export type alias for backward compatibility
-pub use hotaru_core::http::context::HttpReqCtx;
-// HttpResCtx was for client-side in old Starberry - use HttpContext for both now
-pub type HttpResCtx = HttpContext; 
+pub use hotaru_core::http::context::HttpReqCtx; 
 
 // Re-export HTTP types
 pub use hotaru_core::http::response::HttpResponse;  

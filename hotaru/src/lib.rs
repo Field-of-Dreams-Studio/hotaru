@@ -29,11 +29,10 @@ pub use hotaru_core::client::{Client, ClientBuilder, ClientRegistry, SClient, Co
 pub use hotaru_core::http::request::request_templates; 
 pub use hotaru_core::http::response::response_templates; 
 
-pub use hotaru_core::http::response::HttpResponse;  
+pub use hotaru_core::http::response::HttpResponse;
 pub use hotaru_core::http::request::HttpRequest;
-pub use hotaru_core::http::context::{HttpContext, Executable};
-pub use hotaru_core::http::client_context::HttpClientContext;
-pub use hotaru_core::http::traits::{HTTP, HTTP_CLIENT, HttpTransport, HttpMessage, HttpClientProtocol}; 
+pub use hotaru_core::http::context::{HttpContext, HttpResCtx, Executable};
+pub use hotaru_core::http::traits::{HTTP, HttpTransport, HttpMessage}; 
 
 pub use hotaru_core::http::meta::*; 
 pub use hotaru_core::http::http_value::*; 

@@ -17,11 +17,10 @@ pub use crate::outpoint;
 pub use crate::{LApp, LClient, LUrl, LPattern}; 
 
 // Template rendering (protocol-agnostic)
-pub use crate::ahttpm::akari_render; 
-pub use crate::ahttpm::akari_json; 
-pub use crate::AsyncMiddleware; 
-pub use crate::{Params, ParamsClone, Locals, LocalsClone}; // Always keep this in prelude 
-pub use crate::HttpClientContext;
+pub use crate::ahttpm::akari_render;
+pub use crate::ahttpm::akari_json;
+pub use crate::AsyncMiddleware;
+pub use crate::{Params, ParamsClone, Locals, LocalsClone}; // Always keep this in prelude
 
 pub use std::sync::Arc; 
 pub use std::thread::sleep; 

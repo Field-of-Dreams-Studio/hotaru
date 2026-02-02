@@ -122,7 +122,7 @@ fn logger_middleware <HTTP>(context: CustomParam) {
 } 
 
 #[outpoint(API_CLIENT.url("/users/<id>"))]
-fn get_user <HTTP_CLIENT>() {
+fn get_user <HTTP>() {
     req.request.meta.start_line.set_method(HttpMethod::GET);
     let url = match req.build_url() {
         Ok(url) => url,
@@ -136,12 +136,12 @@ fn get_user <HTTP_CLIENT>() {
 
 async fn run_client_example() {
     let entry = ClientRegistry::global()
-        .get::<HttpClientContext>("jsonplaceholder", "get_user")
+        .get::<HttpContext>("jsonplaceholder", "get_user")
         .expect("outpoint not registered");
 
-    let mut ctx = HttpClientContext::new(API_CLIENT.clone())
-        .url_patterns(entry.patterns.clone(), entry.names.clone())
-        .param("id", "1");
+    let mut ctx = HttpContext::new_client_with_context(API_CLIENT.clone())
+        .with_url_patterns(entry.patterns.clone(), entry.names.clone())
+        .with_param("id", "1");
 
     let response = get_user(&mut ctx).await;
     println!(

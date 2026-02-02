@@ -1,4 +1,5 @@
 use crate::app::application::App;
+use crate::client::{Client, ConnectionTarget};
 use crate::connection::error::ConnectionError;
 use crate::connection::{
     ConnectionBuilder, ConnectionStatus, ProtocolRole, RequestContext, TcpConnectionStream,
@@ -17,9 +18,10 @@ use crate::http::{
     meta::HttpMeta,
     response::HttpResponse,
 };
-use crate::url::Url;
-use akari::Value; 
+use crate::url::{PathPattern, Url};
+use akari::Value;
 use once_cell::sync::Lazy;
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::{BufReader, BufWriter, ReadHalf, WriteHalf};
@@ -60,6 +62,12 @@ pub struct HttpContext {
     // Shared fields for middleware/handlers
     pub params: Params,
     pub locals: Locals,
+
+    // Client-specific fields (None/empty for server mode)
+    pub client: Option<Arc<Client>>,           // Client config (None for server)
+    pub url_patterns: Vec<PathPattern>,        // URL template patterns
+    pub url_names: Vec<Option<String>>,        // Named URL parameters
+    pub url_params: HashMap<String, String>,   // URL parameter values
 }
 
 // Type alias for backward compatibility
@@ -91,6 +99,11 @@ impl HttpContext {
             local_addr,
             params: Default::default(),
             locals: Default::default(),
+            // Client fields - unused in server mode
+            client: None,
+            url_patterns: Vec::new(),
+            url_names: Vec::new(),
+            url_params: HashMap::new(),
         }
     }
 
@@ -106,6 +119,31 @@ impl HttpContext {
             local_addr: None,
             params: Default::default(),
             locals: Default::default(),
+            // Client fields - used in client mode
+            client: None,
+            url_patterns: Vec::new(),
+            url_names: Vec::new(),
+            url_params: HashMap::new(),
+        }
+    }
+
+    /// Creates a new client context with Client configuration (for outpoint usage)
+    pub fn new_client_with_context(client: Arc<Client>) -> Self {
+        Self {
+            request: HttpRequest::default(),
+            response: HttpResponse::default(),
+            executable: Executable::Response,
+            host: None,
+            safety: HttpSafety::default(),
+            remote_addr: None,
+            local_addr: None,
+            params: Default::default(),
+            locals: Default::default(),
+            // Client fields - used in client mode
+            client: Some(client),
+            url_patterns: Vec::new(),
+            url_names: Vec::new(),
+            url_params: HashMap::new(),
         }
     }
 
@@ -483,6 +521,171 @@ impl HttpContext {
         self.response.body = body;
         self
     }
+
+    // ========================================================================
+    // Client-specific methods (ported from HttpClientContext)
+    // ========================================================================
+
+    /// Get URL patterns (client mode)
+    pub fn url_patterns(&self) -> &[PathPattern] {
+        &self.url_patterns
+    }
+
+    /// Set URL patterns with builder pattern (client mode)
+    pub fn with_url_patterns(
+        mut self,
+        patterns: Vec<PathPattern>,
+        names: Vec<Option<String>>
+    ) -> Self {
+        self.url_patterns = patterns;
+        self.url_names = names;
+        self
+    }
+
+    /// Set URL patterns mutably (client mode)
+    pub fn set_url_patterns(
+        &mut self,
+        patterns: Vec<PathPattern>,
+        names: Vec<Option<String>>
+    ) -> &mut Self {
+        self.url_patterns = patterns;
+        self.url_names = names;
+        self
+    }
+
+    /// Add a URL parameter (client mode) - builder pattern
+    pub fn with_param<K: Into<String>, V: Into<String>>(
+        mut self,
+        key: K,
+        value: V
+    ) -> Self {
+        self.url_params.insert(key.into(), value.into());
+        self
+    }
+
+    /// Add a URL parameter mutably (client mode)
+    pub fn add_param<K: Into<String>, V: Into<String>>(
+        &mut self,
+        key: K,
+        value: V
+    ) -> &mut Self {
+        self.url_params.insert(key.into(), value.into());
+        self
+    }
+
+    /// Set config value with builder pattern
+    pub fn set_config<V: Send + Sync + 'static>(mut self, value: V) -> Self {
+        self.params.set(value);
+        self
+    }
+
+    /// Get config value
+    pub fn get_config<V: Clone + Send + Sync + 'static>(&self) -> Option<V> {
+        self.params.get::<V>().cloned()
+    }
+
+    /// Set local value with builder pattern
+    pub fn set_local<K: Into<String>, V: Send + Sync + 'static>(
+        mut self,
+        key: K,
+        value: V,
+    ) -> Self {
+        let key = key.into();
+        if let Some(s) = (&value as &dyn Any).downcast_ref::<&'static str>().copied() {
+            self.locals.set(key.clone(), s);
+            self.locals.set(key, s.to_string());
+        } else {
+            self.locals.set(key, value);
+        }
+        self
+    }
+
+    /// Get local value
+    pub fn get_local<V: Clone + Send + Sync + 'static>(&self, key: &str) -> Option<V> {
+        self.locals.get::<V>(key).cloned()
+    }
+
+    /// Build URL from patterns and parameters (client mode)
+    pub fn build_url(&self) -> Result<String, String> {
+        use crate::url::parser::substitute;
+
+        if self.url_patterns.is_empty() {
+            return Err("URL patterns not set".to_string());
+        }
+
+        let path = substitute(&self.url_patterns, &self.url_names, &self.url_params)?;
+
+        if let Some(ref client) = self.client {
+            if let Some(base_url) = &client.base_url {
+                let base = base_url.trim_end_matches('/');
+                let path = path.trim_start_matches('/');
+                return Ok(format!("{}/{}", base, path));
+            }
+        }
+
+        Ok(path)
+    }
+
+    /// Get client reference (client mode)
+    pub fn client(&self) -> Option<&Arc<Client>> {
+        self.client.as_ref()
+    }
+
+    /// Get response status code (client mode)
+    pub fn status_code(&self) -> u16 {
+        self.response.meta.start_line.status_code().as_u16()
+    }
+
+    /// Get response body reference (client mode)
+    pub fn response_body(&self) -> &HttpBody {
+        &self.response.body
+    }
+
+    /// Set request with builder pattern (client mode)
+    pub fn with_request(mut self, request: HttpRequest) -> Self {
+        self.request = request;
+        self
+    }
+
+    /// Set safety config with builder pattern (client mode)
+    pub fn with_safety(mut self, safety: HttpSafety) -> Self {
+        self.safety = safety;
+        self
+    }
+
+    /// Send HTTP request (client mode)
+    pub async fn send(&mut self, url: &str) -> Result<(), ConnectionError> {
+        let target =
+            ConnectionTarget::<HTTP>::from_url(url).map_err(ConnectionError::Other)?;
+
+        if self.request.meta.get_host().is_none() {
+            if let Some(port) = target.port {
+                self.request
+                    .meta
+                    .set_host(Some(format!("{}:{}", target.host, port)));
+            } else {
+                self.request.meta.set_host(Some(target.host.clone()));
+            }
+        }
+
+        self.request.meta.start_line.set_path(target.path.clone());
+
+        let connection = target
+            .to_connection_builder()
+            .map_err(ConnectionError::Other)?
+            .connect()
+            .await?;
+        let (read, write) = connection.split();
+
+        let mut reader = BufReader::new(read);
+        let mut writer = BufWriter::new(write);
+
+        let request = std::mem::take(&mut self.request);
+        HttpContext::write_frame(&mut writer, request).await?;
+        let response = HttpContext::read_next_frame(&self.safety, &mut reader).await?;
+        self.response = response;
+        Ok(())
+    }
 }
 
 impl RequestContext for HttpContext {
@@ -645,6 +848,7 @@ impl HttpContext {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::{
         http::{
             context::HttpResCtx,
@@ -840,5 +1044,149 @@ mod test {
         .await
         .unwrap();
         println!("{:?}, {:?}", response.meta, response.body);
+    }
+
+    // =========================================================================
+    // Client Context Tests (ported from HttpClientContext)
+    // =========================================================================
+
+    #[test]
+    fn test_http_context_client_url_building() {
+        use crate::client::Client;
+        use crate::url::PathPattern;
+
+        let client = Client::new()
+            .name("test")
+            .base_url("https://api.example.com")
+            .build();
+
+        let ctx = HttpContext::new_client_with_context(client)
+            .with_url_patterns(
+                vec![
+                    PathPattern::Literal("users".to_string()),
+                    PathPattern::Any,
+                ],
+                vec![None, Some("id".to_string())],
+            )
+            .with_param("id", "123");
+
+        assert_eq!(
+            ctx.build_url().unwrap(),
+            "https://api.example.com/users/123"
+        );
+    }
+
+    #[test]
+    fn test_http_context_client_no_base_url() {
+        use crate::client::Client;
+        use crate::url::PathPattern;
+
+        let client = Client::new().name("test").build();
+
+        let ctx = HttpContext::new_client_with_context(client)
+            .with_url_patterns(
+                vec![PathPattern::Literal("get".to_string())],
+                vec![None],
+            );
+
+        assert_eq!(ctx.build_url().unwrap(), "/get");
+    }
+
+    #[test]
+    fn test_http_context_client_params_locals() {
+        use crate::client::Client;
+
+        let client = Client::new().name("test").build();
+
+        let ctx = HttpContext::new_client_with_context(client)
+            .set_config(HttpSafety::default())
+            .set_local("auth_token", "xyz".to_string());
+
+        assert!(ctx.get_config::<HttpSafety>().is_some());
+        assert_eq!(ctx.get_local::<String>("auth_token").unwrap(), "xyz");
+    }
+
+    #[test]
+    fn test_http_context_client_mutable_param() {
+        use crate::client::Client;
+        use crate::url::PathPattern;
+
+        let client = Client::new()
+            .name("test")
+            .base_url("https://api.example.com")
+            .build();
+
+        let mut ctx = HttpContext::new_client_with_context(client);
+        ctx.set_url_patterns(
+            vec![
+                PathPattern::Literal("posts".to_string()),
+                PathPattern::Any,
+            ],
+            vec![None, Some("post_id".to_string())],
+        );
+        ctx.add_param("post_id", "456");
+
+        assert_eq!(
+            ctx.build_url().unwrap(),
+            "https://api.example.com/posts/456"
+        );
+    }
+
+    #[test]
+    fn test_http_context_client_no_patterns_error() {
+        use crate::client::Client;
+
+        let client = Client::new().name("test").build();
+        let ctx = HttpContext::new_client_with_context(client);
+
+        assert!(ctx.build_url().is_err());
+        assert_eq!(ctx.build_url().unwrap_err(), "URL patterns not set");
+    }
+
+    #[test]
+    fn test_http_context_client_response_accessors() {
+        use crate::http::http_value::StatusCode;
+
+        let mut ctx = HttpContext::new_client("api.example.com".to_string(), HttpSafety::default());
+        ctx.response.meta.start_line.set_status_code(404);
+
+        assert_eq!(ctx.status_code(), 404);
+        // Default response body is Unparsed
+        assert!(matches!(ctx.response_body(), HttpBody::Unparsed));
+    }
+
+    #[test]
+    fn test_http_context_unified_both_modes() {
+        use crate::app::application::App;
+        use crate::client::Client;
+        use crate::http::request::HttpRequest;
+        use crate::url::Url;
+        use std::net::{IpAddr, Ipv4Addr};
+
+        // Server mode
+        let app = App::new().build();
+        let endpoint = Arc::new(Url::<HttpContext>::default());
+        let request = HttpRequest::default();
+        let remote = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
+        let server_ctx = HttpContext::new_server(
+            app,
+            endpoint,
+            request,
+            Some(remote),
+            None,
+        );
+
+        assert!(server_ctx.app().is_some());
+        assert!(server_ctx.endpoint().is_some());
+        assert!(server_ctx.client().is_none());
+
+        // Client mode
+        let client = Client::new().name("test").build();
+        let client_ctx = HttpContext::new_client_with_context(client);
+
+        assert!(client_ctx.app().is_none());
+        assert!(client_ctx.endpoint().is_none());
+        assert!(client_ctx.client().is_some());
     }
 }
