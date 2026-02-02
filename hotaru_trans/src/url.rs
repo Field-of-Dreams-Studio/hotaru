@@ -444,13 +444,18 @@ pub struct UrlExpr {
     literal: Literal, 
 } 
 
+use hotaru_core::url::parser::parse as parse_check_url; 
+
 impl UrlExpr { 
+    pub fn new(app: Ident, method: Ident, literal: Literal) -> Self { 
+        Self { app, method, literal } 
+    } 
+
     /// Accepts any of the following forms: 
     /// APP_IDENTIFIER("path") 
     /// APP_IDENTIFIER: "path" 
     /// APP_IDENTIFIER.[url|lit_url]("path")
     /// "path" // Defaults to APP 
-    /// TODO: Check the Url Literal format? 
     pub fn from_tokens(input: TokenStream) -> Result<Self, TokenStream> { 
         let mut tokens = into_peekable_iter(input); 
         match tokens.peek() { 
@@ -462,11 +467,12 @@ impl UrlExpr {
                         tokens.next(); // Consume ':' 
                         match tokens.next() { 
                             Some(TokenTree::Literal(lit)) => { 
-                                Ok(UrlExpr { 
+                                Self::check_url_literal_format(&lit)?; 
+                                Ok(Self::new( 
                                     app, 
-                                    method: Ident::new("url", Span::call_site()), 
-                                    literal: lit, 
-                                }) 
+                                    Ident::new("url", Span::call_site()), 
+                                    lit, 
+                                )) 
                             } 
                             _ => Err(generate_compile_error(Span::call_site(), "Expected a string literal after ':'")), 
                         } 
@@ -481,11 +487,12 @@ impl UrlExpr {
                                         let mut inner_tokens = group.stream().into_iter(); 
                                         match inner_tokens.next() { 
                                             Some(TokenTree::Literal(lit)) => { 
-                                                Ok(UrlExpr { 
+                                                Self::check_url_literal_format(&lit)?; 
+                                                Ok(Self::new( 
                                                     app, 
                                                     method, 
-                                                    literal: lit, 
-                                                }) 
+                                                    lit, 
+                                                )) 
                                             } 
                                             _ => Err(generate_compile_error(Span::call_site(), "Expected a string literal inside the parentheses")), 
                                         } 
@@ -500,14 +507,21 @@ impl UrlExpr {
                 }
             } 
             Some(TokenTree::Literal(lit)) => { 
-                Ok(UrlExpr { 
-                    app: Ident::new("APP", Span::call_site()), 
-                    method: Ident::new("url", Span::call_site()), 
-                    literal: lit.clone(), 
-                }) 
+                Self::check_url_literal_format(&lit)?; 
+                Ok(Self::new( 
+                    Ident::new("APP", Span::call_site()), 
+                    Ident::new("url", Span::call_site()), 
+                    lit.clone(), 
+                )) 
             } 
             _ => Err(generate_compile_error(Span::call_site(), "Expected an application identifier or a string literal for URL")), 
         }
+    } 
+
+    fn check_url_literal_format(lit: &Literal) -> Result<(),TokenStream> { 
+        parse_check_url(&lit.to_string()).map_err(
+            |e| generate_compile_error(Span::call_site(), &format!("Invalid URL literal format: {}", e))
+        ).map(|_| ()) 
     } 
 
     pub fn expand(&self, protocol: Ident) -> TokenStream { 

@@ -11,7 +11,7 @@ categories = ["network-programming", "web-programming"]
 
 [dependencies]
 # Hotaru dependencies
-hotaru_core = { path = "../hotaru_core", version = "0.7.5" }
+hotaru_core = { path = "../hotaru_core", version = "0.8.0" }
 h2per = { path = "../h2per", version = "0.7.0" } 
 ctor = "0.4" 
 

@@ -13,7 +13,7 @@ readme = "readme.md"
 
 [dependencies] 
 hotaru_meta = { path = "../hotaru_meta", version="0.8.0"} 
-hotaru_core = { path = "../hotaru_core", version="0.7.5" }
+hotaru_core = { path = "../hotaru_core", version="0.8.0" }
 hotaru_lib = { path = "../hotaru_lib", version="0.7.3", features = ["url_encoding", "compression"]  }
 
 # Hyper and HTTP protocol support

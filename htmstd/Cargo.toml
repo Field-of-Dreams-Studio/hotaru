@@ -10,8 +10,8 @@ categories = ["network-programming", "web-programming::http-server"]
 keywords = ["hotaru"]   
 
 [dependencies]
-hotaru_meta = { path = "../hotaru_meta", version="0.8.0"} 
-hotaru_core = { path = "../hotaru_core", version="0.7.5"} 
+hotaru_trans = { path = "../hotaru_trans", version="0.8.0"} 
+hotaru_core = { path = "../hotaru_core", version="0.8.0"} 
 hotaru_lib = { path = "../hotaru_lib", version="0.7.3", features = ["ende", "url_encoding"]} 
 akari = "^0.2" 
 dashmap = "6.1.0" 

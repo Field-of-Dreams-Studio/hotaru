@@ -108,6 +108,13 @@ fn index <HTTP>() {
     ) 
 } 
 
+// #[endpoint("/<i:>")] 
+// fn index_alt <HTTP>() { 
+//     akari_json!({
+//         message: "This endpoint have an url formatting error! Trans crate will report an error!" 
+//     }) 
+// } 
+
 #[middleware] 
 fn logger_middleware <HTTP>(context: CustomParam) {
     println!("Request received: {} {}", context.method(), context.path());
