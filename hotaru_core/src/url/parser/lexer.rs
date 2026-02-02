@@ -98,9 +98,9 @@ fn count_pipes(chars: &[char], mut i: usize) -> usize {
 // Tokenize the URL pattern string into RawToken sequence.
 //
 // Notes on behavior:
-// - We treat "-" followed by "<" (i.e., "-<") as a literal "<" (escape for '<').
-//   Similarly, "->" is treated as literal ">" (escape for '>').
-//   The '-' used for escaping is NOT included in output.
+// - We treat "\" followed by "<" (i.e., "\<") as a literal "<" (escape for '<').
+//   Similarly, "\>" is treated as literal ">" (escape for '>').
+//   The '\' used for escaping is NOT included in output.
 // - Outside of <...>:
 //   - "/" is emitted as RawToken::Slash (segment separator).
 //   - All other characters accumulate into Literal.
@@ -134,8 +134,8 @@ pub fn tokenize(input: &str) -> Vec<RawToken> {
     let mut freeform_regex_until_colon = false;
 
     while i < chars.len() {
-        // Escape handling for angles: "-<" -> "<", "->" -> ">"
-        if i + 1 < chars.len() && chars[i] == '-' {
+        // Escape handling for angles: "\<" -> "<", "\>" -> ">"
+        if i + 1 < chars.len() && chars[i] == '\\' {
             match chars[i + 1] {
                 '<' => {
                     // literal '<'
@@ -150,8 +150,8 @@ pub fn tokenize(input: &str) -> Vec<RawToken> {
                     continue;
                 }
                 _ => {
-                    // '-' not escaping angle; treat as literal
-                    lit_buf.push('-');
+                    // '\' not escaping angle; treat as literal
+                    lit_buf.push('\\');
                     i += 1;
                     continue;
                 }
@@ -541,8 +541,8 @@ mod tests {
     }
 
     #[test]
-    fn escape_angles_with_dash() {
-        let input = "foo-<bar->baz";
+    fn escape_angles_with_backslash() {
+        let input = "foo\\<bar\\>baz";
         let tokens = tokenize(input);
         let expected = vec![
             Literal("foo<bar>baz".into()),

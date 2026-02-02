@@ -51,7 +51,7 @@ pub(self) mod parser;
 //     - Free-form literal regex: <...[ :name]?> (until ":" or ">").
 //     - If a name is provided (:name), the segment becomes a named capture.
 // - Escaping angle brackets in the outer literal:
-//   - The lexer treats "-<" as a literal "<", and "->" as a literal ">". The dash is not included in output.
+//   - The lexer treats "\<" as a literal "<", and "\>" as a literal ">". The backslash is not included in output.
 
 // How segments are produced:
 // - A segment is everything between two "/" separators.
@@ -87,7 +87,7 @@ pub(self) mod parser;
 //     - patterns: [Any, Regex("-?\\d+")]
 //     - names: []  // no declared names, captures are positional only (if you choose to expose them)
 // - Escaping angles
-//   - Input: "foo-<bar->baz"
+//   - Input: "foo\<bar\>baz"
 //   - Output:
 //     - patterns: [Literal("foo<bar>baz")]
 //     - names: []

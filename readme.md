@@ -386,4 +386,4 @@ We believe in transparency about AI-assisted development. Below is an honest bre
 
 GPL-3.0 License
 
-Copyright (c) 2024-2025 Redstone @ Field of Dreams Studio
+Copyright (c) 2024-2026 @ Field of Dreams Studio
