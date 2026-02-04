@@ -10,10 +10,10 @@ categories = ["network-programming", "web-programming::http-server"]
 keywords = ["hotaru"]   
 
 [dependencies]
-hotaru_trans = { path = "../hotaru_trans", version="0.8.0"} 
-hotaru_core = { path = "../hotaru_core", version="0.8.0"} 
-hotaru_lib = { path = "../hotaru_lib", version="0.7.3", features = ["ende", "url_encoding"]} 
-akari = "^0.2" 
-dashmap = "6.1.0" 
-tokio = { version = "1.28", features = ["full"] }  
+hotaru_trans = { path = "../hotaru_trans", version="0.8.0", features = ["trans"]}
+hotaru_core = { path = "../hotaru_core", version="0.8.0"}
+hotaru_lib = { path = "../hotaru_lib", version="0.7.3", features = ["ende", "url_encoding"]}
+akari = "^0.2"
+dashmap = "6.1.0"
+tokio = { version = "1.28", features = ["full"] }
 lazy_static = "1.5.0" 

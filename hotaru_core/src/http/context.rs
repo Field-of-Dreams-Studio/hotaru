@@ -1,5 +1,5 @@
 use crate::app::application::App;
-use crate::client::{Client, ConnectionTarget};
+use crate::client::{Client, ConnectionTarget, ConnectionPool, ConnectionKey};
 use crate::connection::error::ConnectionError;
 use crate::connection::{
     ConnectionBuilder, ConnectionStatus, ProtocolRole, RequestContext, TcpConnectionStream,
@@ -799,13 +799,23 @@ impl HttpContext {
             }
         }
 
-        let (read, write) = ConnectionBuilder::<HTTP>::new(host_part)
-            .port(port)
-            .tls(is_https)
-            .connect()
-            .await?
-            .split();
+        // Create connection key for pooling
+        let key = ConnectionKey::new(host_part.to_string(), port, is_https);
 
+        // Try to get pooled connection
+        let stream = match ConnectionPool::global().get(&key).await {
+            Some(conn) => conn,
+            None => {
+                // Pool miss: create new connection
+                ConnectionBuilder::<HTTP>::new(host_part)
+                    .port(port)
+                    .tls(is_https)
+                    .connect()
+                    .await?
+            }
+        };
+
+        let (read, write) = stream.split();
         let mut reader = BufReader::new(read);
         let mut writer = BufWriter::new(write);
 
@@ -813,6 +823,24 @@ impl HttpContext {
         HttpContext::write_frame(&mut writer, request).await?;
         // Read the HTTP response frame
         let response = HttpContext::read_next_frame(&safety_config, &mut reader).await?;
+
+        // Determine if connection should be reused
+        let should_reuse = response
+            .meta
+            .header
+            .get("connection")
+            .map(|v| v.as_str().to_lowercase() != "close")
+            .unwrap_or(true); // HTTP/1.1 defaults to keep-alive
+
+        if should_reuse {
+            // Reconstruct stream from split halves and return to pool
+            let stream = TcpConnectionStream::from_parts(
+                reader.into_inner(),
+                writer.into_inner()
+            );
+            ConnectionPool::global().put(key, stream).await;
+        }
+
         Ok(response)
     }
 

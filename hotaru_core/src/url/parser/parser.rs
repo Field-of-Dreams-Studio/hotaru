@@ -435,24 +435,24 @@ mod tests {
         debug_log!("{:?}, {:?}", pats, names); 
     }
 
-    // #[test]
-    // fn ok_typed_and_regex_segments() {
-    //     let tokens = tokenize("/page-<uint:num>/<||a|b||:alt>/<uuid:order>");
-    //     let (pats, names) = tokens_to_patterns(&tokens).unwrap();
-    //     assert_eq!(pats.len(), 3);
-    //     match &pats[0] {
-    //         PathPattern::Literal(s) => assert!(s.starts_with("page<")),
-    //         _ => panic!("expected regex"),
-    //     }
-    //     assert_eq!(names[0], Some("num".into()));
-    //     assert_eq!(pats[1], PathPattern::Regex("a|b".into()));
-    //     assert_eq!(names[1], Some("alt".into()));
-    //     match &pats[2] {
-    //         PathPattern::Regex(s) => assert!(s.contains("{8}-")),
-    //         _ => panic!("expected regex"),
-    //     }
-    //     assert_eq!(names[2], Some("order".into()));
-    // }
+    #[test]
+    fn ok_typed_and_regex_segments() {
+        let tokens = tokenize("/page-<uint:num>/<||a|b||:alt>/<uuid:order>");
+        let (pats, names) = tokens_to_patterns(&tokens).unwrap();
+        assert_eq!(pats.len(), 3);
+        match &pats[0] {
+            PathPattern::Regex(s) => assert!(s.starts_with("page-\\d+")),
+            _ => panic!("expected regex"),
+        }
+        assert_eq!(names[0], Some("num".into()));
+        assert_eq!(pats[1], PathPattern::Regex("a|b".into()));
+        assert_eq!(names[1], Some("alt".into()));
+        match &pats[2] {
+            PathPattern::Regex(s) => assert!(s.contains("a")),
+            _ => panic!("expected regex"),
+        }
+        assert_eq!(names[2], Some("order".into()));
+    }
 
     #[test]
     fn ok_anypath_catch_all() {

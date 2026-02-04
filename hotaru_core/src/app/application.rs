@@ -11,12 +11,13 @@ use std::time::Duration;
 
 use crate::{debug_log, debug_error, debug_warn};
 
-use crate::url::{Url, dangling_url}; 
+use crate::url::{Url, dangling_url};
 use crate::app::protocol::{ProtocolHandlerBuilder, ProtocolRegistryBuilder};
 use crate::connection::TcpConnectionStream;
 use crate::connection::Protocol;
+use crate::client::pool::start_cleanup_task;
 
-use crate::extensions::{Params, Locals}; 
+use crate::extensions::{Params, Locals};
 use crate::http::context::HttpReqCtx;
 
 // use super::middleware::AsyncMiddleware;
@@ -407,6 +408,9 @@ impl App {
                 let _ = shutdown_tx.send(());
             }
         });
+
+        // Start the connection pool cleanup task
+        start_cleanup_task();
 
         loop {
             tokio::select! {

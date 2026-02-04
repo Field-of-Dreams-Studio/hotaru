@@ -11,9 +11,11 @@ use crate::url::{parser::parse, PathPattern};
 
 pub mod registry;
 pub mod connection_target;
+pub mod pool;
 
 pub use registry::{ClientRegistry, OutpointEntry, OutpointHandler};
 pub use connection_target::ConnectionTarget;
+pub use pool::{ConnectionPool, PoolConfig, ConnectionKey};
 
 pub struct Client {
     pub name: String,

@@ -2,7 +2,7 @@ use hotaru_core::app::middleware::AsyncMiddleware;
 use hotaru_core::{connection::Protocol, http::traits::HTTP};
 use hotaru_core::http::http_value::{HttpMethod, StatusCode};
 use hotaru_core::http::response::response_templates;
-use hotaru_meta::middleware;
+use hotaru_trans::middleware;
 
 use super::cors_settings::*;
 
