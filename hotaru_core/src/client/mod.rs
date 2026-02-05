@@ -125,7 +125,7 @@ pub struct OutpointRegistration<C: RequestContext> {
 }
 
 impl<C: RequestContext> OutpointRegistration<C> {
-    fn new(
+    pub(crate) fn new(
         client_name: String,
         patterns: Vec<PathPattern>,
         names: Vec<Option<String>>,

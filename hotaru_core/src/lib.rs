@@ -7,7 +7,10 @@ pub mod app;
 pub mod connection;
 pub mod client;
 pub mod url;
-pub mod debug; 
+pub mod debug;
+
+#[cfg(feature = "sql")]
+pub mod sql; 
 
 pub use akari::*;
 

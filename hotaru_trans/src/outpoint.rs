@@ -433,7 +433,8 @@ impl OutpointExpr {
                         tokens.next();
                         match tokens.next() {
                             Some(TokenTree::Ident(method_ident))
-                                if method_ident.to_string() == "url" =>
+                                if method_ident.to_string() == "url"
+                                    || method_ident.to_string() == "query" =>
                             {
                                 let method = method_ident.clone();
                                 match tokens.next() {
@@ -461,7 +462,7 @@ impl OutpointExpr {
                             }
                             _ => Err(generate_compile_error(
                                 Span::call_site(),
-                                "Expected 'url' method identifier after '.'",
+                                "Expected 'url' or 'query' method identifier after '.'",
                             )),
                         }
                     }
