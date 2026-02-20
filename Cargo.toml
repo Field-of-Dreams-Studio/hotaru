@@ -5,6 +5,8 @@ members = [
     "hotaru_trans",
     "htmstd",
     "hotaru_core",
+    "hotaru_tls",
+    "hotaru_http", 
     "hotaru_lib",
 
     # "h2per",
@@ -13,6 +15,7 @@ members = [
 
     "multi_protocol_example",
     "example_hotaru",
+    "example_hotaru_2",
     "hyper_hotaru_example",
     "hotaru_bench",
     "hotaru_style_guide",

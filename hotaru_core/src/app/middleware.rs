@@ -1,7 +1,6 @@
 use std::pin::Pin; 
 use std::future::Future;
-use std::sync::Arc; 
-use crate::http::context::HttpReqCtx;
+use std::sync::Arc;  
 
 use crate::{debug_log, connection::RequestContext}; 
 use std::any::Any; 
@@ -90,40 +89,41 @@ pub async fn run_chain<C: RequestContext + 'static>(
     chain.run(ctx).await
 } 
 
-pub struct LoggingMiddleware;
+// HTTP Implementation example (to be moved to hotaru_http crate later) 
+// pub struct LoggingMiddleware;
 
-impl AsyncMiddleware<HttpReqCtx> for LoggingMiddleware {
-    fn handle<'a>(
-        &'a self,
-        mut req: HttpReqCtx, 
-        next: Box<dyn Fn(HttpReqCtx) -> Pin<Box<dyn Future<Output = HttpReqCtx> + Send>> + Send + Sync + 'static>,
-    ) -> Pin<Box<dyn Future<Output = HttpReqCtx> + Send + 'static>> {
-        Box::pin(async move {
-            print!("[Request Received] Method: "); 
-            print!("{}, ", req.method()); 
-            print!("Path: "); 
-            debug_log!("{}, ", req.path()); 
-            if req.meta().get_host() == None { 
-                req.response = crate::http::response::response_templates::normal_response(400, "").content_type(crate::http::http_value::HttpContentType::TextPlain());  
-                debug_log!("[Bad Request] Missing Host Header"); 
-                return req; 
-            }
-            req = next(req).await; 
-            print!("[Request Processed] Method: "); 
-            print!("{}, ", req.method()); 
-            print!("Path: "); 
-            print!("{}, ", req.path()); 
-            print!("Status Code: "); 
-            debug_log!("{}, ", req.response.meta.start_line.status_code()); 
-            req 
-        }) 
-    }
+// impl AsyncMiddleware<HttpReqCtx> for LoggingMiddleware {
+//     fn handle<'a>(
+//         &'a self,
+//         mut req: HttpReqCtx, 
+//         next: Box<dyn Fn(HttpReqCtx) -> Pin<Box<dyn Future<Output = HttpReqCtx> + Send>> + Send + Sync + 'static>,
+//     ) -> Pin<Box<dyn Future<Output = HttpReqCtx> + Send + 'static>> {
+//         Box::pin(async move {
+//             print!("[Request Received] Method: "); 
+//             print!("{}, ", req.method()); 
+//             print!("Path: "); 
+//             debug_log!("{}, ", req.path()); 
+//             if req.meta().get_host() == None { 
+//                 req.response = crate::http::response::response_templates::normal_response(400, "").content_type(crate::http::http_value::HttpContentType::TextPlain());  
+//                 debug_log!("[Bad Request] Missing Host Header"); 
+//                 return req; 
+//             }
+//             req = next(req).await; 
+//             print!("[Request Processed] Method: "); 
+//             print!("{}, ", req.method()); 
+//             print!("Path: "); 
+//             print!("{}, ", req.path()); 
+//             print!("Status Code: "); 
+//             debug_log!("{}, ", req.response.meta.start_line.status_code()); 
+//             req 
+//         }) 
+//     }
     
-    fn as_any(&self) -> &dyn Any {
-        self
-    } 
+//     fn as_any(&self) -> &dyn Any {
+//         self
+//     } 
 
-    fn return_self() -> Self {
-        LoggingMiddleware
-    } 
-} 
+//     fn return_self() -> Self {
+//         LoggingMiddleware
+//     } 
+// } 

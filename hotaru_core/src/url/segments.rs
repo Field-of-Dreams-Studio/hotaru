@@ -1,7 +1,7 @@
 use crate::app::application::App;
 use crate::extensions::{ParamValue, ParamsClone};
 use crate::{debug_log, debug_trace};
-use crate::connection::RequestContext;
+use crate::connection::{RequestContext, TransportSpec};
 use crate::url::parser::parse;
 use std::future::Future;
 use std::pin::Pin;
@@ -14,7 +14,7 @@ use super::pattern::PathPattern;
 
 /// Represents a URL in the application.
 /// This struct holds the various components of a URL, including its path, query parameters, and more.
-pub struct Url<C: RequestContext> {
+pub struct Url<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
     // The last segment of the URL path
     path: PathPattern,
 
@@ -22,10 +22,10 @@ pub struct Url<C: RequestContext> {
     // TODO: Replace PRwLock<Children<C>> with more granular locking strategy
     // Current design locks entire children collection during access, causing contention
     // Consider: Children<C> with internal DashMap or Arc<Url> with individual locks
-    children: PRwLock<Children<C>>,
+    children: PRwLock<Children<C, TS>>,
 
     // The ancestor segment of the URL path
-    ancestor: PRwLock<Ancestor<C>>,
+    ancestor: PRwLock<Ancestor<C, TS>>,
 
     // The handle method of the URL
     method: PRwLock<Option<Arc<dyn AsyncFinalHandler<C>>>>,
@@ -40,22 +40,22 @@ pub struct Url<C: RequestContext> {
     names: StepName,
 
     // Cached App reference to avoid repeated ancestor traversal
-    app_cache: PRwLock<Option<Arc<App>>>,
+    app_cache: PRwLock<Option<Arc<App<TS>>>>,
 }
 
-pub struct Children<C: RequestContext> {
+pub struct Children<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
     // Private vec - only accessible through methods
-    inner: Vec<Arc<Url<C>>>,
+    inner: Vec<Arc<Url<C, TS>>>,
 }
 
-impl<C: RequestContext> Children<C> {
+impl<C: RequestContext, TS: TransportSpec> Children<C, TS> {
     /// Create a new empty Children collection
     pub fn new() -> Self {
         Self { inner: Vec::new() }
     }
 
     /// Get a clone of the children vec for iteration (read-only access)
-    pub fn get_vec(&self) -> Vec<Arc<Url<C>>> {
+    pub fn get_vec(&self) -> Vec<Arc<Url<C, TS>>> {
         self.inner.clone()
     }
 
@@ -71,7 +71,7 @@ impl<C: RequestContext> Children<C> {
 
     /// Insert a child in priority order (Literal → Regex → Any → AnyPath)
     /// This is the only way to add children, ensuring proper ordering
-    pub(crate) fn insert_ordered(&mut self, child: Arc<Url<C>>) {
+    pub(crate) fn insert_ordered(&mut self, child: Arc<Url<C, TS>>) {
         // Find insertion position based on priority
         let insert_pos = self.inner
             .iter()
@@ -92,7 +92,7 @@ impl<C: RequestContext> Children<C> {
     }
 
     /// Find a child by pattern
-    pub(crate) fn find(&self, pattern: &PathPattern) -> Option<Arc<Url<C>>> {
+    pub(crate) fn find(&self, pattern: &PathPattern) -> Option<Arc<Url<C, TS>>> {
         self.inner.iter().find(|c| c.path == *pattern).cloned()
     }
 
@@ -106,10 +106,10 @@ impl<C: RequestContext> Children<C> {
     }
 }
 
-pub enum Ancestor<C: RequestContext> {
+pub enum Ancestor<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
     Nil,
-    App(Arc<App>),
-    Some(Arc<Url<C>>),
+    App(Arc<App<TS>>),
+    Some(Arc<Url<C, TS>>),
 }
 
 pub struct StepName(PRwLock<Vec<Option<String>>>);
@@ -150,7 +150,7 @@ impl std::default::Default for StepName {
     }
 }
 
-impl<C: RequestContext> std::fmt::Display for Url<C> {
+impl<C: RequestContext, TS: TransportSpec> std::fmt::Display for Url<C, TS> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut func_str = String::new();
         // Look for whether the fuction is None or not
@@ -164,12 +164,12 @@ impl<C: RequestContext> std::fmt::Display for Url<C> {
     }
 }
 
-impl<C: RequestContext + 'static> Url<C> {
+impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
     /// Create a new Url instance with all fields except cache (cache is auto-initialized)
     pub fn new(
         path: PathPattern,
-        children: Children<C>,
-        ancestor: Ancestor<C>,
+        children: Children<C, TS>,
+        ancestor: Ancestor<C, TS>,
         method: Option<Arc<dyn AsyncFinalHandler<C>>>,
         middlewares: Vec<Arc<dyn AsyncMiddleware<C>>>,
         params: ParamsClone,
@@ -308,7 +308,7 @@ impl<C: RequestContext + 'static> Url<C> {
         })
     }
 
-    pub async fn walk_str(self: Arc<Self>, path: &str) -> Arc<Url<C>> {
+    pub async fn walk_str(self: Arc<Self>, path: &str) -> Arc<Url<C, TS>> {
         let mut path = path.split('/').collect::<Vec<&str>>();
         path.remove(0);
 
@@ -321,7 +321,7 @@ impl<C: RequestContext + 'static> Url<C> {
     /// Walk back through the ancestor and look for the APP
     /// Protected against infinite recursion with depth limit (max 100)
     /// Uses cache to avoid repeated traversal
-    pub async fn app(&self) -> Result<Arc<App>, Box<dyn std::error::Error>> {
+    pub async fn app(&self) -> Result<Arc<App<TS>>, Box<dyn std::error::Error>> {
         // Check cache first
         {
             let cache_guard = self.app_cache.read();
@@ -340,7 +340,7 @@ impl<C: RequestContext + 'static> Url<C> {
     }
 
     /// Internal helper with depth tracking to prevent infinite recursion
-    fn app_with_depth(&self, depth: usize) -> Pin<Box<dyn Future<Output = Result<Arc<App>, Box<dyn std::error::Error>>> + Send + '_>> {
+    fn app_with_depth(&self, depth: usize) -> Pin<Box<dyn Future<Output = Result<Arc<App<TS>>, Box<dyn std::error::Error>>> + Send + '_>> {
         const MAX_DEPTH: usize = 100;
 
         Box::pin(async move {
@@ -368,7 +368,7 @@ impl<C: RequestContext + 'static> Url<C> {
     }
 
     /// Set the ancestor of this URL to be the application
-    pub fn set_app(&self, app: Arc<App>) {
+    pub fn set_app(&self, app: Arc<App<TS>>) {
         {
             let mut guard = self.ancestor.write();
             *guard = Ancestor::App(app.clone());
@@ -379,7 +379,7 @@ impl<C: RequestContext + 'static> Url<C> {
 
     /// Internal method to update app cache for this URL and all descendants
     /// Called when ancestor is set to ensure cache consistency
-    fn change_app_cache(&self, app: Arc<App>) {
+    fn change_app_cache(&self, app: Arc<App<TS>>) {
         // Update this node's cache
         *self.app_cache.write() = Some(app.clone());
 
@@ -465,7 +465,7 @@ impl<C: RequestContext + 'static> Url<C> {
         middleware: Vec<Arc<dyn AsyncMiddleware<C>>>,
         params: ParamsClone,
         names: StepName,
-    ) -> Result<Arc<Url<C>>, String> {
+    ) -> Result<Arc<Url<C, TS>>, String> {
         debug_log!("Creating child URL: {:?}", child);
 
         // Check if child already exists - if so, update it in place
@@ -538,7 +538,7 @@ impl<C: RequestContext + 'static> Url<C> {
         function: Option<Arc<dyn AsyncFinalHandler<C>>>,
         middleware: Option<Vec<Arc<dyn AsyncMiddleware<C>>>>,
         params: ParamsClone,
-    ) -> Result<Arc<Url<C>>, String> {
+    ) -> Result<Arc<Url<C, TS>>, String> {
         debug_log!("Changing url into path pattern: {}", path);
         // Remove the first slash if exist
         let path = if path.starts_with('/') {
@@ -638,7 +638,7 @@ impl<C: RequestContext + 'static> Url<C> {
 
 }
 
-impl <C: RequestContext + 'static> Default for Url<C> {
+impl <C: RequestContext + 'static, TS: TransportSpec> Default for Url<C, TS> {
     fn default() -> Self {
         Self::new(
             PathPattern::Literal(String::from("/")),
@@ -652,7 +652,7 @@ impl <C: RequestContext + 'static> Default for Url<C> {
     }
 }
 
-pub fn dangling_url<C: RequestContext>() -> Arc<Url<C>> {
+pub fn dangling_url<C: RequestContext, TS: TransportSpec>() -> Arc<Url<C, TS>> {
     Arc::new(Url::new(
         PathPattern::Any,
         Children::new(),

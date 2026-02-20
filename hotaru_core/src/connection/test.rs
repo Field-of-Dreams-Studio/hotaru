@@ -33,6 +33,7 @@ async fn test_https_connection() {
 #[cfg(test)]
 mod tcp_echo_tests {
     use crate::connection::{Protocol, Transport, Stream, Message, RequestContext, ProtocolRole, TcpConnectionStream, TcpReader, TcpWriter};
+    use crate::connection::TransportSpec;
     use crate::app::application::App;
     use std::error::Error;
     use async_trait::async_trait;
@@ -210,10 +211,15 @@ mod tcp_echo_tests {
 
     #[async_trait]
     impl Protocol for TcpProtocol {
+        type Wire = TcpConnectionStream;
         type Transport = TcpTransport;
         type Stream = TcpStream;
         type Message = TcpMessage;
         type Context = TcpContext;
+
+        fn name(&self) -> &'static str {
+            "tcp_echo"
+        } 
 
         fn detect(initial_bytes: &[u8]) -> bool {
             // Check if it's NOT an HTTP request first
@@ -237,12 +243,15 @@ mod tcp_echo_tests {
             self.role
         }
 
-        async fn handle(
+        async fn handle<TS>(
             &mut self,
             mut reader: TcpReader,
             mut writer: TcpWriter,
-            _app: Arc<App>,
-        ) -> Result<(), Box<dyn Error + Send + Sync>> {
+            _app: Arc<App<TS>>,
+        ) -> Result<(), Box<dyn Error + Send + Sync>>
+        where
+            TS: TransportSpec<Wire = Self::Wire>,
+        {
             match self.role {
                 ProtocolRole::Server => {
                     let mut buffer = [0u8; 1024];

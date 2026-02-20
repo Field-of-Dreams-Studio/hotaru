@@ -1,75 +1,91 @@
 //! HTTP protocol implementation using the new Protocol trait.
-//! 
+//!
 //! This replaces the old Rx/Tx based implementation with the new
 //! unified protocol system.
+//!
+//! The current integration updates signatures/wiring so it works with
+//! `ConnStream` split halves while keeping existing HTTP/1.1 logic.
 
-use std::{any::Any, net::SocketAddr};
-use std::sync::Arc;
 use std::error::Error;
-use bytes::BytesMut;
+use std::marker::PhantomData;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use std::{any::Any};
+
 use async_trait::async_trait;
+use bytes::BytesMut;
 use futures::executor::block_on;
+use tokio::io::{AsyncBufRead, AsyncWriteExt, BufReader, ReadBuf};
+use tokio::net::TcpStream;
 
 use crate::{
     app::application::App,
     connection::{
-        Protocol,
-        Transport,
-        // Stream,
-        Message,
-        // RequestContext,
-        ProtocolRole,
-        TcpReader,
-        TcpWriter,
+        ConnMeta, ConnStream, Message, Protocol, ProtocolRole, Transport, TransportSpec,
     },
     http::{
-        request::HttpRequest,
-        response::HttpResponse,
-        safety::HttpSafety,
-        context::HttpContext, 
-    } 
+        context::HttpContext, request::HttpRequest, response::HttpResponse, safety::HttpSafety,
+    },
 };
 
 // ============================================================================
 // Type Aliases
 // ============================================================================
 
+/// Default transport spec used by HTTP when callers don't specify one.
+pub type DefaultHttpTransport = crate::connection::tcp::TcpTransport;
+
 /// Default HTTP protocol (currently HTTP/1.1)
 /// This provides a simpler name for user-facing code while maintaining
 /// version-specific naming in the implementation.
-pub type HTTP = Http1Protocol;
+///
+/// In the new transport design this defaults to plain TCP transport.
+pub type HTTP = Http1Protocol<TcpStream, DefaultHttpTransport>;
+
+/// HTTP/1.1 over plain TCP transport.
+pub type Http1TcpProtocol = Http1Protocol<TcpStream, DefaultHttpTransport>;
+
+/// HTTP/1.1 over TLS transport (enabled by `tls` feature).
+#[cfg(feature = "tls")]
+pub type Http1TlsProtocol = Http1Protocol<hotaru_tls::TlsStream, hotaru_tls::TlsTransport>;
+
+/// HTTPS alias (HTTP/1.1 over TLS), enabled by `tls` feature.
+#[cfg(feature = "tls")]
+pub type HTTPS = Http1TlsProtocol;
 
 // ============================================================================
 // HttpTransport - Connection state for HTTP
 // ============================================================================
 
 /// HTTP transport state.
-/// 
+///
 /// Tracks connection-level state for HTTP:
 /// - Connection ID for logging
-/// - Keep-alive status  
+/// - Keep-alive status
 /// - Request count for connection reuse
 /// - Safety configuration
 #[derive(Clone)]
 pub struct HttpTransport {
     /// Unique connection identifier
     id: i128,
-    
+
     /// Whether this connection supports keep-alive
-    pub keep_alive: bool, 
+    pub keep_alive: bool,
 
-    /// Local address of the connection 
-    pub local_addr: SocketAddr, 
+    /// Local address of the connection
+    pub local_addr: SocketAddr,
 
-    /// Remote address of the connection 
-    pub remote_addr: SocketAddr, 
-    
+    /// Remote address of the connection
+    pub remote_addr: SocketAddr,
+
     /// Number of requests processed on this connection
     pub request_count: u64,
-    
+
     /// HTTP safety configuration (limits, timeouts, etc.)
     pub safety: HttpSafety,
-    
+
     /// Role of this protocol instance
     pub role: ProtocolRole,
 }
@@ -82,7 +98,12 @@ const UNSET_ADDR: SocketAddr = SocketAddr::new(
 
 impl HttpTransport {
     /// Creates a new HTTP/1.1 transport with socket addresses.
-    pub fn new(role: ProtocolRole, safety: HttpSafety, local_addr: SocketAddr, remote_addr: SocketAddr) -> Self {
+    pub fn new(
+        role: ProtocolRole,
+        safety: HttpSafety,
+        local_addr: SocketAddr,
+        remote_addr: SocketAddr,
+    ) -> Self {
         Self {
             id: generate_connection_id(),
             keep_alive: true,
@@ -109,17 +130,17 @@ impl HttpTransport {
             self.remote_addr = addr;
         }
     }
-    
+
     /// Increments the request counter.
     pub fn increment_requests(&mut self) {
         self.request_count += 1;
     }
-    
+
     /// Checks if the connection should be kept alive.
     pub fn should_keep_alive(&self) -> bool {
         self.keep_alive
     }
-    
+
     /// Updates keep-alive based on request headers.
     pub fn update_keep_alive(&mut self, request: &HttpRequest) {
         // Check Connection header
@@ -136,11 +157,11 @@ impl Transport for HttpTransport {
     fn id(&self) -> i128 {
         self.id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -151,15 +172,15 @@ impl Transport for HttpTransport {
 // ============================================================================
 
 /// HTTP message wrapper.
-/// 
+///
 /// Wraps the existing HttpRequest and HttpResponse types
 /// to implement the Message trait.
 #[derive(Debug)]
 pub enum HttpMessage {
     /// HTTP request (client -> server)
     Request(HttpRequest),
-    
-    /// HTTP response (server -> client)  
+
+    /// HTTP response (server -> client)
     Response(HttpResponse),
 }
 
@@ -170,31 +191,30 @@ impl Message for HttpMessage {
                 // Clone to get ownership
                 let mut meta = req.meta.clone();
                 let body = req.body.clone();
-                
+
                 // Use into_static to properly set headers and get body bytes
                 let body_bytes = block_on(body.into_static(&mut meta));
-                
+
                 // Use represent() to format headers
                 let headers = meta.represent();
                 buf.extend_from_slice(headers.as_bytes());
-                
+
                 // Add body
                 buf.extend_from_slice(&body_bytes);
-                
                 Ok(())
             }
             HttpMessage::Response(res) => {
                 // Clone to get ownership
                 let mut meta = res.meta.clone();
                 let body = res.body.clone();
-                
+
                 // Use into_static to properly set headers and get body bytes
                 let body_bytes = block_on(body.into_static(&mut meta));
-                
+
                 // Use represent() to format headers
                 let headers = meta.represent();
                 buf.extend_from_slice(headers.as_bytes());
-                
+
                 // Add body
                 buf.extend_from_slice(&body_bytes);
                 
@@ -202,7 +222,7 @@ impl Message for HttpMessage {
             }
         }
     }
-    
+
     fn decode(_buf: &mut BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>> {
         // For now, we'll use the existing parsing logic in handle methods
         // Full implementation would use HttpRequest::parse_lazy here
@@ -211,28 +231,124 @@ impl Message for HttpMessage {
 }
 
 // ============================================================================
+// Wire wrappers (signature migration only)
+// ============================================================================
+
+/// Reader wrapper that carries connection addresses while preserving `AsyncBufRead`.
+pub struct HttpWireReader<R> {
+    inner: R,
+    local_addr: Option<SocketAddr>,
+    remote_addr: Option<SocketAddr>,
+}
+
+impl<R> HttpWireReader<R> {
+    pub fn new(inner: R, local_addr: Option<SocketAddr>, remote_addr: Option<SocketAddr>) -> Self {
+        Self {
+            inner,
+            local_addr,
+            remote_addr,
+        }
+    }
+
+    pub fn local_addr(&self) -> Option<SocketAddr> {
+        self.local_addr
+    }
+
+    pub fn remote_addr(&self) -> Option<SocketAddr> {
+        self.remote_addr
+    }
+}
+
+impl<R: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for HttpWireReader<R> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read(cx, buf)
+    }
+}
+
+impl<R: AsyncBufRead + Unpin> AsyncBufRead for HttpWireReader<R> {
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<&[u8]>> {
+        let this = self.get_mut();
+        Pin::new(&mut this.inner).poll_fill_buf(cx)
+    }
+
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        let this = self.get_mut();
+        Pin::new(&mut this.inner).consume(amt)
+    }
+}
+
+/// Thin writer wrapper so the old HTTP logic can keep using one local type.
+pub struct HttpWireWriter<W> {
+    inner: W,
+}
+
+impl<W> HttpWireWriter<W> {
+    pub fn new(inner: W) -> Self {
+        Self { inner }
+    }
+}
+
+impl<W: tokio::io::AsyncWrite + Unpin> tokio::io::AsyncWrite for HttpWireWriter<W> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        Pin::new(&mut self.inner).poll_write(cx, buf)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
+}
+
+// ============================================================================
 // Http1Protocol - Main protocol handler
 // ============================================================================
 
 /// HTTP/1.1 protocol handler.
-/// 
+///
 /// Implements the Protocol trait for HTTP/1.1, handling both
 /// server and client roles.
-#[derive(Clone)]
-pub struct Http1Protocol {
+///
+/// Generic over the concrete wire stream type so the same logic can be used
+/// for TCP and TLS transports without duplicating protocol code.
+pub struct Http1Protocol<
+    W: ConnStream = TcpStream,
+    TS: TransportSpec<Wire = W> = DefaultHttpTransport,
+> {
     /// Transport state for this connection
     transport: HttpTransport,
-    
-    /// Application reference
-    app: Option<Arc<App>>,
+    /// Application reference is passed to handle methods and not stored here.
+    _wire: PhantomData<fn() -> W>,
+    _ts: PhantomData<fn() -> TS>,
 }
 
-impl Http1Protocol {
+impl<W: ConnStream, TS: TransportSpec<Wire = W>> Clone for Http1Protocol<W, TS> {
+    fn clone(&self) -> Self {
+        Self {
+            transport: self.transport.clone(),
+            _wire: PhantomData,
+            _ts: PhantomData,
+        }
+    }
+}
+
+impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
     /// Creates a new HTTP/1.1 protocol handler for server role.
     pub fn server(safety: HttpSafety) -> Self {
         Self {
             transport: HttpTransport::new_unbound(ProtocolRole::Server, safety),
-            app: None,
+            _wire: PhantomData,
+            _ts: PhantomData,
         }
     }
 
@@ -240,77 +356,29 @@ impl Http1Protocol {
     pub fn client(safety: HttpSafety) -> Self {
         Self {
             transport: HttpTransport::new_unbound(ProtocolRole::Client, safety),
-            app: None,
+            _wire: PhantomData,
+            _ts: PhantomData,
         }
     }
-}
 
-#[async_trait]
-impl Protocol for Http1Protocol {
-    type Transport = HttpTransport;
-    type Stream = ();  // HTTP/1.1 doesn't have multiplexed streams
-    type Message = HttpMessage;
-    type Context = HttpContext;
-    
-    fn role(&self) -> ProtocolRole {
-        self.transport.role
-    }
-    
-    fn detect(initial_bytes: &[u8]) -> bool {
-        // Check for HTTP/1.1 request methods
-        initial_bytes.starts_with(b"GET ") ||
-        initial_bytes.starts_with(b"POST ") ||
-        initial_bytes.starts_with(b"PUT ") ||
-        initial_bytes.starts_with(b"DELETE ") ||
-        initial_bytes.starts_with(b"HEAD ") ||
-        initial_bytes.starts_with(b"OPTIONS ") ||
-        initial_bytes.starts_with(b"PATCH ") ||
-        initial_bytes.starts_with(b"CONNECT ") ||
-        initial_bytes.starts_with(b"TRACE ")
-    }
-    
-    async fn handle(
-        &mut self,
-        reader: TcpReader,
-        writer: TcpWriter,
-        app: Arc<App>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        // Store app reference
-        self.app = Some(app.clone());
-
-        // Set socket addresses from reader
-        self.transport.set_addresses(reader.local_addr(), reader.remote_addr());
-
-        match self.role() {
-            ProtocolRole::Server => {
-                self.handle_server(reader, writer, app).await
-            }
-            ProtocolRole::Client => {
-                self.handle_client(reader, writer, app).await
-            }
-        }
-    }
-}
-
-impl Http1Protocol {
     /// Handles server-side HTTP/1.1 connections.
-    async fn handle_server(
+    async fn handle_server<ATS>(
         &mut self,
-        mut reader: TcpReader,
-        mut writer: TcpWriter,
-        app: Arc<App>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        // Get the root handler from the App's protocol registry
-        let root_handler = app.handler.url::<Http1Protocol>()
+        mut reader: HttpWireReader<BufReader<W::ReadHalf>>,
+        mut writer: HttpWireWriter<W::WriteHalf>,
+        app: Arc<App<ATS>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>>
+    where
+        ATS: TransportSpec<Wire = W>,
+    {
+        let root_handler = app
+            .handler
+            .url::<Http1Protocol<W, ATS>>()
             .ok_or("No HTTP/1.1 handler registered in the application")?;
 
         loop {
             // Parse request using existing logic
-            let request = HttpRequest::parse_lazy(
-                &mut reader,
-                &self.transport.safety,
-                false  // Not in build mode
-            ).await;
+            let request = HttpRequest::parse_lazy(&mut reader, &self.transport.safety, false).await;
 
             // Check if request is empty/default (parsing failed)
             if request.meta.path().is_empty() && request.meta.header.is_empty() {
@@ -349,16 +417,70 @@ impl Http1Protocol {
 
         Ok(())
     }
-    
+
     /// Handles client-side HTTP/1.1 connections.
-    async fn handle_client(
+    async fn handle_client<ATS>(
         &mut self,
-        _reader: TcpReader,
-        _writer: TcpWriter,
-        _app: Arc<App>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        _reader: HttpWireReader<BufReader<W::ReadHalf>>,
+        _writer: HttpWireWriter<W::WriteHalf>,
+        _app: Arc<App<ATS>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>>
+    where
+        ATS: TransportSpec<Wire = W>,
+    {
         // Client implementation will be added when we create the Client App
         Err("HTTP/1.1 client not yet implemented".into())
+    }
+}
+
+#[async_trait]
+impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, TS> {
+    type Wire = W;
+    type Transport = HttpTransport;
+    type Stream = ();
+    type Message = HttpMessage;
+    type Context = HttpContext<TS>;
+
+    fn name(&self) -> &'static str {
+        "http"
+    }
+
+    fn role(&self) -> ProtocolRole {
+        self.transport.role
+    }
+
+    fn detect(initial_bytes: &[u8]) -> bool {
+        initial_bytes.starts_with(b"GET ")
+            || initial_bytes.starts_with(b"POST ")
+            || initial_bytes.starts_with(b"PUT ")
+            || initial_bytes.starts_with(b"DELETE ")
+            || initial_bytes.starts_with(b"HEAD ")
+            || initial_bytes.starts_with(b"OPTIONS ")
+            || initial_bytes.starts_with(b"PATCH ")
+            || initial_bytes.starts_with(b"CONNECT ")
+            || initial_bytes.starts_with(b"TRACE ")
+    }
+
+    async fn handle<ATS>(
+        &mut self,
+        reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
+        writer: <Self::Wire as ConnStream>::WriteHalf,
+        meta: <Self::Wire as ConnStream>::Meta,
+        app: Arc<App<ATS>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>>
+    where
+        ATS: TransportSpec<Wire = Self::Wire>,
+    {
+        self.transport
+            .set_addresses(meta.local_addr(), meta.remote_addr());
+
+        let reader = HttpWireReader::new(reader, meta.local_addr(), meta.remote_addr());
+        let writer = HttpWireWriter::new(writer);
+
+        match self.role() {
+            ProtocolRole::Server => self.handle_server(reader, writer, app).await,
+            ProtocolRole::Client => self.handle_client(reader, writer, app).await,
+        }
     }
 }
 
@@ -373,16 +495,16 @@ fn generate_connection_id() -> i128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_http1_detection() {
-        assert!(Http1Protocol::detect(b"GET / HTTP/1.1\r\n"));
-        assert!(Http1Protocol::detect(b"POST /api HTTP/1.1\r\n"));
-        assert!(Http1Protocol::detect(b"PUT /resource HTTP/1.1\r\n"));
-        assert!(!Http1Protocol::detect(b"INVALID REQUEST\r\n"));
-        assert!(!Http1Protocol::detect(b""));
+        assert!(HTTP::detect(b"GET / HTTP/1.1\r\n"));
+        assert!(HTTP::detect(b"POST /api HTTP/1.1\r\n"));
+        assert!(HTTP::detect(b"PUT /resource HTTP/1.1\r\n"));
+        assert!(!HTTP::detect(b"INVALID REQUEST\r\n"));
+        assert!(!HTTP::detect(b""));
     }
-    
+
     #[test]
     fn test_transport_keep_alive() {
         let mut transport = HttpTransport::new_unbound(ProtocolRole::Server, HttpSafety::default());
@@ -391,11 +513,11 @@ mod tests {
         transport.keep_alive = false;
         assert!(!transport.should_keep_alive());
     }
-    
+
+    #[test]
     /// Test for HTTP message encoding - currently fails due to incomplete HttpRequest::default()
     /// TODO: Fix HttpRequest::default() to include proper start line initialization
     /// Run with: cargo test --lib -- --ignored test_message_encoding
-    #[test]
     #[ignore = "requires HttpRequest::default() to include start line"]
     fn test_message_encoding() {
         use crate::http::meta::HttpMeta;
@@ -403,7 +525,9 @@ mod tests {
         // Test request encoding
         let mut request = HttpRequest::default();
         request.meta = HttpMeta::new(Default::default(), Default::default());
-        request.meta.header.insert("Host".to_string(), "example.com".into());
+        request.meta
+            .header
+            .insert("Host".to_string(), "example.com".into());
 
         let msg = HttpMessage::Request(request);
         let mut buf = BytesMut::new();

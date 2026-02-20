@@ -1,18 +1,21 @@
-pub mod connection; 
-pub mod stream; 
-pub mod error; 
-pub mod builder; 
-pub mod protocol; 
-pub mod test; 
+pub mod connection;
+pub mod error;
+pub mod test;
+pub mod stream;
+pub mod accepter;
+pub mod connector;
+pub mod transport_spec;
+pub mod tcp;
 
-pub use self::builder::ConnectionBuilder;  
-// TODO: Rename builder::Protocol to ConnectionProtocol or ClientProtocol
-// pub use self::builder::Protocol; 
-pub use self::stream::{TcpConnectionStream, TcpReader, TcpWriter, split_connection};
-pub use self::error::Result; 
+pub use self::accepter::Accepter;
+pub use self::connector::Connector;
+pub use self::transport_spec::TransportSpec;
+pub use self::stream::{ConnMeta, ConnStream};
+pub use self::tcp::{TcpAccepter, TcpConnector, TcpConnectorAddr, TcpMeta, TcpTransport};
+pub use self::error::Result;
 
 // New protocol traits
-pub use self::protocol::{
+pub use crate::protocol::{
     Protocol,
     Transport,
     Stream,
@@ -23,10 +26,7 @@ pub use self::protocol::{
     ProtocolError,
     ProtocolErrorKind,
     ProtocolErrorBox,
+    ProtocolResult,
+    IoProtocolError,
+    StaticProtocolError,
 };
-
-// Alias for generic connection stream for compatibility
-pub use self::stream::TcpConnectionStream as Connection; 
-pub use self::connection::ConnectionStatus;
-
-

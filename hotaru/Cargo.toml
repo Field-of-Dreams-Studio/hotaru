@@ -19,6 +19,7 @@ futures = "0.3"
 once_cell = "1.17.2"
 hotaru_trans = { path = "../hotaru_trans", version="0.8.0" } 
 hotaru_core = { path = "../hotaru_core", version="0.8.0" }
+hotaru_http = { path = "../hotaru_http", version = "0.8.0" }
 ahttpm = { path = "../ahttpm", version="0.7.0" }
 hotaru_lib = { path = "../hotaru_lib", version="0.7.3", features = ["url_encoding", "compression"]  }
 # ctor is only needed when external-ctor feature is enabled

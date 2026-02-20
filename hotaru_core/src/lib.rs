@@ -1,10 +1,9 @@
 // Type aliases (must be declared before other modules that use it)
 pub mod alias;
 
-pub mod http;
-// pub mod http2;
 pub mod app;
 pub mod connection;
+pub mod protocol;
 pub mod url;
 pub mod debug; 
 

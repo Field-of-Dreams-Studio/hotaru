@@ -363,6 +363,7 @@ We believe in transparency about AI-assisted development. Below is an honest bre
 | hotaru_core/app | Minimal | |
 | hotaru_core/connection | Some | |
 | hotaru_core/url | Minor | |
+| hotaru_core/protocol | Minor | |
 | hotaru_core/http | Minor | |
 | hotaru_lib | Some | Basic API Access |
 | hotaru_meta/endpoint | None | |

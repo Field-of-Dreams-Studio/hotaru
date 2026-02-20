@@ -6,7 +6,12 @@ async fn main() {
     APP.clone().run().await;
 }
 
-LApp!(APP = App::new().build()); 
+LApp!(APP = App::new()
+    .single_protocol(
+        ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+    )
+    .build()
+); 
 
 // Trans 
 

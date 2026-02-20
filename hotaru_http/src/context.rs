@@ -1,8 +1,9 @@
 use crate::app::application::App;
 use crate::connection::error::ConnectionError;
 use crate::connection::{
-    ConnectionBuilder, ConnectionStatus, ProtocolRole, RequestContext, TcpConnectionStream,
+    ConnStream, Connector, ProtocolRole, RequestContext, TransportSpec,
 };
+use crate::connection::connection::ConnectionStatus;
 use std::net::{IpAddr, SocketAddr};
 use crate::debug_log;
 use crate::extensions::{Locals, Params};
@@ -21,17 +22,17 @@ use akari::Value;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::io::{BufReader, BufWriter, ReadHalf, WriteHalf};
+use tokio::io::{AsyncBufRead, AsyncWrite, BufReader, BufWriter};
 
 use super::http_value::StatusCode;
 use super::response::response_templates;
 
 /// Executable context - determines what's available for execution
-pub enum Executable {
+pub enum Executable<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
     /// Server context with App and URL endpoint
     Request {
-        app: Arc<App>,
-        endpoint: Arc<Url<HttpContext>>,
+        app: Arc<App<TS>>,
+        endpoint: Arc<Url<HttpContext<TS>, TS>>,
     },
     /// Client context (empty for now, will be extended later)
     Response,
@@ -41,12 +42,12 @@ pub enum Executable {
 ///
 /// This context flows through handlers and middleware, supporting both
 /// server-side request handling and client-side response processing.
-pub struct HttpContext {
+pub struct HttpContext<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
     pub request: HttpRequest,
     pub response: HttpResponse,
 
     // Execution context determines available operations
-    pub executable: Executable,
+    pub executable: Executable<TS>,
 
     // Additional fields
     pub host: Option<String>, // Used by client for target host
@@ -62,7 +63,7 @@ pub struct HttpContext {
 }
 
 // Type alias for backward compatibility
-pub type HttpReqCtx = HttpContext;
+pub type HttpReqCtx<TS = crate::connection::tcp::TcpTransport> = HttpContext<TS>;
 
 /// Placeholder address for uninitialized or unknown connections.
 /// `0.0.0.0:0` indicates that no socket address information is available.
@@ -71,11 +72,11 @@ const UNSET_ADDR: SocketAddr = SocketAddr::new(
     0,
 );
 
-impl HttpContext {
+impl<TS: TransportSpec> HttpContext<TS> {
     /// Creates a new server context with socket addresses.
     pub fn new_server(
-        app: Arc<App>,
-        endpoint: Arc<Url<HttpContext>>,
+        app: Arc<App<TS>>,
+        endpoint: Arc<Url<HttpContext<TS>, TS>>,
         request: HttpRequest,
         remote_addr: Option<SocketAddr>,
         local_addr: Option<SocketAddr>,
@@ -198,10 +199,13 @@ impl HttpContext {
         self.local_addr.unwrap_or(UNSET_ADDR)
     }
 
-    pub async fn read_request(
-        app: Arc<App>,
-        reader: &mut BufReader<ReadHalf<TcpConnectionStream>>,
-    ) -> Result<HttpRequest, ConnectionError> {
+    pub async fn read_request<R>(
+        app: Arc<App<TS>>,
+        reader: &mut R,
+    ) -> Result<HttpRequest, ConnectionError>
+    where
+        R: AsyncBufRead + Unpin,
+    {
         Ok(HttpRequest::parse_lazy(
             reader,
             app.config.get::<HttpSafety>().unwrap_or_default(),
@@ -211,10 +215,13 @@ impl HttpContext {
     }
 
     /// Sends the response
-    pub async fn send_response(
+    pub async fn send_response<W>(
         response: HttpResponse,
-        writer: &mut BufWriter<WriteHalf<TcpConnectionStream>>,
-    ) {
+        writer: &mut W,
+    )
+    where
+        W: AsyncWrite + Unpin,
+    {
         let _ = response.send(writer).await;
     }
 
@@ -246,7 +253,10 @@ impl HttpContext {
     }
 
     /// Checks whether the request fulfills the endpoint's security requirements.
-    pub fn request_check(&mut self, endpoint: &Arc<Url<HttpContext>>) -> Result<(), StatusCode> {
+    pub fn request_check(
+        &mut self,
+        endpoint: &Arc<Url<HttpContext<TS>, TS>>,
+    ) -> Result<(), StatusCode> {
         let config = endpoint.get_params::<HttpSafety>().unwrap_or_default();
         // println!(
         //     "Checking request: {:?} {}{} ",config,self.request.meta.method(),config.check_method(&self.request.meta.method())
@@ -269,7 +279,7 @@ impl HttpContext {
     }
 
     /// Returns the Arc<App> if this is a server context
-    pub fn app(&self) -> Option<Arc<App>> {
+    pub fn app(&self) -> Option<Arc<App<TS>>> {
         match &self.executable {
             Executable::Request { app, .. } => Some(app.clone()),
             Executable::Response => None,
@@ -277,7 +287,7 @@ impl HttpContext {
     }
 
     /// Returns the endpoint URL if this is a server context
-    pub fn endpoint(&self) -> Option<Arc<Url<HttpContext>>> {
+    pub fn endpoint(&self) -> Option<Arc<Url<HttpContext<TS>, TS>>> {
         match &self.executable {
             Executable::Request { endpoint, .. } => Some(endpoint.clone()),
             Executable::Response => None,
@@ -484,7 +494,7 @@ impl HttpContext {
     }
 }
 
-impl RequestContext for HttpContext {
+impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
     type Request = HttpRequest;
     type Response = HttpResponse;
 
@@ -512,103 +522,52 @@ impl RequestContext for HttpContext {
     }
 }
 
-impl HttpContext {
+impl<TS: TransportSpec> HttpContext<TS> {
     pub fn bad_request(&mut self) {
         self.handle_error();
     }
 }
 
 // Type alias for backward compatibility with client code
-pub type HttpResCtx = HttpContext;
+pub type HttpResCtx<TS = crate::connection::tcp::TcpTransport> = HttpContext<TS>;
 
-impl HttpContext {
+impl<TS: TransportSpec> HttpContext<TS> {
     /// Creates a client context for sending requests (backward compatibility)
     pub fn new_res(config: HttpSafety, host: impl Into<String>) -> Self {
         Self::new_client(host.into(), config)
     }
 
-    /// Sends a request to the given host and returns a `HttpResCtx` context.
-    /// This function will automatically determine whether to use HTTP or HTTPS based on the host string.
-    pub async fn send_request<T: Into<String>>(
-        host: T,
-        mut request: HttpRequest,
+    /// Sends a request to the given connector target and returns the response.
+    ///
+    /// This path no longer auto-parses/normalizes host string schemes (`http://`, `https://`)
+    /// in `send_request`; it now trusts transport target type.
+    ///
+    /// Connector creation is explicit: callers provide connector config and this
+    /// method constructs `TS::Connector` from that config (no default connector).
+    pub async fn send_request<TTarget, TConnectorConfig>(
+        target: TTarget,
+        connector_config: TConnectorConfig,
+        request: HttpRequest,
         safety_config: HttpSafety,
-    ) -> Result<HttpResponse, ConnectionError> {
-        // Test whether the host uses https
-        let host_str = host.into();
-        let (is_https, without_scheme) = if host_str.starts_with("https://") {
-            (true, host_str.trim_start_matches("https://"))
-        } else if host_str.starts_with("http://") {
-            (false, host_str.trim_start_matches("http://"))
-        } else {
-            (false, host_str.as_str())
-        };
-
-        // Find last colon with trailing digits
-        let mut host_part = without_scheme;
-        let mut port = if is_https { 443 } else { 80 };
-        let mut explicit_port = false;
-
-        if let Some(colon_pos) = without_scheme.rfind(':') {
-            let port_part = &without_scheme[colon_pos + 1..];
-
-            // Check if port part is numeric (1-5 digits)
-            if !port_part.is_empty()
-                && port_part.len() <= 5
-                && port_part.chars().all(|c| c.is_ascii_digit())
-            {
-                if let Ok(parsed_port) = port_part.parse::<u16>() {
-                    port = parsed_port;
-                    host_part = &without_scheme[..colon_pos];
-                    explicit_port = true;
-                }
-            }
-        }
-
-        // Auto set host if host is not set
-        match request.meta.get_host() {
-            None => {
-                // Host is NOT set, so set it
-                if explicit_port {
-                    request
-                        .meta
-                        .set_host(Some(format!("{}:{}", host_part, port)));
-                } else {
-                    request.meta.set_host(Some(host_part.to_string()));
-                }
-            }
-            Some(_) => {} // Host is already set, do nothing
-        }
-
-        if let Some(colon_pos) = without_scheme.rfind(':') {
-            let port_part = &without_scheme[colon_pos + 1..];
-
-            // Check if port part is numeric (1-5 digits)
-            if !port_part.is_empty()
-                && port_part.len() <= 5
-                && port_part.chars().all(|c| c.is_ascii_digit())
-            {
-                if let Ok(parsed_port) = port_part.parse::<u16>() {
-                    port = parsed_port;
-                    host_part = &without_scheme[..colon_pos];
-                }
-            }
-        }
-
-        let (read, write) = ConnectionBuilder::new(host_part, port)
-            .protocol(crate::connection::builder::Protocol::HTTP)
-            .tls(is_https)
-            .connect()
-            .await?
-            .split();
+    ) -> Result<HttpResponse, ConnectionError>
+    where
+        TTarget: Into<<TS::Connector as Connector>::Target>,
+        TS::Connector: From<TConnectorConfig>,
+    {
+        let connector = TS::Connector::from(connector_config);
+        let wire = connector
+            .connect(target.into())
+            .await
+            .map_err(ConnectionError::IoError)?;
+        let (read, write, _meta) = wire.split();
 
         let mut reader = BufReader::new(read);
         let mut writer = BufWriter::new(write);
 
         // Write the HTTP request frame
-        HttpContext::write_frame(&mut writer, request).await?;
+        Self::write_frame(&mut writer, request).await?;
         // Read the HTTP response frame
-        let response = HttpContext::read_next_frame(&safety_config, &mut reader).await?;
+        let response = Self::read_next_frame(&safety_config, &mut reader).await?;
         Ok(response)
     }
 
@@ -622,8 +581,8 @@ impl HttpContext {
     }
 
     /// Write an HTTP request frame to the stream
-    pub async fn write_frame(
-        write_stream: &mut BufWriter<WriteHalf<TcpConnectionStream>>,
+    pub async fn write_frame<W: AsyncWrite + Unpin>(
+        write_stream: &mut W,
         request_frame: HttpRequest,
     ) -> Result<(), ConnectionError> {
         request_frame
@@ -634,11 +593,76 @@ impl HttpContext {
     }
 
     /// Read an HTTP response frame from the stream
-    pub async fn read_next_frame(
+    pub async fn read_next_frame<R: AsyncBufRead + Unpin>(
         config: &HttpSafety,
-        read_stream: &mut BufReader<ReadHalf<TcpConnectionStream>>,
+        read_stream: &mut R,
     ) -> Result<HttpResponse, ConnectionError> {
         Ok(HttpResponse::parse_lazy(read_stream, config, false).await)
+    }
+}
+
+impl HttpContext<crate::connection::tcp::TcpTransport> {
+    /// Backward-compatible helper for string hosts with optional port override.
+    ///
+    /// This helper keeps old ergonomics (`host + optional port`) and then routes
+    /// to the transport-target `send_request` API.
+    pub async fn send_request_host<T: Into<String>, TConnectorConfig>(
+        host: T,
+        port: Option<u16>,
+        connector_config: TConnectorConfig,
+        mut request: HttpRequest,
+        safety_config: HttpSafety,
+    ) -> Result<HttpResponse, ConnectionError>
+    where
+        <crate::connection::tcp::TcpTransport as TransportSpec>::Connector: From<TConnectorConfig>,
+    {
+        let host_str = host.into();
+        let (is_https, without_scheme) = if host_str.starts_with("https://") {
+            (true, host_str.trim_start_matches("https://"))
+        } else if host_str.starts_with("http://") {
+            (false, host_str.trim_start_matches("http://"))
+        } else {
+            (false, host_str.as_str())
+        };
+
+        if is_https {
+            return Err(ConnectionError::Other(
+                "HTTPS outbound requests are not supported yet; use http://".to_string(),
+            ));
+        }
+
+        // Parse optional host:port from input string.
+        let mut host_part = without_scheme;
+        let mut parsed_port: Option<u16> = None;
+
+        if let Some(colon_pos) = without_scheme.rfind(':') {
+            let port_part = &without_scheme[colon_pos + 1..];
+            if !port_part.is_empty()
+                && port_part.len() <= 5
+                && port_part.chars().all(|c| c.is_ascii_digit())
+            {
+                if let Ok(p) = port_part.parse::<u16>() {
+                    parsed_port = Some(p);
+                    host_part = &without_scheme[..colon_pos];
+                }
+            }
+        }
+
+        let final_port = port.or(parsed_port).unwrap_or(80);
+
+        // Auto set Host header when absent.
+        if request.meta.get_host().is_none() {
+            if final_port == 80 && port.is_none() && parsed_port.is_none() {
+                request.meta.set_host(Some(host_part.to_string()));
+            } else {
+                request
+                    .meta
+                    .set_host(Some(format!("{}:{}", host_part, final_port)));
+            }
+        }
+
+        let target = format!("{}:{}", host_part, final_port);
+        Self::send_request(target, connector_config, request, safety_config).await
     }
 }
 
@@ -652,6 +676,8 @@ mod test {
         },
     };
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    #[cfg(feature = "tls")]
+    use hotaru_tls::{TlsClientConfig, TlsConnector, TlsTransport};
 
     // =========================================================================
     // Socket Address Accessor Tests
@@ -739,7 +765,7 @@ mod test {
 
     #[test]
     fn test_client_context_has_no_addresses() {
-        let ctx = super::HttpContext::new_client(
+        let ctx = super::HttpContext::<crate::connection::tcp::TcpTransport>::new_client(
             "example.com".to_string(),
             HttpSafety::default(),
         );
@@ -802,10 +828,15 @@ mod test {
     //     // println!("{:?}, {:?}", request.response.meta, request.response.body);
     // }
 
+    /// HTTPS test (requires `tls` feature and external network).
+    #[cfg(feature = "tls")]
     #[tokio::test]
+    #[ignore = "requires external network and TLS feature"]
     async fn request_another_page() {
-        let response = HttpResCtx::send_request(
-            "https://api.pmine.org",
+        let connector = TlsConnector::new(TlsClientConfig::new()).unwrap();
+        let response = HttpResCtx::<TlsTransport>::send_request(
+            ("api.pmine.org".to_string(), 443),
+            connector,
             get_request("/num/change/lhsduifhsjdbczfjgszjdhfgxyjey/36/2"),
             HttpSafety::new().with_max_body_size(25565),
         )
@@ -814,10 +845,15 @@ mod test {
         println!("{:?}, {:?}", response.meta, response.body);
     }
 
+    /// HTTPS chunked-response test (requires `tls` feature and external network).
+    #[cfg(feature = "tls")]
     #[tokio::test]
+    #[ignore = "requires external network and TLS feature"]
     async fn request_chunked_page() {
-        let response = HttpResCtx::send_request(
-            "https://api.pmine.org",
+        let connector = TlsConnector::new(TlsClientConfig::new()).unwrap();
+        let response = HttpResCtx::<TlsTransport>::send_request(
+            ("api.pmine.org".to_string(), 443),
+            connector,
             get_request("/num/c2"),
             HttpSafety::new().with_max_body_size(25565),
         )
@@ -831,8 +867,10 @@ mod test {
     #[tokio::test]
     #[ignore = "requires local server on port 3003"]
     async fn localhost() {
-        let response = HttpResCtx::send_request(
+        let response = HttpResCtx::send_request_host(
             "http://localhost:3003",
+            None,
+            crate::connection::tcp::TcpConnector,
             get_request("/"),
             HttpSafety::new().with_max_body_size(25565),
         )
