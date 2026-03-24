@@ -7,9 +7,10 @@ release/
 # Cargo lock file
 Cargo.lock
 
-# Generated documentation
+# Documentation
 doc/
 **/doc/
+hotaru_core/REFACTOR_NOTES.md
 
 # Backup files
 *.swp

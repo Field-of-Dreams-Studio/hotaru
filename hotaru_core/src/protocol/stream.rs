@@ -12,8 +12,10 @@ use std::any::Any;
 /// - Pub/Sub: Topic subscriptions
 /// - Game Protocol: Different channels (movement, chat, combat)
 pub trait Stream: Send + Sync + 'static {
+    type Id: Send + Sync + 'static; // Stream identifier type (e.g. u32 for HTTP/2) 
+
     /// Returns the stream identifier.
-    fn id(&self) -> u32;
+    fn id(&self) -> Self::Id;
     
     /// Returns a reference to the stream as `Any`.
     fn as_any(&self) -> &dyn Any;
@@ -24,6 +26,7 @@ pub trait Stream: Send + Sync + 'static {
 
 /// Unit type stream for protocols that don't use streams.
 impl Stream for () {
+    type Id = u32; 
     fn id(&self) -> u32 { 0 }
     fn as_any(&self) -> &dyn Any { self }
     fn as_any_mut(&mut self) -> &mut dyn Any { self }

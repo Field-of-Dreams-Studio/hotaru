@@ -226,7 +226,7 @@ impl<TS: TransportSpec> App<TS> {
         })
         .await
         .expect("Runtime task panicked");
-    }
+    } 
 
     /// Internal application loop - listens for and handles connections
     async fn run_app_loop(self: Arc<Self>) {

@@ -9,7 +9,7 @@ use akari::extensions::{Locals, Params};
 use tokio::io::BufReader;
 
 use crate::{
-    app::middleware::AsyncMiddlewareChain,
+    executable::middleware::AsyncMiddlewareChain,
     app::application::App,
     connection::{ConnStream, Protocol, TransportSpec},
     debug_error,
@@ -123,7 +123,9 @@ where
         self
     }
 
-    fn attach_app(&self, app: Arc<App<TS>>) {
-        self.root_handler.set_app(app);
+    fn attach_app(&self, _app: Arc<App<TS>>) {
+        // Runtime ownership is being removed from Url temporarily.
+        // Route trees remain attached structurally, but no longer cache App here.
+        // self.root_handler.set_app(app);
     }
 }

@@ -1,4 +1,3 @@
-use crate::app::application::App;
 use crate::extensions::{ParamValue, ParamsClone};
 use crate::{debug_log, debug_trace};
 use crate::connection::{RequestContext, TransportSpec};
@@ -9,7 +8,7 @@ use std::slice::Iter;
 use std::sync::Arc;
 use crate::alias::PRwLock; 
 // pub static ROOT_URL: OnceLock<Url> = OnceLock::new();
-use super::super::app::middleware::*;
+use crate::executable::middleware::*;
 use super::pattern::PathPattern;
 
 /// Represents a URL in the application.
@@ -39,8 +38,9 @@ pub struct Url<C: RequestContext, TS: TransportSpec = crate::connection::tcp::Tc
     // The step names of the URL path
     names: StepName,
 
-    // Cached App reference to avoid repeated ancestor traversal
-    app_cache: PRwLock<Option<Arc<App<TS>>>>,
+    // Runtime root storage was removed temporarily while execution/runtime
+    // ownership is being moved out of the route tree.
+    // app_cache: PRwLock<Option<Arc<App<TS>>>>,
 }
 
 pub struct Children<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
@@ -108,7 +108,7 @@ impl<C: RequestContext, TS: TransportSpec> Children<C, TS> {
 
 pub enum Ancestor<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
     Nil,
-    App(Arc<App<TS>>),
+    // App(Arc<App<TS>>),
     Some(Arc<Url<C, TS>>),
 }
 
@@ -183,7 +183,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
             middlewares: PRwLock::new(middlewares),
             params: PRwLock::new(params),
             names,
-            app_cache: PRwLock::new(None),
+            // app_cache: PRwLock::new(None),
         }
     }
 
@@ -318,81 +318,14 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
         })
     }
 
-    /// Walk back through the ancestor and look for the APP
-    /// Protected against infinite recursion with depth limit (max 100)
-    /// Uses cache to avoid repeated traversal
-    pub async fn app(&self) -> Result<Arc<App<TS>>, Box<dyn std::error::Error>> {
-        // Check cache first
-        {
-            let cache_guard = self.app_cache.read();
-            if let Some(app) = cache_guard.as_ref() {
-                return Ok(app.clone());
-            }
-        }
-
-        // Cache miss - traverse ancestor chain
-        let app = self.app_with_depth(0).await?;
-
-        // Update cache before returning
-        *self.app_cache.write() = Some(app.clone());
-
-        Ok(app)
-    }
-
-    /// Internal helper with depth tracking to prevent infinite recursion
-    fn app_with_depth(&self, depth: usize) -> Pin<Box<dyn Future<Output = Result<Arc<App<TS>>, Box<dyn std::error::Error>>> + Send + '_>> {
-        const MAX_DEPTH: usize = 100;
-
-        Box::pin(async move {
-            if depth > MAX_DEPTH {
-                return Err(format!("Ancestor chain exceeds max depth {} - possible circular reference", MAX_DEPTH).into());
-            }
-
-            // Clone ancestor before await to drop the read guard
-            let ancestor_clone = {
-                let guard = self.ancestor.read();
-                match &*guard {
-                    Ancestor::Some(ancestor) => Some(ancestor.clone()),
-                    Ancestor::App(app) => return Ok(app.clone()),
-                    Ancestor::Nil => return Err("No ancestor found".into()),
-                }
-            }; // Guard dropped here
-
-            // Now await with no lock held
-            if let Some(ancestor) = ancestor_clone {
-                ancestor.app_with_depth(depth + 1).await
-            } else {
-                unreachable!()
-            }
-        })
-    }
-
-    /// Set the ancestor of this URL to be the application
-    pub fn set_app(&self, app: Arc<App<TS>>) {
-        {
-            let mut guard = self.ancestor.write();
-            *guard = Ancestor::App(app.clone());
-        }
-        // Update cache when ancestor changes
-        self.change_app_cache(app);
-    }
-
-    /// Internal method to update app cache for this URL and all descendants
-    /// Called when ancestor is set to ensure cache consistency
-    fn change_app_cache(&self, app: Arc<App<TS>>) {
-        // Update this node's cache
-        *self.app_cache.write() = Some(app.clone());
-
-        // Recursively update all children's caches
-        let children = {
-            let guard = self.children.read();
-            guard.get_vec()
-        };
-
-        for child in children.iter() {
-            child.change_app_cache(app.clone());
-        }
-    }
+    // Runtime back-references are intentionally commented out for now.
+    // The current refactor direction is to carry runtime ownership in the
+    // executable/request context instead of the route tree.
+    //
+    // pub async fn app(&self) -> Result<Arc<App<TS>>, Box<dyn std::error::Error>> { ... }
+    // fn app_with_depth(&self, depth: usize) -> Pin<Box<dyn Future<Output = Result<Arc<App<TS>>, Box<dyn std::error::Error>>> + Send + '_>> { ... }
+    // pub fn set_app(&self, app: Arc<App<TS>>) { ... }
+    // fn change_app_cache(&self, app: Arc<App<TS>>) { ... }
 
     /// Retrieves a cloned value of type `T` from the URL's parameter storage.
     /// Returns `Some(T)` if the parameter exists and matches the type, `None` otherwise.

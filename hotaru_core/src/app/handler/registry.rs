@@ -1,8 +1,9 @@
 use super::{ProtocolHandler, ProtocolHandlerTrait};
 use crate::{
-    app::{application::App, middleware::{AsyncMiddleware, AsyncMiddlewareChain}},
+    app::application::App,
     connection::{ConnStream, Protocol, TransportSpec},
     debug_log,
+    executable::middleware::{AsyncMiddleware, AsyncMiddlewareChain},
     extensions::ParamsClone,
     url::Url,
 };

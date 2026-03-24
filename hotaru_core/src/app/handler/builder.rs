@@ -1,7 +1,7 @@
 use super::{ProtocolHandler, ProtocolHandlerTrait, ProtocolRegistry, ProtocolRegistryKind};
 use crate::{
-    app::middleware::AsyncMiddleware,
     connection::{Protocol, TransportSpec},
+    executable::middleware::AsyncMiddleware,
     url::Url,
 };
 use std::sync::Arc;

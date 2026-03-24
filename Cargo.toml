@@ -1,16 +1,17 @@
 [workspace]
 members = [
     "hotaru",
-    "hotaru_meta",
-    "hotaru_trans",
-    "htmstd",
     "hotaru_core",
+    "hotaru_trans",
+    
+    "hotaru_meta",
     "hotaru_tls",
     "hotaru_http", 
     "hotaru_lib",
-
-    # "h2per",
     "ahttpm",
+
+    "htmstd",
+    # "h2per",
     "hotaru_grpc",
 
     "multi_protocol_example",
