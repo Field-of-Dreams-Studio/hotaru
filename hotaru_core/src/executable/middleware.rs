@@ -42,55 +42,6 @@ where
     }
 } 
 
-/// The middleware‐chain builder and executor.
-pub struct MiddlewareChain<C> {
-    inner: Arc<dyn Fn(C) -> BoxFuture<C> + Send + Sync + 'static>,
-}
-
-impl<C> MiddlewareChain<C>
-where
-    C: RequestContext + Send + 'static,
-{
-    /// Build a chain from:
-    ///  - `middlewares`: the Vec of AsyncMiddleware<R> in the order you want them to run
-    ///  - `final_handler`: the AsyncFinalHandler<R> that executes last
-    pub fn new(
-        middlewares: Vec<Arc<dyn AsyncMiddleware<C>>>,
-        final_handler: Arc<dyn AsyncFinalHandler<C>>,
-    ) -> Self {
-        // Wrap the final handler in a Fn(R)->Future
-        let final_fn: Arc<dyn Fn(C) -> BoxFuture<C> + Send + Sync + 'static> =
-            Arc::new(move |ctx| final_handler.handle(ctx));
-
-        // Fold the middlewares in reverse so that the first element runs first
-        let chain = middlewares.into_iter().rev().fold(final_fn, |next, mw| {
-            let next_clone = next.clone();
-            Arc::new(move |ctx: C| {
-                // Each middleware calls the `next_fn` when ready to proceed
-                let next_fn = next_clone.clone();
-                mw.handle(ctx, Box::new(move |r| next_fn(r)))
-            }) as Arc<dyn Fn(C) -> BoxFuture<C> + Send + Sync + 'static>
-        });
-
-        MiddlewareChain { inner: chain }
-    }
-
-    /// Drive the chain to completion, returning the final context.
-    pub async fn run(&self, ctx: C) -> C {
-        (self.inner)(ctx).await
-    }
-} 
-
-/// A helper that builds and runs a middleware chain in one call.
-pub async fn run_chain<C: RequestContext + 'static>(
-    middlewares: Vec<Arc<dyn AsyncMiddleware<C>>>,
-    final_handler: Arc<dyn AsyncFinalHandler<C>>,
-    ctx: C,
-) -> C {
-    let chain = MiddlewareChain::new(middlewares, final_handler);
-    chain.run(ctx).await
-} 
-
 // HTTP Implementation example (to be moved to hotaru_http crate later) 
 // pub struct LoggingMiddleware;
 

@@ -190,7 +190,7 @@ mod tests {
 
         // Client
         let stream = TcpStream::connect(addr).await.unwrap();
-        let (mut read, _write) = ConnStream::split(stream);
+        let (mut read, _write, _meta) = ConnStream::split(stream);
 
         let mut buf = [0u8; 4];
         read.read_exact(&mut buf).await.unwrap();

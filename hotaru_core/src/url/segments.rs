@@ -8,8 +8,8 @@ use std::slice::Iter;
 use std::sync::Arc;
 use crate::alias::PRwLock; 
 // pub static ROOT_URL: OnceLock<Url> = OnceLock::new();
-use crate::executable::middleware::*;
-use super::pattern::PathPattern;
+use crate::executable::{middleware::*, ExecutableBinding};
+use super::{node::StepName, pattern::PathPattern};
 
 /// Represents a URL in the application.
 /// This struct holds the various components of a URL, including its path, query parameters, and more.
@@ -26,11 +26,8 @@ pub struct Url<C: RequestContext, TS: TransportSpec = crate::connection::tcp::Tc
     // The ancestor segment of the URL path
     ancestor: PRwLock<Ancestor<C, TS>>,
 
-    // The handle method of the URL
-    method: PRwLock<Option<Arc<dyn AsyncFinalHandler<C>>>>,
-
-    // The middleware chain of the URL
-    middlewares: PRwLock<Vec<Arc<dyn AsyncMiddleware<C>>>>,
+    // Execution payload attached to this route node.
+    binding: PRwLock<ExecutableBinding<C>>,
 
     // The config of the URL
     params: PRwLock<ParamsClone>,
@@ -112,49 +109,11 @@ pub enum Ancestor<C: RequestContext, TS: TransportSpec = crate::connection::tcp:
     Some(Arc<Url<C, TS>>),
 }
 
-pub struct StepName(PRwLock<Vec<Option<String>>>);
-
-impl StepName  {
-    pub fn new() -> Self {
-        StepName(PRwLock::new(vec![]))
-    }
-
-    pub fn get(&self, index: usize) -> Option<String> {
-        let guard = self.0.read();
-        guard.get(index).cloned().flatten()
-    }
-
-    pub fn index<A: AsRef<str>>(&self, name: A) -> Option<usize> {
-        let guard = self.0.read();
-        let name = name.as_ref();
-        for (i, n) in guard.iter().enumerate() {
-            if let Some(n) = n {
-                if n == name {
-                    return Some(i);
-                }
-            }
-        }
-        None
-    }
-}
-
-impl From<Vec<Option<String>>> for StepName {
-    fn from(value: Vec<Option<String>>) -> Self {
-        StepName(PRwLock::new(value))
-    }
-}
-
-impl std::default::Default for StepName {
-    fn default() -> Self {
-        StepName::new()
-    }
-}
-
 impl<C: RequestContext, TS: TransportSpec> std::fmt::Display for Url<C, TS> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut func_str = String::new();
         // Look for whether the fuction is None or not
-        if let Some(_) = self.method.read().as_ref() {
+        if self.binding.read().has_handler() {
             func_str.push_str(&format!("Function Exists, "));
         } else {
             func_str.push_str("None, ");
@@ -175,12 +134,17 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
         params: ParamsClone,
         names: StepName,
     ) -> Self {
+        let mut binding = ExecutableBinding::new();
+        if let Some(method) = method {
+            binding.set_handler(method);
+        }
+        binding.set_middlewares(middlewares);
+
         Self {
             path,
             children: PRwLock::new(children),
             ancestor: PRwLock::new(ancestor),
-            method: PRwLock::new(method),
-            middlewares: PRwLock::new(middlewares),
+            binding: PRwLock::new(binding),
             params: PRwLock::new(params),
             names,
             // app_cache: PRwLock::new(None),
@@ -188,23 +152,29 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
     }
 
     pub async fn run(&self, mut rx: C) -> C {
-        let final_handler = {
-            let guard = self.method.read();
-            guard.clone()
+        let chain = {
+            let guard = self.binding.read();
+            guard.execution_chain()
         };
-        // Lock the middleware
-        let middlewares = {
-            let guard = self.middlewares.read();
-            guard.clone()
-        };
-        // Runs the function inside it
-        if let Some(method) = final_handler {
-            run_chain(middlewares, method, rx).await
-            // return method.handle(request).await;
+
+        if let Some(chain) = chain {
+            chain.run(rx).await
         } else {
             rx.handle_error();
             rx
         }
+    }
+
+    pub fn dangling_url() -> Arc<Self> {
+        Arc::new(Self::new(
+            PathPattern::Any,
+            Children::new(),
+            Ancestor::Nil,
+            None,
+            vec![],
+            ParamsClone::default(),
+            StepName::default(),
+        ))
     }
 
     /// Walk the URL tree based on the path segments.
@@ -352,12 +322,12 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
         mut rc: C,
     ) -> Pin<Box<dyn Future<Output = C> + Send>> {
         Box::pin(async move {
-            let handler_opt = {
-                let guard = self.method.read();
-                guard.clone()
+            let chain = {
+                let guard = self.binding.read();
+                guard.execution_chain()
             };
-            if let Some(handler) = handler_opt {
-                return handler.handle(rc).await;
+            if let Some(chain) = chain {
+                return chain.run(rc).await;
             } else {
                 rc.handle_error();
                 return rc;
@@ -404,8 +374,15 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
         // Check if child already exists - if so, update it in place
         if let Some(existing_child) = self.clone().find_child(&child) {
             // Update the existing child's properties (but keep its children)
-            *existing_child.method.write() = function;
-            *existing_child.middlewares.write() = middleware;
+            {
+                let mut binding = existing_child.binding.write();
+                if let Some(function) = function {
+                    binding.set_handler(function);
+                } else {
+                    binding.clear_handler();
+                }
+                binding.set_middlewares(middleware);
+            }
             *existing_child.params.write() = self.combine_params(&params);
             // Note: We don't update names or path as they define the child's identity
             return Ok(existing_child);
@@ -525,7 +502,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
         names: StepName
     ) -> Result<Arc<Self>, String> {
         debug_log!("Registering URL: {:?}", path);
-        let middleware = middleware.unwrap_or_else(|| (*self.middlewares.read()).clone());
+        let middleware = middleware.unwrap_or_else(|| self.binding.read().middlewares().clone());
         if path.len() == 0 {
             return self.childbirth(PathPattern::Literal("".to_string()), function, middleware, params, names);
         } else if path.len() == 1 {
@@ -544,13 +521,11 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
     }
 
     pub fn set_method(&self, handler: Arc<dyn AsyncFinalHandler<C>>) {
-        let mut guard = self.method.write();
-        *guard = Some(handler);
+        self.binding.write().set_handler(handler);
     }
 
     pub fn set_middlewares(&self, middlewares: Vec<Arc<dyn AsyncMiddleware<C>>>) {
-        let mut guard = self.middlewares.write();
-        *guard = middlewares;
+        self.binding.write().set_middlewares(middlewares);
     }
 
     /// Combine the current URL's parameters with the provided parameters.
@@ -586,13 +561,5 @@ impl <C: RequestContext + 'static, TS: TransportSpec> Default for Url<C, TS> {
 }
 
 pub fn dangling_url<C: RequestContext, TS: TransportSpec>() -> Arc<Url<C, TS>> {
-    Arc::new(Url::new(
-        PathPattern::Any,
-        Children::new(),
-        Ancestor::Nil,
-        None,
-        vec![],
-        ParamsClone::default(),
-        StepName::default(),
-    ))
+    Url::dangling_url()
 }

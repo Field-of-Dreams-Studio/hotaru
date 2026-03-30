@@ -2,10 +2,11 @@ use std::{error::Error, sync::Arc};
 use async_trait::async_trait;
 use tokio::io::BufReader;
 
-use crate::app::application::App;
+use crate::app::common::RuntimeConfig;
 use crate::connection::stream::ConnStream;
 use crate::connection::TransportSpec;
 use crate::protocol::ProtocolRole;
+use crate::url::UrlRoot;
 
 use super::{Message, RequestContext, Stream as ProtocolStream, Transport};
 
@@ -65,12 +66,20 @@ pub trait Protocol: Clone + Send + Sync + 'static {
         reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
         writer: <Self::Wire as ConnStream>::WriteHalf,
         config: <Self::Wire as ConnStream>::Meta,
-        app: Arc<App<TS>>,
+        runtime: Arc<RuntimeConfig>,
+        root: Arc<UrlRoot<Self::Context, TS>>,
     ) -> Result<(), Box<dyn Error + Send + Sync>>
     where
         TS: TransportSpec<Wire = Self::Wire>;
     
-    // TODO: Future client-specific methods for Tx replacement
-    // async fn connect(&mut self, addr: &str, app: Arc<App>) -> Result<(), Box<dyn Error>>;
-    // async fn request(&mut self, message: Self::Message) -> Result<Self::Message, Box<dyn Error>>;
+    async fn request<TS>(
+        &mut self,
+        reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
+        writer: <Self::Wire as ConnStream>::WriteHalf,
+        config: <Self::Wire as ConnStream>::Meta,
+        runtime: Arc<RuntimeConfig>,
+        root: Arc<UrlRoot<Self::Context, TS>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>>
+    where
+        TS: TransportSpec<Wire = Self::Wire>;
 }

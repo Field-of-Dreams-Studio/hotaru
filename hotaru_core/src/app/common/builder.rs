@@ -1,20 +1,23 @@
 use std::sync::Arc;
 
 use crate::{
+    app::{
+        client::{Client, ProtocolRegistryKind as ClientProtocolRegistryKind},
+        server::{ProtocolRegistryKind as ServerProtocolRegistryKind, Server},
+    },
     connection::{Protocol, TransportSpec},
+    executable::{registry::ProtocolEntryRegistry, ProtocolEntryBuilder, ProtocolRegistryBuilder},
     extensions::{Locals, Params},
 };
 
-use super::{
-    application::{App, RunMode},
-    handler::{ProtocolHandlerBuilder, ProtocolRegistryBuilder, ProtocolRegistryKind},
-};
+use super::{OperationalConfig, RunMode, RuntimeConfig};
 
-/// Builder for App
+/// Shared runtime builder used as the base for server/client builders.
 pub struct AppBuilder<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
     binding_address: Option<String>,
-    handler: Option<ProtocolRegistryKind<TS>>,
+    registry: Option<ProtocolEntryRegistry<TS>>,
     accepter: Option<TS::Accepter>,
+    connector: Option<TS::Connector>,
     mode: Option<RunMode>,
     worker: Option<usize>,
     max_connection_time: Option<usize>,
@@ -27,8 +30,9 @@ impl<TS: TransportSpec> AppBuilder<TS> {
     pub fn new() -> Self {
         Self {
             binding_address: None,
-            handler: None,
+            registry: None,
             accepter: None,
+            connector: None,
             mode: None,
             worker: None,
             max_connection_time: None,
@@ -38,77 +42,64 @@ impl<TS: TransportSpec> AppBuilder<TS> {
         }
     }
 
-    /// Set the binding address for the application
     pub fn binding<T: Into<String>>(mut self, binding: T) -> Self {
         self.binding_address = Some(binding.into());
         self
     }
 
-    /// Set the handler for the application
-    pub fn handler(mut self, protocol: ProtocolRegistryKind<TS>) -> Self {
-        self.handler = Some(protocol);
+    pub fn registry(mut self, protocol: ProtocolEntryRegistry<TS>) -> Self {
+        self.registry = Some(protocol);
         self
     }
 
-    /// Set the accepter for inbound connection upgrade.
     pub fn accepter(mut self, accepter: TS::Accepter) -> Self {
         self.accepter = Some(accepter);
         self
     }
 
-    /// Set the handler for the application using a ProtocolRegistryBuilder
-    pub fn handle(mut self, protocol: ProtocolRegistryBuilder<TS>) -> Self {
-        self.handler = Some(protocol.build());
+    pub fn connector(mut self, connector: TS::Connector) -> Self {
+        self.connector = Some(connector);
         self
     }
 
-    /// Set the handler for the application using a ProtocolHandlerBuilder
-    /// This works for a single protocol appication
+    pub fn handle(mut self, protocol: ProtocolRegistryBuilder<TS>) -> Self {
+        self.registry = Some(protocol.build());
+        self
+    }
+
     pub fn single_protocol<P: Protocol<Wire = TS::Wire>>(
         mut self,
-        builder: ProtocolHandlerBuilder<P, TS>,
+        builder: ProtocolEntryBuilder<P, TS>,
     ) -> Self {
-        self.handler = Some(ProtocolRegistryBuilder::<TS>::new().protocol(builder).build());
+        self.registry = Some(ProtocolRegistryBuilder::<TS>::new().protocol(builder).build());
         self
     }
 
-    /// Set the run mode for the application
     pub fn mode(mut self, mode: RunMode) -> Self {
         self.mode = Some(mode);
         self
     }
 
-    /// Set the number of worker threads for the application's tokio runtime
-    ///
-    /// This controls how many threads the App's internal runtime will use for handling
-    /// async tasks and connections. The default is the number of CPU cores.
-    ///
-    /// Note: This setting is independent of any outer tokio runtime. When `run()` is called,
-    /// the App creates its own runtime with this many worker threads.
     pub fn worker(mut self, threads: usize) -> Self {
         self.worker = Some(threads);
         self
     }
 
-    /// Set the maximum connection time for the application
     pub fn max_connection_time(mut self, max_connection_time: usize) -> Self {
         self.max_connection_time = Some(max_connection_time);
         self
     }
 
-    /// Set the maxium process time for a frame
     pub fn max_frame_process_time(mut self, max_frame_process_time: usize) -> Self {
         self.max_frame_process_time = Some(max_frame_process_time);
         self
     }
 
-    /// Set the FULL LOCAL HASHMAP for the application
     pub fn statics(mut self, statics: Locals) -> Self {
         self.statics = statics;
         self
     }
 
-    /// Set a single static value in the statics map
     pub fn set_statics<K: Into<String>, V: Send + Sync + 'static>(
         mut self,
         key: K,
@@ -118,27 +109,25 @@ impl<TS: TransportSpec> AppBuilder<TS> {
         self
     }
 
-    /// Set the FULL PARAMS HASHMAP for the application
     pub fn config(mut self, config: Params) -> Self {
         self.config = config;
         self
     }
 
-    /// Set a single config value in the config map
     pub fn set_config<V: Send + Sync + 'static>(mut self, value: V) -> Self {
         self.config.set(value);
         self
     }
 
-    /// Build method: create the `App`, storing binding address without creating a TcpListener
-    pub fn build(self) -> Arc<App<TS>> {
+    pub fn build_server(self) -> Arc<super::super::server::Server<TS>> {
         let handler = self
-            .handler
-            .expect("AppBuilder::handler(...) must be set for App<TS>");
+            .registry
+            .map(ServerProtocolRegistryKind::from)
+            .expect("AppBuilder::registry(...) must be set for App<TS>");
         let accepter = self
             .accepter
             .or_else(TS::default_accepter)
-            .expect("AppBuilder::accepter(...) must be set for App<TS>");
+            .expect("AppBuilder::accepter(...) must be set for Server<TS>");
 
         let binding_address = self
             .binding_address
@@ -147,21 +136,47 @@ impl<TS: TransportSpec> AppBuilder<TS> {
         let worker = self.worker.unwrap_or_else(num_cpus);
         let max_connection_time = self.max_connection_time.unwrap_or(30);
         let max_frame_process_time = self.max_frame_process_time.unwrap_or(5);
-
-        let app = Arc::new(App {
-            handler,
-            accepter,
+        let runtime = RuntimeConfig::from_parts(mode, self.config, self.statics);
+        let server = OperationalConfig::from_server_parts(
             binding_address,
-            mode,
             worker,
             max_connection_time,
             max_frame_process_time,
-            config: self.config,
-            statics: self.statics,
+        );
+        let runtime = Arc::new(runtime);
+
+        let app = Arc::new(Server {
+            handler,
+            accepter,
+            runtime,
+            server,
         });
 
-        app.handler.attach_app(app.clone());
-        app
+        app 
+    }
+
+    pub fn build_client(self) -> Arc<Client<TS>> {
+        let session = self
+            .registry
+            .map(ClientProtocolRegistryKind::from)
+            .expect("AppBuilder::registry(...) must be set for Client<TS>");
+        let connector = self
+            .connector
+            .or_else(TS::default_connector)
+            .expect("AppBuilder::connector(...) must be set for Client<TS>");
+
+        let mode = self.mode.unwrap_or(RunMode::Development);
+        let connect_timeout = self.max_connection_time.unwrap_or(30);
+        let request_timeout = self.max_frame_process_time.unwrap_or(30);
+        let runtime = Arc::new(RuntimeConfig::from_parts(mode, self.config, self.statics));
+        let client = OperationalConfig::from_client_parts(connect_timeout, request_timeout);
+
+        Arc::new(Client {
+            session,
+            connector,
+            runtime,
+            client,
+        })
     }
 }
 
@@ -172,3 +187,5 @@ fn num_cpus() -> usize {
         Err(_) => 1, // Fallback if we can't determine
     }
 }
+ 
+ 
