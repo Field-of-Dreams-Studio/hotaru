@@ -10,7 +10,7 @@ use crate::{
 /// Neutral builder for one protocol entry shared by server and client runtimes.
 pub struct ProtocolEntryBuilder<P, TS = crate::connection::tcp::TcpTransport>
 where
-    P: Protocol<Wire = TS::Wire> + Clone + 'static,
+    P: Protocol<Wire = TS::Wire, Spec = TS> + Clone + 'static,
     TS: TransportSpec,
 {
     protocol: Option<P>,
@@ -20,7 +20,7 @@ where
 
 impl<P, TS> ProtocolEntryBuilder<P, TS>
 where
-    P: Protocol<Wire = TS::Wire> + Clone + 'static,
+    P: Protocol<Wire = TS::Wire, Spec = TS> + Clone + 'static,
     TS: TransportSpec,
 {
     pub fn new(protocol: P) -> Self {

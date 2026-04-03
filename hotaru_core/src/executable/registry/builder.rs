@@ -15,7 +15,7 @@ impl<TS: TransportSpec> ProtocolRegistryBuilder<TS> {
         Self { handlers: Vec::new() }
     }
 
-    pub fn protocol<P: Protocol<Wire = TS::Wire> + Clone + 'static>(
+    pub fn protocol<P: Protocol<Wire = TS::Wire, Spec = TS> + Clone + 'static>(
         mut self,
         builder: ProtocolEntryBuilder<P, TS>,
     ) -> Self {

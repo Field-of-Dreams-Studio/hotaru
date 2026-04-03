@@ -30,7 +30,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
     }
 
     /// Register a protocol entry.
-    pub fn register<P: Protocol<Wire = TS::Wire> + Clone + 'static>(
+    pub fn register<P: Protocol<Wire = TS::Wire, Spec = TS> + Clone + 'static>(
         &mut self,
         protocol: P,
         root_handler: Arc<UrlRoot<P::Context, TS>>,
@@ -85,7 +85,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         }
     }
 
-    pub fn url<P: Protocol<Wire = TS::Wire> + 'static>(&self) -> Option<Arc<UrlRoot<P::Context, TS>>> {
+    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(&self) -> Option<Arc<UrlRoot<P::Context, TS>>> {
         for handler in &self.handlers {
             if let Some(ph) = handler.as_any().downcast_ref::<ProtocolEntry<P, TS>>() {
                 return Some(ph.root_handler.clone());
@@ -94,7 +94,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         None
     }
 
-    pub fn lit_url<P: Protocol<Wire = TS::Wire> + 'static, T: Into<String>>(
+    pub fn lit_url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
         &self,
         url: T,
         executable: ExecutableBinding<P::Context>,
@@ -108,7 +108,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         }
     }
 
-    pub fn sub_url<P: Protocol<Wire = TS::Wire> + 'static, T: Into<String>>(
+    pub fn sub_url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
         &self,
         pattern: T,
         executable: ExecutableBinding<P::Context>,
@@ -129,7 +129,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         self.handlers.first().map(|h| h.as_any().type_id())
     }
 
-    pub fn get_protocol_middlewares<P: Protocol<Wire = TS::Wire> + 'static>(
+    pub fn get_protocol_middlewares<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
         &self,
     ) -> Vec<Arc<dyn AsyncMiddleware<P::Context>>> {
         for handler in &self.handlers {

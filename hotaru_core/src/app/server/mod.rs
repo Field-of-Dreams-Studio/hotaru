@@ -20,6 +20,7 @@ pub use crate::executable::ProtocolRegistryBuilder;
 // use super::middleware::AsyncMiddleware;
 pub use super::common::builder::AppBuilder;
 use super::common::{OperationalConfig, RunMode, RuntimeConfig};
+use super::common::builder::ServerRole;
 
 // type Job = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
@@ -32,7 +33,8 @@ pub struct Server<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
 } 
 
 impl<TS: TransportSpec> Server<TS> {
-    pub fn new() -> AppBuilder<TS> {
+    /// Creates a server builder whose terminal method is `build()`.
+    pub fn new() -> AppBuilder<ServerRole, TS> {
         AppBuilder::new()
     }
 
@@ -102,7 +104,7 @@ impl<TS: TransportSpec> Server<TS> {
     /// This function add a new url to the app. It will be added to the root url
     /// # Arguments
     /// * `url` - The url to add. It should be a string.
-    pub fn lit_url<P: Protocol<Wire = TS::Wire> + 'static, T: Into<String>>(
+    pub fn lit_url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
         self: &Arc<Self>,
         url: T,
         mut executable: ExecutableBinding<P::Context>, 
@@ -117,7 +119,7 @@ impl<TS: TransportSpec> Server<TS> {
     } 
 
     /// Regiter a URL by using Hotaru Pattern 
-    pub fn url<P: Protocol<Wire = TS::Wire> + 'static, T: Into<String>>(
+    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
         self: &Arc<Self>,
         url: T,
         mut executable: ExecutableBinding<P::Context>, 
@@ -174,11 +176,12 @@ impl<TS: TransportSpec> Server<TS> {
     ///
     /// Example:
     /// ```no_run
-    /// use hotaru_core::app::Server;
+    /// use hotaru_core::app::server::Server;
+    /// use hotaru_core::connection::tcp::TcpTransport;
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let app = Server::new()
+    ///     let app = Server::<TcpTransport>::new()
     ///         .worker(4)  // Server will use 4 worker threads
     ///         .build();
     ///     app.run().await;

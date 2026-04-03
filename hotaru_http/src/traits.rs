@@ -21,13 +21,14 @@ use tokio::io::{AsyncBufRead, AsyncWriteExt, BufReader, ReadBuf};
 use tokio::net::TcpStream;
 
 use crate::{
-    app::application::App,
+    app::common::RuntimeConfig,
     connection::{
         ConnMeta, ConnStream, Message, Protocol, ProtocolRole, Transport, TransportSpec,
     },
     http::{
         context::HttpContext, request::HttpRequest, response::HttpResponse, safety::HttpSafety,
     },
+    url::UrlRoot,
 };
 
 // ============================================================================
@@ -154,6 +155,8 @@ impl HttpTransport {
 }
 
 impl Transport for HttpTransport {
+    type Id = i128;
+
     fn id(&self) -> i128 {
         self.id
     }
@@ -362,20 +365,13 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
     }
 
     /// Handles server-side HTTP/1.1 connections.
-    async fn handle_server<ATS>(
+    async fn handle_server(
         &mut self,
         mut reader: HttpWireReader<BufReader<W::ReadHalf>>,
         mut writer: HttpWireWriter<W::WriteHalf>,
-        app: Arc<App<ATS>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>
-    where
-        ATS: TransportSpec<Wire = W>,
-    {
-        let root_handler = app
-            .handler
-            .url::<Http1Protocol<W, ATS>>()
-            .ok_or("No HTTP/1.1 handler registered in the application")?;
-
+        runtime: Arc<RuntimeConfig>,
+        root: Arc<UrlRoot<HttpContext<TS>, TS>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
         loop {
             // Parse request using existing logic
             let request = HttpRequest::parse_lazy(&mut reader, &self.transport.safety, false).await;
@@ -391,11 +387,14 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
 
             // Walk the URL tree to find the matching endpoint
             let path = request.meta.path();
-            let endpoint = root_handler.clone().walk_str(&path).await;
+            let endpoint = root
+                .walk_str(&path)
+                .await
+                .ok_or("No HTTP/1.1 endpoint matched the request path")?;
 
             // Create the context with the found endpoint
             let ctx = HttpContext::new_server(
-                app.clone(),
+                runtime.clone(),
                 endpoint,
                 request,
                 reader.remote_addr(),
@@ -419,15 +418,13 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
     }
 
     /// Handles client-side HTTP/1.1 connections.
-    async fn handle_client<ATS>(
+    async fn handle_client(
         &mut self,
         _reader: HttpWireReader<BufReader<W::ReadHalf>>,
         _writer: HttpWireWriter<W::WriteHalf>,
-        _app: Arc<App<ATS>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>
-    where
-        ATS: TransportSpec<Wire = W>,
-    {
+        _runtime: Arc<RuntimeConfig>,
+        _root: Arc<UrlRoot<HttpContext<TS>, TS>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
         // Client implementation will be added when we create the Client App
         Err("HTTP/1.1 client not yet implemented".into())
     }
@@ -436,6 +433,7 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
 #[async_trait]
 impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, TS> {
     type Wire = W;
+    type Spec = TS;
     type Transport = HttpTransport;
     type Stream = ();
     type Message = HttpMessage;
@@ -461,16 +459,14 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
             || initial_bytes.starts_with(b"TRACE ")
     }
 
-    async fn handle<ATS>(
+    async fn handle(
         &mut self,
         reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
         writer: <Self::Wire as ConnStream>::WriteHalf,
         meta: <Self::Wire as ConnStream>::Meta,
-        app: Arc<App<ATS>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>
-    where
-        ATS: TransportSpec<Wire = Self::Wire>,
-    {
+        runtime: Arc<RuntimeConfig>,
+        root: Arc<UrlRoot<Self::Context, Self::Spec>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
         self.transport
             .set_addresses(meta.local_addr(), meta.remote_addr());
 
@@ -478,9 +474,26 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         let writer = HttpWireWriter::new(writer);
 
         match self.role() {
-            ProtocolRole::Server => self.handle_server(reader, writer, app).await,
-            ProtocolRole::Client => self.handle_client(reader, writer, app).await,
+            ProtocolRole::Server => self.handle_server(reader, writer, runtime, root).await,
+            ProtocolRole::Client => self.handle_client(reader, writer, runtime, root).await,
         }
+    }
+
+    async fn request(
+        &mut self,
+        reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
+        writer: <Self::Wire as ConnStream>::WriteHalf,
+        meta: <Self::Wire as ConnStream>::Meta,
+        runtime: Arc<RuntimeConfig>,
+        root: Arc<UrlRoot<Self::Context, Self::Spec>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        self.transport
+            .set_addresses(meta.local_addr(), meta.remote_addr());
+
+        let reader = HttpWireReader::new(reader, meta.local_addr(), meta.remote_addr());
+        let writer = HttpWireWriter::new(writer);
+
+        self.handle_client(reader, writer, runtime, root).await
     }
 }
 

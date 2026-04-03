@@ -26,6 +26,9 @@ pub trait Protocol: Clone + Send + Sync + 'static {
     /// The protocol's wire-level connection stream type.
     type Wire: ConnStream;
 
+    /// The transport spec used by this protocol runtime.
+    type Spec: TransportSpec<Wire = Self::Wire>;
+
     /// The protocol's connection-level abstraction.
     type Transport: Transport;
     
@@ -61,25 +64,21 @@ pub trait Protocol: Clone + Send + Sync + 'static {
     ///   each protocol implementation (flush behavior is protocol-dependent).
     /// - Concrete wire split types (no generic R/W): each protocol handles exactly
     ///   its wire kind; stream-specific logic remains in the protocol layer.
-    async fn handle<TS>(
+    async fn handle(
         &mut self,
         reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
         writer: <Self::Wire as ConnStream>::WriteHalf,
         config: <Self::Wire as ConnStream>::Meta,
         runtime: Arc<RuntimeConfig>,
-        root: Arc<UrlRoot<Self::Context, TS>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>
-    where
-        TS: TransportSpec<Wire = Self::Wire>;
+        root: Arc<UrlRoot<Self::Context, Self::Spec>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>>;
     
-    async fn request<TS>(
+    async fn request(
         &mut self,
         reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
         writer: <Self::Wire as ConnStream>::WriteHalf,
         config: <Self::Wire as ConnStream>::Meta,
         runtime: Arc<RuntimeConfig>,
-        root: Arc<UrlRoot<Self::Context, TS>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>
-    where
-        TS: TransportSpec<Wire = Self::Wire>;
+        root: Arc<UrlRoot<Self::Context, Self::Spec>>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>>;
 }

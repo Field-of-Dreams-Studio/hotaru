@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 use crate::{
     app::{
@@ -12,8 +12,15 @@ use crate::{
 
 use super::{OperationalConfig, RunMode, RuntimeConfig};
 
-/// Shared runtime builder used as the base for server/client builders.
-pub struct AppBuilder<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct ServerRole;
+pub struct ClientRole;
+
+/// Shared runtime builder used as the base for server and client construction.
+///
+/// The role marker decides which terminal `build()` method is available:
+/// `AppBuilder<ServerRole, TS>` builds a [`Server`], while
+/// `AppBuilder<ClientRole, TS>` builds a [`Client`].
+pub struct AppBuilder<R, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
     binding_address: Option<String>,
     registry: Option<ProtocolEntryRegistry<TS>>,
     accepter: Option<TS::Accepter>,
@@ -24,9 +31,10 @@ pub struct AppBuilder<TS: TransportSpec = crate::connection::tcp::TcpTransport> 
     max_frame_process_time: Option<usize>,
     config: Params,
     statics: Locals,
+    _role: PhantomData<R>,
 }
 
-impl<TS: TransportSpec> AppBuilder<TS> {
+impl<R, TS: TransportSpec> AppBuilder<R, TS> {
     pub fn new() -> Self {
         Self {
             binding_address: None,
@@ -39,6 +47,7 @@ impl<TS: TransportSpec> AppBuilder<TS> {
             max_frame_process_time: None,
             config: Params::new(),
             statics: Locals::new(),
+            _role: PhantomData,
         }
     }
 
@@ -67,7 +76,7 @@ impl<TS: TransportSpec> AppBuilder<TS> {
         self
     }
 
-    pub fn single_protocol<P: Protocol<Wire = TS::Wire>>(
+    pub fn single_protocol<P: Protocol<Wire = TS::Wire, Spec = TS>>(
         mut self,
         builder: ProtocolEntryBuilder<P, TS>,
     ) -> Self {
@@ -119,7 +128,11 @@ impl<TS: TransportSpec> AppBuilder<TS> {
         self
     }
 
-    pub fn build_server(self) -> Arc<super::super::server::Server<TS>> {
+}
+
+impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
+    /// Builds a server runtime from the configured server-side builder state.
+    pub fn build(self) -> Arc<super::super::server::Server<TS>> {
         let handler = self
             .registry
             .map(ServerProtocolRegistryKind::from)
@@ -154,8 +167,11 @@ impl<TS: TransportSpec> AppBuilder<TS> {
 
         app 
     }
+}
 
-    pub fn build_client(self) -> Arc<Client<TS>> {
+impl<TS: TransportSpec> AppBuilder<ClientRole, TS> {
+    /// Builds a client runtime from the configured client-side builder state.
+    pub fn build(self) -> Arc<Client<TS>> {
         let session = self
             .registry
             .map(ClientProtocolRegistryKind::from)

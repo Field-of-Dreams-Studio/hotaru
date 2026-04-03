@@ -77,7 +77,7 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
 /// Concrete handler for a specific protocol.
 pub struct ProtocolEntry<P, TS>
 where
-    P: Protocol + Clone,
+    P: Protocol<Spec = TS> + Clone,
     TS: TransportSpec<Wire = P::Wire>,
 {
     pub protocol: P,
@@ -87,7 +87,7 @@ where
 
 impl<P, TS> ProtocolEntry<P, TS>
 where
-    P: Protocol + Clone,
+    P: Protocol<Spec = TS> + Clone,
     TS: TransportSpec<Wire = P::Wire>,
 {
     pub fn new(
@@ -105,7 +105,7 @@ where
 
 impl<P, TS> ProtocolEntryTrait<TS> for ProtocolEntry<P, TS>
 where
-    P: Protocol + Clone + 'static,
+    P: Protocol<Spec = TS> + Clone + 'static,
     TS: TransportSpec<Wire = P::Wire>,
 {
     fn test(&self, buf: &[u8]) -> bool {

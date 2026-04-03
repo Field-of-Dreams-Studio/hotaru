@@ -1,4 +1,3 @@
-use crate::app::application::App;
 use crate::connection::error::ConnectionError;
 use crate::connection::{
     ConnStream, Connector, ProtocolRole, RequestContext, TransportSpec,
@@ -17,7 +16,8 @@ use crate::http::{
     meta::HttpMeta,
     response::HttpResponse,
 };
-use crate::url::Url;
+use crate::app::common::{RunMode, RuntimeConfig};
+use crate::url::UrlNode;
 use akari::Value; 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -29,10 +29,10 @@ use super::response::response_templates;
 
 /// Executable context - determines what's available for execution
 pub enum Executable<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
-    /// Server context with App and URL endpoint
+    /// Server context with runtime config and matched endpoint.
     Request {
-        app: Arc<App<TS>>,
-        endpoint: Arc<Url<HttpContext<TS>, TS>>,
+        runtime: Arc<RuntimeConfig>,
+        endpoint: Arc<UrlNode<HttpContext<TS>, TS>>,
     },
     /// Client context (empty for now, will be extended later)
     Response,
@@ -75,8 +75,8 @@ const UNSET_ADDR: SocketAddr = SocketAddr::new(
 impl<TS: TransportSpec> HttpContext<TS> {
     /// Creates a new server context with socket addresses.
     pub fn new_server(
-        app: Arc<App<TS>>,
-        endpoint: Arc<Url<HttpContext<TS>, TS>>,
+        runtime: Arc<RuntimeConfig>,
+        endpoint: Arc<UrlNode<HttpContext<TS>, TS>>,
         request: HttpRequest,
         remote_addr: Option<SocketAddr>,
         local_addr: Option<SocketAddr>,
@@ -84,7 +84,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
         Self {
             request,
             response: HttpResponse::default(),
-            executable: Executable::Request { app, endpoint },
+            executable: Executable::Request { runtime, endpoint },
             host: None,
             safety: HttpSafety::default(),
             remote_addr,
@@ -99,7 +99,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
         Self {
             request: HttpRequest::default(),
             response: HttpResponse::default(),
-            executable: Executable::Response,
+            executable: Executable::<TS>::Response,
             host: Some(host),
             safety,
             remote_addr: None,
@@ -200,7 +200,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     }
 
     pub async fn read_request<R>(
-        app: Arc<App<TS>>,
+        runtime: Arc<RuntimeConfig>,
         reader: &mut R,
     ) -> Result<HttpRequest, ConnectionError>
     where
@@ -208,8 +208,8 @@ impl<TS: TransportSpec> HttpContext<TS> {
     {
         Ok(HttpRequest::parse_lazy(
             reader,
-            app.config.get::<HttpSafety>().unwrap_or_default(),
-            app.get_mode() == crate::app::application::RunMode::Build,
+            &runtime.get_config::<HttpSafety>().unwrap_or_default(),
+            runtime.mode() == RunMode::Build,
         )
         .await)
     }
@@ -255,7 +255,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// Checks whether the request fulfills the endpoint's security requirements.
     pub fn request_check(
         &mut self,
-        endpoint: &Arc<Url<HttpContext<TS>, TS>>,
+        endpoint: &Arc<UrlNode<HttpContext<TS>, TS>>,
     ) -> Result<(), StatusCode> {
         let config = endpoint.get_params::<HttpSafety>().unwrap_or_default();
         // println!(
@@ -278,19 +278,19 @@ impl<TS: TransportSpec> HttpContext<TS> {
         &mut self.request.meta
     }
 
-    /// Returns the Arc<App> if this is a server context
-    pub fn app(&self) -> Option<Arc<App<TS>>> {
+    /// Returns the runtime config if this is a server context.
+    pub fn runtime(&self) -> Option<Arc<RuntimeConfig>> {
         match &self.executable {
-            Executable::Request { app, .. } => Some(app.clone()),
-            Executable::Response => None,
+            Executable::Request { runtime, .. } => Some(runtime.clone()),
+            Executable::<TS>::Response => None,
         }
     }
 
     /// Returns the endpoint URL if this is a server context
-    pub fn endpoint(&self) -> Option<Arc<Url<HttpContext<TS>, TS>>> {
+    pub fn endpoint(&self) -> Option<Arc<UrlNode<HttpContext<TS>, TS>>> {
         match &self.executable {
             Executable::Request { endpoint, .. } => Some(endpoint.clone()),
-            Executable::Response => None,
+            Executable::<TS>::Response => None,
         }
     }
 
@@ -507,7 +507,7 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
                 )
                 .status(404);
             }
-            Executable::Response => {
+            Executable::<TS>::Response => {
                 // Client: set default error response
                 self.response = HttpResponse::default();
             }
@@ -517,7 +517,7 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
     fn role(&self) -> ProtocolRole {
         match &self.executable {
             Executable::Request { .. } => ProtocolRole::Server,
-            Executable::Response => ProtocolRole::Client,
+            Executable::<TS>::Response => ProtocolRole::Client,
         }
     }
 }
