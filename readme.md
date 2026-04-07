@@ -1,3 +1,5 @@
+A major update of Hotaru is scheduled in 02/May/2026. There will not be further release before that. 
+
 # Hotaru Web Framework
 
 ![Latest Version](https://img.shields.io/badge/version-0.7.7-brightgreen)
