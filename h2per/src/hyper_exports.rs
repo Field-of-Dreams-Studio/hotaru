@@ -4,25 +4,13 @@
 //! allowing users to leverage the full power of the Hyper library.
 
 // HTTP basics
-pub use hyper::{
-    Method, 
-    StatusCode, 
-    Version,
-    Uri,
-    Error as HyperError,
-};
+pub use hyper::{Error as HyperError, Method, StatusCode, Uri, Version};
 
 // Request and Response
-pub use hyper::{
-    Request,
-    Response,
-};
+pub use hyper::{Request, Response};
 
 // Headers
 pub use hyper::header::{
-    HeaderMap,
-    HeaderName,
-    HeaderValue,
     // Common header names
     ACCEPT,
     ACCEPT_CHARSET,
@@ -61,6 +49,9 @@ pub use hyper::header::{
     FORWARDED,
     FROM,
     HOST,
+    HeaderMap,
+    HeaderName,
+    HeaderValue,
     IF_MATCH,
     IF_MODIFIED_SINCE,
     IF_NONE_MATCH,
@@ -106,14 +97,9 @@ pub use hyper::header::{
 };
 
 // Body utilities
-pub use http_body_util::{
-    BodyExt,
-    Full,
-    Empty,
-    combinators::BoxBody,
-};
+pub use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
 
-pub use bytes::{Bytes, BytesMut, Buf, BufMut};
+pub use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 // Extensions for storing custom data
 pub use hyper::http::Extensions;
@@ -122,71 +108,68 @@ pub use hyper::http::Extensions;
 pub use crate::context::Body;
 
 // Builder patterns
-pub use hyper::http::{
-    request::Builder as RequestBuilder,
-    response::Builder as ResponseBuilder,
-};
+pub use hyper::http::{request::Builder as RequestBuilder, response::Builder as ResponseBuilder};
 
 // Utilities for working with bodies
 pub mod body {
     use super::*;
+    use http_body::{Body as HttpBody, Frame};
     use std::pin::Pin;
     use std::task::{Context, Poll};
-    use http_body::{Body as HttpBody, Frame};
-    
+
     /// Create an empty body
     pub fn empty() -> BoxBody<Bytes, std::convert::Infallible> {
         Empty::<Bytes>::new().boxed()
     }
-    
+
     /// Create a body from bytes
     pub fn from_bytes(bytes: impl Into<Bytes>) -> BoxBody<Bytes, std::convert::Infallible> {
         Full::new(bytes.into()).boxed()
     }
-    
+
     /// Create a body from a string
     pub fn from_string(s: String) -> BoxBody<Bytes, std::convert::Infallible> {
         Full::new(Bytes::from(s)).boxed()
     }
-    
+
     /// Create a body from a vector
     pub fn from_vec(v: Vec<u8>) -> BoxBody<Bytes, std::convert::Infallible> {
         Full::new(Bytes::from(v)).boxed()
     }
-    
+
     /// Stream body wrapper for custom streaming implementations
     pub struct StreamBody<S> {
         stream: S,
     }
-    
+
     impl<S> StreamBody<S> {
         pub fn new(stream: S) -> Self {
             Self { stream }
         }
     }
-    
+
     // Implement HttpBody for StreamBody if needed for custom streaming
 }
 
 // Utilities for working with headers
 pub mod headers {
     use super::*;
-    
+
     /// Parse a header value to string
     pub fn to_str(value: &HeaderValue) -> Result<&str, hyper::header::ToStrError> {
         value.to_str()
     }
-    
+
     /// Create a header value from string
     pub fn from_str(s: &str) -> Result<HeaderValue, hyper::header::InvalidHeaderValue> {
         HeaderValue::from_str(s)
     }
-    
+
     /// Create a header value from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<HeaderValue, hyper::header::InvalidHeaderValue> {
         HeaderValue::from_bytes(bytes)
     }
-    
+
     /// Check if a header value contains a substring
     pub fn contains(value: &HeaderValue, needle: &str) -> bool {
         value.to_str().map(|s| s.contains(needle)).unwrap_or(false)
@@ -195,8 +178,8 @@ pub mod headers {
 
 // HTTP/2 specific features
 pub mod http2 {
-    pub use hyper::ext::{Protocol as Http2Protocol};
-    
+    pub use hyper::ext::Protocol as Http2Protocol;
+
     /// HTTP/2 settings
     pub struct Settings {
         pub enable_push: bool,
@@ -205,7 +188,7 @@ pub mod http2 {
         pub max_frame_size: u32,
         pub max_header_list_size: u32,
     }
-    
+
     impl Default for Settings {
         fn default() -> Self {
             Self {
@@ -224,16 +207,13 @@ pub use hyper::service::Service;
 
 // Client and server connection builders
 pub mod conn {
+    pub use hyper::client::conn::{http1 as client_http1, http2 as client_http2};
     pub use hyper::server::conn::{http1, http2};
-    pub use hyper::client::conn::{
-        http1 as client_http1, 
-        http2 as client_http2
-    };
 }
 
 // Utilities
 pub use hyper_util::{
-    rt::{TokioIo, TokioExecutor, TokioTimer},
     client::legacy::Client,
+    rt::{TokioExecutor, TokioIo, TokioTimer},
     server::graceful::GracefulShutdown,
 };

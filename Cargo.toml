@@ -3,6 +3,7 @@ members = [
     "hotaru",
     "hotaru_core",
     "hotaru_trans",
+    "hotaru_mqtt",
     
     "hotaru_meta",
     "hotaru_tls",

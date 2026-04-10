@@ -11,6 +11,8 @@ pub enum UrlError {
     ParseError(String),
     DepthLimitExceeded { max: u32, actual: usize },
     NotImplemented(&'static str),
+    /// No protocol of the requested type is registered in this registry.
+    ProtocolNotFound,
 }
 
 impl fmt::Display for UrlError {
@@ -26,6 +28,7 @@ impl fmt::Display for UrlError {
                 write!(f, "depth limit exceeded: max={}, actual={}", max, actual)
             }
             UrlError::NotImplemented(feature) => write!(f, "not implemented: {}", feature),
+            UrlError::ProtocolNotFound => write!(f, "protocol not found in registry"),
         }
     }
 }

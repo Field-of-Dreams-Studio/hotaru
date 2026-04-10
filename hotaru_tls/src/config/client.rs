@@ -5,9 +5,9 @@ use std::io::BufReader;
 use std::path::Path;
 use std::sync::Arc;
 
+use rustls::crypto::ring::default_provider;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
 use rustls::{ClientConfig, RootCertStore};
-use rustls::crypto::ring::default_provider;
 use webpki_roots::TLS_SERVER_ROOTS;
 
 /// TLS configuration for client-side connections.
@@ -36,7 +36,10 @@ impl Clone for TlsClientConfig {
         Self {
             root_certs: self.root_certs.clone(),
             use_webpki_roots: self.use_webpki_roots,
-            client_auth: self.client_auth.as_ref().map(|(certs, key)| (certs.clone(), key.clone_key())),
+            client_auth: self
+                .client_auth
+                .as_ref()
+                .map(|(certs, key)| (certs.clone(), key.clone_key())),
             alpn_protocols: self.alpn_protocols.clone(),
             verify_server: self.verify_server,
         }
@@ -137,7 +140,10 @@ impl TlsClientConfigBuilder {
     /// Add a custom root CA certificate from a PEM file.
     ///
     /// This certificate will be trusted in addition to the webpki roots.
-    pub fn add_root_certificate(mut self, path: impl AsRef<Path>) -> Result<Self, TlsClientConfigError> {
+    pub fn add_root_certificate(
+        mut self,
+        path: impl AsRef<Path>,
+    ) -> Result<Self, TlsClientConfigError> {
         let root_store = Self::load_root_certs(path)?;
 
         self.root_certs = Some(match self.root_certs.take() {
@@ -172,8 +178,7 @@ impl TlsClientConfigBuilder {
         key_path: impl AsRef<Path>,
     ) -> Result<Self, TlsClientConfigError> {
         // Load certificate chain
-        let file = File::open(cert_path.as_ref())
-            .map_err(|e| TlsClientConfigError::IoError(e))?;
+        let file = File::open(cert_path.as_ref()).map_err(|e| TlsClientConfigError::IoError(e))?;
         let mut reader = BufReader::new(file);
 
         let certs = rustls_pemfile::certs(&mut reader)
@@ -187,8 +192,7 @@ impl TlsClientConfigBuilder {
         }
 
         // Load private key
-        let file = File::open(key_path.as_ref())
-            .map_err(|e| TlsClientConfigError::IoError(e))?;
+        let file = File::open(key_path.as_ref()).map_err(|e| TlsClientConfigError::IoError(e))?;
         let mut reader = BufReader::new(file);
 
         let key = rustls_pemfile::private_key(&mut reader)
@@ -231,7 +235,7 @@ impl TlsClientConfigBuilder {
             _ => {
                 return Err(TlsClientConfigError::MissingField(
                     "both client certificate and key required for mTLS",
-                ))
+                ));
             }
         };
 

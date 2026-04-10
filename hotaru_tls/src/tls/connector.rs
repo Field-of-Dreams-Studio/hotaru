@@ -1,13 +1,13 @@
 //! TLS client-side connector.
 
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 use tokio::net::TcpStream;
 
 use hotaru_core::connection::Connector;
 
-use crate::config::client::TlsClientConfig;
 use super::stream::TlsStream;
+use crate::config::client::TlsClientConfig;
 
 /// TLS connector for establishing outbound TLS connections.
 ///

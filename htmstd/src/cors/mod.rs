@@ -1,2 +1,2 @@
-pub mod cors; 
-pub mod cors_settings; 
+pub mod cors;
+pub mod cors_settings;

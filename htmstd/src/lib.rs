@@ -1,9 +1,8 @@
-pub mod session; 
-pub mod cors; 
+pub mod cors;
+pub mod session;
 
-pub use hotaru_core::app::middleware::LoggingMiddleware as PrintLog; 
-pub use session::Session; 
-pub use session::CookieSession; 
+pub use session::CookieSession;
+pub use session::Session;
 
-pub use cors::cors::Cors; 
-pub use cors::cors_settings; 
+pub use cors::cors::Cors;
+pub use cors::cors_settings;

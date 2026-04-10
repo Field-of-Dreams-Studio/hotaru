@@ -5,7 +5,7 @@ use std::any::Any;
 // ----------------------------------------------------------------------------
 
 /// Protocol-defined stream abstraction.
-/// 
+///
 /// A "stream" means different things to different protocols:
 /// - HTTP/2: Multiplexed request/response pairs
 /// - WebSocket: Single bidirectional message stream
@@ -16,18 +16,24 @@ pub trait Stream: Send + Sync + 'static {
 
     /// Returns the stream identifier.
     fn id(&self) -> Self::Id;
-    
+
     /// Returns a reference to the stream as `Any`.
     fn as_any(&self) -> &dyn Any;
-    
+
     /// Returns a mutable reference to the stream as `Any`.
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 /// Unit type stream for protocols that don't use streams.
 impl Stream for () {
-    type Id = u32; 
-    fn id(&self) -> u32 { 0 }
-    fn as_any(&self) -> &dyn Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn Any { self }
+    type Id = u32;
+    fn id(&self) -> u32 {
+        0
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
 }

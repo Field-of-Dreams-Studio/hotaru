@@ -1,14 +1,14 @@
 //! TLS server-side accepter.
 
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsAcceptor as RustlsAcceptor;
 
 use hotaru_core::connection::Accepter;
 
-use crate::config::server::TlsConfig;
 use super::stream::TlsStream;
+use crate::config::server::TlsConfig;
 
 /// TLS accepter that performs the server-side TLS handshake on incoming TCP connections.
 ///

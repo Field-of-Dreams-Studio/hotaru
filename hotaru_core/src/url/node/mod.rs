@@ -8,9 +8,9 @@ use crate::{
     url::PathPattern,
 };
 
-mod children; 
+mod children;
 mod partial;
-mod stepname; 
+mod stepname;
 
 pub use self::children::{Children, ChildrenInner, LiteralChild, RegexChild};
 pub use self::partial::PartialState;
@@ -22,7 +22,7 @@ pub struct UrlNode<C: RequestContext, TS: TransportSpec = crate::connection::tcp
     // The last segment of the URL path
     path: PathPattern,
 
-    // The child segments of the URL path 
+    // The child segments of the URL path
     children: Children<C, TS>,
 
     // Immutable executable definition attached to this route node.
@@ -209,13 +209,23 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
     }
 
     pub async fn walk_str(self: Arc<Self>, path: &str) -> Option<Arc<Self>> {
-        let segments: Vec<&str> = path.split('/').filter(|segment| !segment.is_empty()).collect();
+        let segments: Vec<&str> = path
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .collect();
         self.walk(segments.iter()).await
     }
 
     /// Walks the URL tree from a string path, rejecting paths deeper than `max_depth`.
-    pub async fn walk_str_with_limit(self: Arc<Self>, path: &str, max_depth: u32) -> Option<Arc<Self>> {
-        let segments: Vec<&str> = path.split('/').filter(|segment| !segment.is_empty()).collect();
+    pub async fn walk_str_with_limit(
+        self: Arc<Self>,
+        path: &str,
+        max_depth: u32,
+    ) -> Option<Arc<Self>> {
+        let segments: Vec<&str> = path
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .collect();
         if segments.len() > max_depth as usize {
             return None;
         }
@@ -277,13 +287,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
                 self.insert_child(rebound.clone());
                 Ok(rebound)
             } else {
-                let child = Arc::new(Self::new(
-                    pattern,
-                    Children::new(),
-                    binding,
-                    params,
-                    names,
-                ));
+                let child = Arc::new(Self::new(pattern, Children::new(), binding, params, names));
                 self.insert_child(child.clone());
                 Ok(child)
             }

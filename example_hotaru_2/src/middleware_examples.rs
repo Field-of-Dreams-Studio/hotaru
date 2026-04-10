@@ -1,5 +1,5 @@
-use hotaru::prelude::*; 
-use hotaru::http::*;  
+use hotaru::http::*;
+use hotaru::prelude::*;
 
 use crate::APP;
 
@@ -65,7 +65,7 @@ middleware! {
 endpoint! {
     APP.url("/with_middleware"),
     middleware = [LogStart, LogEnd],
-    
+
     /// Endpoint with logging middleware
     pub with_middleware <HTTP> {
         text_response("This endpoint has middleware")
@@ -75,7 +75,7 @@ endpoint! {
 endpoint! {
     APP.url("/with_values"),
     middleware = [SetValues, ReadValues],
-    
+
     /// Endpoint that uses values from middleware
     pub with_values <HTTP> {
         let value = req.locals.get::<i32>("some_value").unwrap_or(&0);
@@ -87,7 +87,7 @@ endpoint! {
 endpoint! {
     APP.url("/directly_return"),
     middleware = [ShortCircuit],
-    
+
     /// This endpoint will be short-circuited by middleware
     pub directly_return <HTTP> {
         text_response("This should not be reached")

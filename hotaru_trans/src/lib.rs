@@ -2,79 +2,77 @@ use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenSt
 
 // Procedural macros for Hotaru framework
 // Entry points will be moved here from hotaru_trans
-pub(crate) mod url; 
-pub(crate) mod middleware; 
+pub(crate) mod middleware;
+pub(crate) mod url;
 
-pub(crate) mod outer_attr; 
-pub(crate) mod helper; 
-use helper::*; 
-pub(crate) mod ctor; 
+pub(crate) mod helper;
+pub(crate) mod outer_attr;
+use helper::*;
+pub(crate) mod ctor;
 
 /// Our own constructor attribute - works like #[ctor::ctor] but built-in
-/// Generates platform-specific linker sections for automatic initialization 
+/// Generates platform-specific linker sections for automatic initialization
 #[cfg(not(feature = "external-ctor"))]
-#[proc_macro_attribute] 
+#[proc_macro_attribute]
 pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
     ctor::ctor(_attr, item)
-} 
+}
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "trans")] {
-        #[proc_macro] 
+        #[proc_macro]
         pub fn endpoint(input: TokenStream) -> TokenStream {
-            match url::parse_trans(input) { 
+            match url::parse_trans(input) {
                 Ok(url_args) => url_args.expand(),
-                Err(err) => err, 
+                Err(err) => err,
             }
-        } 
+        }
     } else if #[cfg(feature = "attr")] {
-        #[proc_macro_attribute] 
+        #[proc_macro_attribute]
         pub fn endpoint(attr: TokenStream, input: TokenStream) -> TokenStream {
-            match url::parse_attr(attr, input) { 
+            match url::parse_attr(attr, input) {
                 Ok(url_args) => url_args.expand(),
-                Err(err) => err, 
+                Err(err) => err,
             }
-        } 
-    } else { 
-        #[proc_macro_attribute] 
+        }
+    } else {
+        #[proc_macro_attribute]
         pub fn endpoint(_attr: TokenStream, input: TokenStream) -> TokenStream {
-            match url::parse_semi_trans(input) { 
+            match url::parse_semi_trans(input) {
                 Ok(url_args) => url_args.expand(),
-                Err(err) => err, 
+                Err(err) => err,
             }
-        }  
+        }
     }
-} 
-
+}
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "trans")] {
-        #[proc_macro] 
-        pub fn middleware(input: TokenStream) -> TokenStream { 
+        #[proc_macro]
+        pub fn middleware(input: TokenStream) -> TokenStream {
             match middleware::parse_trans(input) {
                 Ok(mw_func) => mw_func.expand(),
-                Err(err) => err, 
-            } 
-        } 
+                Err(err) => err,
+            }
+        }
     } else if #[cfg(feature = "attr")] {
-        #[proc_macro_attribute] 
-        pub fn middleware(_attr: TokenStream, input: TokenStream) -> TokenStream { 
+        #[proc_macro_attribute]
+        pub fn middleware(_attr: TokenStream, input: TokenStream) -> TokenStream {
             match middleware::parse_semi_trans_or_attr(input) {
                 Ok(mw_func) => mw_func.expand(),
-                Err(err) => err, 
+                Err(err) => err,
             }
-        } 
-    } else { 
-        #[proc_macro_attribute] 
-        pub fn middleware(_attr: TokenStream, input: TokenStream) -> TokenStream { 
+        }
+    } else {
+        #[proc_macro_attribute]
+        pub fn middleware(_attr: TokenStream, input: TokenStream) -> TokenStream {
             match middleware::parse_semi_trans_or_attr(input) {
                 Ok(mw_func) => mw_func.expand(),
-                Err(err) => err, 
+                Err(err) => err,
             }
-        }  
+        }
     }
-} 
-
+}
 
 /// Helper macro to generate lazy static declarations
 /// Used by LApp!, LUrl!, and LPattern! macros
@@ -86,13 +84,23 @@ macro_rules! generate_lazy_static {
             // Parse identifier
             let ident = match tokens.next() {
                 Some(TokenTree::Ident(i)) => i,
-                _ => return generate_compile_error(Span::call_site(), "Expected identifier before '='"),
+                _ => {
+                    return generate_compile_error(
+                        Span::call_site(),
+                        "Expected identifier before '='",
+                    );
+                }
             };
 
             // Expect '='
             match tokens.next() {
-                Some(TokenTree::Punct(p)) if p.as_char() == '=' => {},
-                _ => return generate_compile_error(Span::call_site(), "Expected '=' after identifier"),
+                Some(TokenTree::Punct(p)) if p.as_char() == '=' => {}
+                _ => {
+                    return generate_compile_error(
+                        Span::call_site(),
+                        "Expected '=' after identifier",
+                    );
+                }
             };
 
             // Collect the rest as the expression
@@ -196,4 +204,4 @@ pub fn LUrl(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn LPattern(input: TokenStream) -> TokenStream {
     generate_lazy_static!("SPattern")(input)
-} 
+}

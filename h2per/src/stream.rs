@@ -1,8 +1,8 @@
 //! Stream implementations for HTTP/2 and HTTP/3.
 //! HTTP/1.1 doesn't use streams, so it uses the unit type.
 
-use std::any::Any;
 use hotaru_core::connection::Stream;
+use std::any::Any;
 
 // ============================================================================
 // Base Stream type (used by HTTP/1.1 which doesn't have streams)
@@ -42,7 +42,7 @@ impl Http2Stream {
             weight: 16,
         }
     }
-    
+
     pub fn with_priority(id: u32, priority: Http2Priority) -> Self {
         Self {
             id,
@@ -57,11 +57,11 @@ impl Stream for Http2Stream {
     fn id(&self) -> u32 {
         self.id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -73,7 +73,7 @@ impl Stream for Http2Stream {
 
 #[derive(Clone)]
 pub struct Http3Stream {
-    id: u64,  // HTTP/3 uses u64 for stream IDs
+    id: u64, // HTTP/3 uses u64 for stream IDs
     stream_type: Http3StreamType,
 }
 
@@ -100,14 +100,14 @@ impl Http3Stream {
             stream_type: Http3StreamType::Request,
         }
     }
-    
+
     pub fn new_push(id: u64, push_id: u64) -> Self {
         Self {
             id,
             stream_type: Http3StreamType::Push(push_id),
         }
     }
-    
+
     pub fn new_control(id: u64) -> Self {
         Self {
             id,
@@ -122,11 +122,11 @@ impl Stream for Http3Stream {
         // In practice, stream IDs rarely exceed u32 range
         self.id as u32
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }

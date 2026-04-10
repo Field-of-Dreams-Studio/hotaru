@@ -2,8 +2,8 @@
 // Middleware Examples - Struct Style
 // ============================================================================
 
-use hotaru::prelude::*;
 use hotaru::http::*;
+use hotaru::prelude::*;
 
 // ============================================================================
 // Basic Logging Middleware
@@ -14,10 +14,10 @@ middleware! {
     pub LogRequest <HTTP> {
         println!("[LOG] Request: {} {}", req.method(), req.path());
         let start = std::time::Instant::now();
-        
+
         // Continue to next middleware/endpoint
         let result = next(req).await;
-        
+
         println!("[LOG] Response time: {:?}", start.elapsed());
         result
     }
@@ -35,7 +35,7 @@ middleware! {
             .get("Authorization")
             .and_then(|h| Some(h.as_str().strip_prefix("Bearer ").unwrap_or("").to_string()))
             .unwrap_or("".to_string());
-        
+
         if token.is_empty() || token != "valid-token-123" {
             // Don't call next() - return early with error response
             req.response = json_response(object!({
@@ -67,13 +67,13 @@ middleware! {
         // Set values in locals
         req.locals.set("user_id", 123u64);
         req.locals.set("username", "john_doe".to_string());
-        
+
         // Set complex object in params
         req.params.set(UserContext {
             role: "admin".to_string(),
             permissions: vec!["read".to_string(), "write".to_string(), "delete".to_string()]
         });
-        
+
         println!("[MIDDLEWARE] User context set");
         next(req).await
     }
@@ -83,18 +83,18 @@ middleware! {
     /// Reads and uses values from upstream middleware
     pub UseUserContext <HTTP> {
         let mut result = next(req).await;
-        
+
         // Read from locals
         let user_id = result.locals.take::<u64>("user_id").unwrap_or(0);
         let username = result.locals.take::<String>("username")
             .unwrap_or_else(|| "anonymous".to_string());
-        
+
         // Read from params
         if let Some(context) = result.params.take::<UserContext>() {
-            println!("[MIDDLEWARE] User {} (ID: {}) with role: {}", 
+            println!("[MIDDLEWARE] User {} (ID: {}) with role: {}",
                      username, user_id, context.role);
         }
-        
+
         result
     }
 }
@@ -108,7 +108,7 @@ middleware! {
     pub ConditionalMiddleware <HTTP> {
         if req.path().starts_with("/api/") {
             println!("[MIDDLEWARE] Processing API request");
-            
+
             // Add API-specific headers
             let mut result = next(req).await;
             result.response = result.response
@@ -131,7 +131,7 @@ middleware! {
     pub ErrorHandler <HTTP> {
         let path = req.path().to_owned();
         let result = next(req).await;
-        
+
         // Check if response indicates an error
         // (In real app, you'd check status code or error flag)
         if path == "/error" {
@@ -162,11 +162,11 @@ middleware! {
             .get("X-Forwarded-For")
             .and_then(|h| h.as_str().ok())
             .unwrap_or("unknown");
-        
+
         // Simulate rate limit check
         let requests_count = 5; // Would be fetched from store
         let limit = 100;
-        
+
         if requests_count > limit {
             println!("[RATE_LIMIT] Client {} exceeded rate limit", client_ip);
             req.response = json_response(object!({
@@ -176,7 +176,7 @@ middleware! {
             })).status(StatusCode::TOO_MANY_REQUESTS);
             req
         } else {
-            println!("[RATE_LIMIT] Client {} within limits ({}/{})", 
+            println!("[RATE_LIMIT] Client {} within limits ({}/{})",
                      client_ip, requests_count, limit);
             next(req).await
         }

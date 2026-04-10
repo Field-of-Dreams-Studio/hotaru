@@ -241,15 +241,15 @@ impl UrlArgs {
 
         // let mut endpoint = { <url-expr> };
         // endpoint.set_method(std::sync::Arc::new(__wrapper_xxx));
-        
+
         // Modify url_expr to inject the protocol type parameter
         let mut modified_url_expr = TokenStream::new();
         let mut url_tokens = self.url_expr.clone().into_iter().peekable();
-        
+
         // Process the url expression to inject type parameter after .url
         while let Some(token) = url_tokens.next() {
             modified_url_expr.extend(std::iter::once(token.clone()));
-            
+
             // Check if this is the "url" identifier
             if let TokenTree::Ident(ident) = &token {
                 if ident.to_string() == "url" {
@@ -266,7 +266,7 @@ impl UrlArgs {
                 }
             }
         }
-        
+
         let mut cont = TokenStream::new();
         cont.extend(vec![
             TokenTree::Ident(Ident::new("let", Span::call_site())),
@@ -298,7 +298,7 @@ impl UrlArgs {
         if let Some(mws) = self.middlewares.clone() {
             // Middleware inheritance implementation
             // This section handles the special ".." token which inherits middleware from the protocol's root URL
-            
+
             // let mut middlewares: Vec<std::sync::Arc<dyn hotaru::hotaru_core::app::middleware::AsyncMiddleware<Protocol> + 'static>> = vec![];
             let mut mw_decl = TokenStream::new();
             mw_decl.extend(vec![
@@ -360,33 +360,33 @@ impl UrlArgs {
             // - [.., LocalMw] - inherited middleware first, then local
             // - [LocalMw, ..] - local middleware first, then inherited
             // - [LocalMw1, .., LocalMw2] - LocalMw1, then inherited, then LocalMw2
-            
+
             // Push each middleware individually to allow Arc<Concrete> -> Arc<dyn Trait> coercion.
             for expr in mws {
                 // Check if this token is ".." (middleware inheritance marker)
                 let is_dots = {
                     let tokens: Vec<TokenTree> = expr.clone().into_iter().collect();
-                    tokens.len() == 2 &&
-                    matches!(tokens.get(0), Some(TokenTree::Punct(p)) if p.as_char() == '.') &&
-                    matches!(tokens.get(1), Some(TokenTree::Punct(p)) if p.as_char() == '.')
+                    tokens.len() == 2
+                        && matches!(tokens.get(0), Some(TokenTree::Punct(p)) if p.as_char() == '.')
+                        && matches!(tokens.get(1), Some(TokenTree::Punct(p)) if p.as_char() == '.')
                 };
-                
+
                 if is_dots {
                     // Generate code to inherit middleware from protocol root at runtime
                     // Direct APP access approach for middleware inheritance
                     // This uses the APP() method directly instead of checking ancestor relationships
-                    
+
                     // Generated code structure:
                     // {
                     //     let protocol_middlewares = APP.handler.get_protocol_middlewares::<Protocol>();
                     //     middlewares.extend(protocol_middlewares);
                     // }
-                    
+
                     let mut inheritance_block = TokenStream::new();
-                    
-                    // Create the content of the scoped block  
+
+                    // Create the content of the scoped block
                     let mut block_content = TokenStream::new();
-                    
+
                     // let protocol_middlewares = APP.handler.get_protocol_middlewares::<Protocol>();
                     block_content.extend(vec![
                         TokenTree::Ident(Ident::new("let", Span::call_site())),
@@ -405,7 +405,7 @@ impl UrlArgs {
                         TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
                         TokenTree::Punct(Punct::new(';', Spacing::Alone)),
                     ]);
-                    
+
                     // middlewares.extend(protocol_middlewares);
                     block_content.extend(vec![
                         TokenTree::Ident(Ident::new("middlewares", Span::call_site())),
@@ -413,37 +413,39 @@ impl UrlArgs {
                         TokenTree::Ident(Ident::new("extend", Span::call_site())),
                         TokenTree::Group(Group::new(Delimiter::Parenthesis, {
                             let mut g = TokenStream::new();
-                            g.extend(vec![
-                                TokenTree::Ident(Ident::new("protocol_middlewares", Span::call_site())),
-                            ]);
+                            g.extend(vec![TokenTree::Ident(Ident::new(
+                                "protocol_middlewares",
+                                Span::call_site(),
+                            ))]);
                             g
                         })),
                         TokenTree::Punct(Punct::new(';', Spacing::Alone)),
                     ]);
-                    
-                    inheritance_block.extend(vec![
-                        TokenTree::Group(Group::new(Delimiter::Brace, block_content)),
-                    ]);
-                    
+
+                    inheritance_block.extend(vec![TokenTree::Group(Group::new(
+                        Delimiter::Brace,
+                        block_content,
+                    ))]);
+
                     cont.extend(inheritance_block);
                 } else {
                     // Regular middleware - use existing logic
                     let mut push_call = TokenStream::new();
                     // middlewares.push(std::sync::Arc::new(expr));
                     let mut arc_new = TokenStream::new();
-                arc_new.extend(vec![
-                    TokenTree::Ident(Ident::new("std", Span::call_site())),
-                    TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                    TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("sync", Span::call_site())),
-                    TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                    TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("Arc", Span::call_site())),
-                    TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                    TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("new", Span::call_site())),
-                    TokenTree::Group(Group::new(Delimiter::Parenthesis, expr)),
-                ]);
+                    arc_new.extend(vec![
+                        TokenTree::Ident(Ident::new("std", Span::call_site())),
+                        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                        TokenTree::Ident(Ident::new("sync", Span::call_site())),
+                        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                        TokenTree::Ident(Ident::new("Arc", Span::call_site())),
+                        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                        TokenTree::Ident(Ident::new("new", Span::call_site())),
+                        TokenTree::Group(Group::new(Delimiter::Parenthesis, expr)),
+                    ]);
 
                     push_call.extend(vec![
                         TokenTree::Ident(Ident::new("middlewares", Span::call_site())),
@@ -494,7 +496,7 @@ struct UrlFunc {
     pub is_pub: bool,
     pub fn_name: String,
     pub protocol: Ident,
-    pub req_var_name: Ident, 
+    pub req_var_name: Ident,
     pub fn_cont: TokenStream,
     pub attrs: Vec<TokenStream>,
 }
@@ -503,8 +505,8 @@ impl UrlFunc {
     pub fn new(
         is_pub: bool,
         fn_name: String,
-        protocol: Ident, 
-        req_var_name: Ident, 
+        protocol: Ident,
+        req_var_name: Ident,
         fn_cont: TokenStream,
         attrs: Vec<TokenStream>,
     ) -> Self {
@@ -513,18 +515,18 @@ impl UrlFunc {
             fn_name,
             protocol,
             fn_cont,
-            req_var_name, 
+            req_var_name,
             attrs,
         }
     }
 
     pub fn parse(function: TokenStream) -> Result<Self, TokenStream> {
-        /// Return: ((is_pub, is_fn_style, fn_name), TokenStream) 
+        /// Return: ((is_pub, is_fn_style, fn_name), TokenStream)
         /// Second value = True if use (pub)? fn xxx(req: XXX) style, False if use (pub)? xxx <XXX> style
         fn process_name(
             tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
         ) -> Result<(bool, bool, String), TokenStream> {
-            // Whether it is a pub endpoint or not 
+            // Whether it is a pub endpoint or not
             let mut is_pub = false;
             match tokens.peek() {
                 Some(TokenTree::Ident(ident)) if ident.to_string() == "pub" => {
@@ -538,19 +540,19 @@ impl UrlFunc {
                         "Expected Function Name but found EOF",
                     ));
                 }
-            }; 
+            };
 
-            // Peek the function keyword and branch accordingly 
-            let mut is_fn_style = false; 
+            // Peek the function keyword and branch accordingly
+            let mut is_fn_style = false;
             match tokens.peek() {
-                Some(TokenTree::Ident(ident)) if ident.to_string() == "fn" => { 
-                    tokens.next(); 
-                    is_fn_style = true; 
-                } 
-                _ => {} 
-            } 
+                Some(TokenTree::Ident(ident)) if ident.to_string() == "fn" => {
+                    tokens.next();
+                    is_fn_style = true;
+                }
+                _ => {}
+            }
 
-            // Get the function name 
+            // Get the function name
             match tokens.next() {
                 Some(TokenTree::Ident(ident)) if ident.to_string() == "_" => {
                     return Ok((is_pub, is_fn_style, random_alpha_string(32)));
@@ -561,7 +563,10 @@ impl UrlFunc {
                 Some(token) => {
                     return Err(generate_compile_error(
                         token.span(),
-                        &format!("Expected Function Name or `fn` Keyword, but found {}", token.to_string()),
+                        &format!(
+                            "Expected Function Name or `fn` Keyword, but found {}",
+                            token.to_string()
+                        ),
                     ));
                 }
                 None => {
@@ -627,77 +632,77 @@ impl UrlFunc {
             }
 
             return Ok(protocol);
-        } 
+        }
 
-        /// pub fn endpoint_name(req: Protocol) 
-        /// Return: (Protocol, req_var_name) 
+        /// pub fn endpoint_name(req: Protocol)
+        /// Return: (Protocol, req_var_name)
         fn process_arguments(
             tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
-        ) -> Result<(Ident, Ident), TokenStream> { 
-            match tokens.next() { 
-                Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis => { 
-                    let mut inside_tokens = group.stream().into_iter().peekable(); 
+        ) -> Result<(Ident, Ident), TokenStream> {
+            match tokens.next() {
+                Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis => {
+                    let mut inside_tokens = group.stream().into_iter().peekable();
 
-                    // Expect the request variable name 
-                    let req_var_name = match inside_tokens.next() { 
-                        Some(TokenTree::Ident(ident)) => ident, 
-                        Some(tt) => { 
-                            return Err(generate_compile_error( 
-                                tt.span(), 
-                                "Expected request variable name", 
-                            )); 
-                        } 
-                        None => { 
-                            return Err(generate_compile_error( 
-                                Span::call_site(), 
-                                "Expected something inside the parentheses", 
-                            )); 
-                        } 
-                    }; 
+                    // Expect the request variable name
+                    let req_var_name = match inside_tokens.next() {
+                        Some(TokenTree::Ident(ident)) => ident,
+                        Some(tt) => {
+                            return Err(generate_compile_error(
+                                tt.span(),
+                                "Expected request variable name",
+                            ));
+                        }
+                        None => {
+                            return Err(generate_compile_error(
+                                Span::call_site(),
+                                "Expected something inside the parentheses",
+                            ));
+                        }
+                    };
 
-                    // Expect ':' 
-                    match inside_tokens.next() { 
-                        Some(TokenTree::Punct(punct)) if punct.as_char() == ':' => {} 
-                        Some(tt) => { 
-                            return Err(generate_compile_error( 
-                                tt.span(), 
-                                "Expected ':' after request variable name", 
-                            )); 
-                        } 
-                        None => { 
-                            return Err(generate_compile_error( 
-                                Span::call_site(), 
-                                "Expected ':' after request variable name", 
-                            )); 
-                        } 
-                    }; 
+                    // Expect ':'
+                    match inside_tokens.next() {
+                        Some(TokenTree::Punct(punct)) if punct.as_char() == ':' => {}
+                        Some(tt) => {
+                            return Err(generate_compile_error(
+                                tt.span(),
+                                "Expected ':' after request variable name",
+                            ));
+                        }
+                        None => {
+                            return Err(generate_compile_error(
+                                Span::call_site(),
+                                "Expected ':' after request variable name",
+                            ));
+                        }
+                    };
 
-                    // Expect Protocol type 
-                    let protocol = match inside_tokens.next() { 
-                        Some(TokenTree::Ident(ident)) => ident, 
-                        Some(tt) => { 
-                            return Err(generate_compile_error( 
-                                tt.span(), 
-                                "Expected Protocol type after ':'", 
-                            )); 
-                        } 
-                        None => { 
-                            return Err(generate_compile_error( 
-                                Span::call_site(), 
-                                "Expected Protocol type after ':'", 
-                            )); 
-                        } 
-                    }; 
+                    // Expect Protocol type
+                    let protocol = match inside_tokens.next() {
+                        Some(TokenTree::Ident(ident)) => ident,
+                        Some(tt) => {
+                            return Err(generate_compile_error(
+                                tt.span(),
+                                "Expected Protocol type after ':'",
+                            ));
+                        }
+                        None => {
+                            return Err(generate_compile_error(
+                                Span::call_site(),
+                                "Expected Protocol type after ':'",
+                            ));
+                        }
+                    };
 
                     // Ensure no extra tokens inside parentheses
-                    if let Some(tt) = inside_tokens.next() { 
-                        return Err(generate_compile_error( 
-                            tt.span(), 
-                            "Unexpected token inside parentheses", 
-                        )); 
-                    } 
+                    if let Some(tt) = inside_tokens.next() {
+                        return Err(generate_compile_error(
+                            tt.span(),
+                            "Unexpected token inside parentheses",
+                        ));
+                    }
 
-                    Ok((protocol, req_var_name))  
+                    Ok((protocol, req_var_name))
                 }
                 Some(_) => {
                     return Err(generate_compile_error(
@@ -710,7 +715,7 @@ impl UrlFunc {
                         Span::call_site(),
                         "Expected function arguments after function name",
                     ));
-                } 
+                }
             }
         }
 
@@ -800,16 +805,23 @@ impl UrlFunc {
         // Collect leading #[...] attributes
         let attrs = parse_outer_attrs(&mut tokens)?;
 
-        let (is_pub, fn_style, fn_name) = process_name(&mut tokens)?; 
-        let (protocol, req_var_name) = if fn_style { 
-            process_arguments(&mut tokens)? 
-        } else { 
+        let (is_pub, fn_style, fn_name) = process_name(&mut tokens)?;
+        let (protocol, req_var_name) = if fn_style {
+            process_arguments(&mut tokens)?
+        } else {
             let protocol = process_protocol(&mut tokens)?;
             (protocol, Ident::new("req", Span::call_site()))
         };
         let func_cont = process_func_content(&mut tokens)?;
 
-        Ok(Self::new(is_pub, fn_name, protocol, req_var_name, func_cont, attrs))
+        Ok(Self::new(
+            is_pub,
+            fn_name,
+            protocol,
+            req_var_name,
+            func_cont,
+            attrs,
+        ))
     }
 
     pub fn generate_function(&self) -> TokenStream {
@@ -898,13 +910,13 @@ impl UrlFunc {
             TokenTree::Punct(Punct::new('.', Spacing::Alone)),
             TokenTree::Ident(Ident::new("await", Span::call_site())),
             TokenTree::Punct(Punct::new(';', Spacing::Alone)),
-            TokenTree::Ident(self.req_var_name.clone()), 
+            TokenTree::Ident(self.req_var_name.clone()),
             TokenTree::Punct(Punct::new('.', Spacing::Alone)),
             TokenTree::Ident(Ident::new("response", Span::call_site())),
             TokenTree::Punct(Punct::new('=', Spacing::Alone)),
             TokenTree::Ident(Ident::new("response", Span::call_site())),
             TokenTree::Punct(Punct::new(';', Spacing::Alone)),
-            TokenTree::Ident(self.req_var_name.clone()) 
+            TokenTree::Ident(self.req_var_name.clone()),
         ]);
         let mut tokens = TokenStream::new();
         tokens.extend(vec![
@@ -950,8 +962,8 @@ pub fn endpoint(input: TokenStream) -> TokenStream {
 struct MiddleWare {
     pub is_pub: bool,
     pub name: Ident,
-    pub protocol: Ident, 
-    pub req_var_name: Ident, 
+    pub protocol: Ident,
+    pub req_var_name: Ident,
     pub cont: TokenStream,
     pub attrs: Vec<TokenStream>,
 }
@@ -961,7 +973,7 @@ impl MiddleWare {
         is_pub: bool,
         name: Ident,
         protocol: Ident,
-        req_var_name: Ident, 
+        req_var_name: Ident,
         cont: TokenStream,
         attrs: Vec<TokenStream>,
     ) -> Self {
@@ -1033,7 +1045,7 @@ impl MiddleWare {
             Ok(attrs)
         }
 
-        /// Return: (is_pub, is_fn_style, Ident) 
+        /// Return: (is_pub, is_fn_style, Ident)
         fn process_name(
             tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
         ) -> Result<(bool, bool, Ident), TokenStream> {
@@ -1140,7 +1152,7 @@ impl MiddleWare {
         }
 
         /// fn middleware_name(req: Protocol)
-        /// Return: (Protocol, req_var_name) 
+        /// Return: (Protocol, req_var_name)
         fn process_arguments(
             tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
         ) -> Result<(Ident, Ident), TokenStream> {
@@ -1224,10 +1236,16 @@ impl MiddleWare {
                     if group.delimiter() == Delimiter::Brace {
                         Ok(group.stream())
                     } else {
-                        Err(generate_compile_error(group.span(), "Expect middleware content"))
+                        Err(generate_compile_error(
+                            group.span(),
+                            "Expect middleware content",
+                        ))
                     }
                 }
-                Some(tt) => Err(generate_compile_error(tt.span(), "Expect middleware content")),
+                Some(tt) => Err(generate_compile_error(
+                    tt.span(),
+                    "Expect middleware content",
+                )),
                 None => Err(generate_compile_error(
                     Span::call_site(),
                     "Expect some tokens",
@@ -1246,14 +1264,7 @@ impl MiddleWare {
         };
         let cont = process_func_content(&mut tokens)?;
 
-        Ok(Self::new(
-            is_pub,
-            name,
-            protocol,
-            req_var_name,
-            cont,
-            attrs,
-        ))
+        Ok(Self::new(is_pub, name, protocol, req_var_name, cont, attrs))
     }
 
     pub fn expand(&self) -> TokenStream {
@@ -1693,10 +1704,17 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let function_tokens: Vec<_> = tokens.collect();
 
     // Extract function name for generating unique static name
-    let fn_name = function_tokens.iter()
+    let fn_name = function_tokens
+        .iter()
         .skip_while(|t| !matches!(t, TokenTree::Ident(id) if id.to_string() == "fn"))
         .nth(1)
-        .and_then(|t| if let TokenTree::Ident(id) = t { Some(id.to_string()) } else { None })
+        .and_then(|t| {
+            if let TokenTree::Ident(id) = t {
+                Some(id.to_string())
+            } else {
+                None
+            }
+        })
         .unwrap_or_else(|| "unknown".to_string());
 
     let mut output = TokenStream::new();
@@ -1716,7 +1734,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 TokenTree::Ident(Ident::new("allow", Span::call_site())),
                 TokenTree::Group(Group::new(Delimiter::Parenthesis, {
                     let mut inner = TokenStream::new();
-                    inner.extend(vec![TokenTree::Ident(Ident::new("unsafe_code", Span::call_site()))]);
+                    inner.extend(vec![TokenTree::Ident(Ident::new(
+                        "unsafe_code",
+                        Span::call_site(),
+                    ))]);
                     inner
                 })),
             ]);
@@ -1729,7 +1750,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
         TokenTree::Punct(Punct::new('#', Spacing::Alone)),
         TokenTree::Group(Group::new(Delimiter::Bracket, {
             let mut attr = TokenStream::new();
-            attr.extend(vec![TokenTree::Ident(Ident::new("used", Span::call_site()))]);
+            attr.extend(vec![TokenTree::Ident(Ident::new(
+                "used",
+                Span::call_site(),
+            ))]);
             attr
         })),
     ]);
@@ -1833,7 +1857,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // static __CTOR_<name>: extern "C" fn() = { extern "C" fn __wrapper() { <fn_name>() }; __wrapper };
     static_decl.extend(vec![
         TokenTree::Ident(Ident::new("static", Span::call_site())),
-        TokenTree::Ident(Ident::new(&format!("__CTOR_{}", fn_name.to_uppercase()), Span::call_site())),
+        TokenTree::Ident(Ident::new(
+            &format!("__CTOR_{}", fn_name.to_uppercase()),
+            Span::call_site(),
+        )),
         TokenTree::Punct(Punct::new(':', Spacing::Alone)),
         TokenTree::Ident(Ident::new("extern", Span::call_site())),
         TokenTree::Literal(Literal::string("C")),
@@ -1846,7 +1873,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 TokenTree::Ident(Ident::new("extern", Span::call_site())),
                 TokenTree::Literal(Literal::string("C")),
                 TokenTree::Ident(Ident::new("fn", Span::call_site())),
-                TokenTree::Ident(Ident::new(&format!("__wrapper_{}", fn_name), Span::call_site())),
+                TokenTree::Ident(Ident::new(
+                    &format!("__wrapper_{}", fn_name),
+                    Span::call_site(),
+                )),
                 TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
                 TokenTree::Group(Group::new(Delimiter::Brace, {
                     let mut call = TokenStream::new();
@@ -1857,7 +1887,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     call
                 })),
                 TokenTree::Punct(Punct::new(';', Spacing::Alone)),
-                TokenTree::Ident(Ident::new(&format!("__wrapper_{}", fn_name), Span::call_site())),
+                TokenTree::Ident(Ident::new(
+                    &format!("__wrapper_{}", fn_name),
+                    Span::call_site(),
+                )),
             ]);
             inner
         })),
@@ -1878,13 +1911,23 @@ macro_rules! generate_lazy_static {
             // Parse identifier
             let ident = match tokens.next() {
                 Some(TokenTree::Ident(i)) => i,
-                _ => return generate_compile_error(Span::call_site(), "Expected identifier before '='"),
+                _ => {
+                    return generate_compile_error(
+                        Span::call_site(),
+                        "Expected identifier before '='",
+                    );
+                }
             };
 
             // Expect '='
             match tokens.next() {
-                Some(TokenTree::Punct(p)) if p.as_char() == '=' => {},
-                _ => return generate_compile_error(Span::call_site(), "Expected '=' after identifier"),
+                Some(TokenTree::Punct(p)) if p.as_char() == '=' => {}
+                _ => {
+                    return generate_compile_error(
+                        Span::call_site(),
+                        "Expected '=' after identifier",
+                    );
+                }
             };
 
             // Collect the rest as the expression

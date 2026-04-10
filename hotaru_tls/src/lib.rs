@@ -16,20 +16,18 @@ pub mod tls;
 
 // ── TLS stream layer ──────────────────────────────────────────────────────────
 pub use tls::{
-    TlsAccepter, TlsAccepterError,
-    TlsConnector, TlsConnectorError,
-    TlsMeta, TlsStream, TlsTransport,
+    TlsAccepter, TlsAccepterError, TlsConnector, TlsConnectorError, TlsMeta, TlsStream,
+    TlsTransport,
 };
 
 // ── Configuration builders ────────────────────────────────────────────────────
 pub use config::{
-    ClientAuth,
-    TlsClientConfig, TlsClientConfigBuilder, TlsClientConfigError,
-    TlsConfig, TlsConfigBuilder, TlsConfigError,
+    ClientAuth, TlsClientConfig, TlsClientConfigBuilder, TlsClientConfigError, TlsConfig,
+    TlsConfigBuilder, TlsConfigError,
 };
 
 // ── Flexible TCP/TLS (runtime transport selection) ───────────────────────────
 pub use flexible::{
-    Authentication, ConnectionBuilder, FlexMeta, Protocol,
-    TcpOrTlsStream, TcpReader, TcpWriter, split_connection,
+    Authentication, ConnectionBuilder, FlexMeta, Protocol, TcpOrTlsStream, TcpReader, TcpWriter,
+    split_connection,
 };

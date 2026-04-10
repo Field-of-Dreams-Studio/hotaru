@@ -1,14 +1,16 @@
 use dashmap::DashMap;
-use hotaru_core::http::cookie::Cookie;
+use hotaru_http::cookie::Cookie;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use std::collections::HashMap;
-use lazy_static::lazy_static;
 use tokio::time;
 
-use hotaru_meta::middleware; 
-use hotaru_core::app::middleware::AsyncMiddleware; 
-use hotaru_core::{connection::Protocol, http::traits::HTTP, http::context::HttpContext};  
+use hotaru_core::executable::middleware::AsyncMiddleware;
+use hotaru_core::connection::Protocol;
+use hotaru_http::context::HttpContext;
+use hotaru_http::traits::HTTP;
+use hotaru_meta::middleware;
 
 #[derive(Debug, Clone)]
 pub struct SessionCont {
@@ -18,7 +20,7 @@ pub struct SessionCont {
 
 lazy_static! {
     static ref SESSIONS: DashMap<u64, SessionCont> = DashMap::new();
-} 
+}
 
 static DEFAULT_TTL: u64 = 3600 * 24 * 7; // Default TTL of 7 days  
 
@@ -87,7 +89,7 @@ impl<'a> SessionRW<'a> {
     }
 
     pub fn set<T: Into<String>, U: Into<String>>(&mut self, key: T, value: U) {
-        self.guard.data.insert(key.into(), value.into()); 
+        self.guard.data.insert(key.into(), value.into());
     }
 
     pub fn set_all(&mut self, data: HashMap<String, String>) {
@@ -102,43 +104,46 @@ impl<'a> Default for SessionRW<'a> {
         SessionRW {
             guard: SESSIONS.get_mut(&0).expect("Default session not found"),
             session_id: 0,
-        } 
+        }
     }
-} 
+}
 
 pub fn get_mut<'a>(id: u64) -> Result<SessionRW<'a>, &'static str> {
     match SESSIONS.get_mut(&id) {
-        Some(guard) => Ok(SessionRW { guard, session_id: id }),
+        Some(guard) => Ok(SessionRW {
+            guard,
+            session_id: id,
+        }),
         None => Err("Session not found"),
     }
-} 
+}
 
 middleware!(
-    pub Session<HTTP>{ 
-        let ttl = req.app()
-            .and_then(|app| app.config.get::<u64>().cloned())
-            .unwrap_or(DEFAULT_TTL); 
+    pub Session<HTTP>{
+        let ttl = req.runtime()
+            .and_then(|rt| rt.get_config::<u64>())
+            .unwrap_or(DEFAULT_TTL);
         let mut session_id: u64 = req.get_cookie_or_default("session_id")
             .get_value()
             .parse()
             .unwrap_or_else(|_| {
-                new_session(HashMap::new(), ttl) 
-            }); 
-        let mut session = get_mut(session_id).unwrap_or_else(|_| { 
-            session_id = new_session(HashMap::new(), ttl); 
-            get_mut(session_id).unwrap() 
-        }); 
-        session.touch(ttl); // Refresh session expiration 
-        req.params.set(session); 
-        let mut req = next(req).await; // Continue middleware chain 
+                new_session(HashMap::new(), ttl)
+            });
+        let mut session = get_mut(session_id).unwrap_or_else(|_| {
+            session_id = new_session(HashMap::new(), ttl);
+            get_mut(session_id).unwrap()
+        });
+        session.touch(ttl); // Refresh session expiration
+        req.params.set(session);
+        let mut req = next(req).await; // Continue middleware chain
         req.response = req.response.add_cookie(
-            "session_id", 
-            Cookie::new(session_id.to_string()) 
-                .path("/") 
-        ); // Set cookie with session ID 
-        req 
-    } 
-); 
+            "session_id",
+            Cookie::new(session_id.to_string())
+                .path("/")
+        ); // Set cookie with session ID
+        req
+    }
+);
 
 async fn session_cleanup_task(interval_secs: u64) {
     let mut interval = time::interval(Duration::from_secs(interval_secs));
@@ -154,4 +159,4 @@ async fn session_cleanup_task(interval_secs: u64) {
 
 pub fn init_session_system() {
     tokio::spawn(session_cleanup_task(3600));
-} 
+}

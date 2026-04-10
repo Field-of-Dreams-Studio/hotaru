@@ -2,8 +2,8 @@
 // Response Pattern Examples
 // ============================================================================
 
-use hotaru::prelude::*;
 use hotaru::http::*;
+use hotaru::prelude::*;
 use serde_json::json;
 
 use crate::APP;
@@ -14,7 +14,7 @@ use crate::APP;
 
 endpoint! {
     APP.url("/response/text"),
-    
+
     /// Simple text response
     pub text_response_example <HTTP> {
         text_response("This is a plain text response")
@@ -27,7 +27,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/json/object"),
-    
+
     /// JSON response using object! macro
     pub json_object_response <HTTP> {
         json_response(object!({
@@ -51,7 +51,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/json/serde"),
-    
+
     /// JSON response using serde_json
     pub json_serde_response <HTTP> {
         json_response(json!({
@@ -71,7 +71,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/html"),
-    
+
     /// HTML response example
     pub html_response_example <HTTP> {
         html_response(r#"
@@ -118,7 +118,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/created"),
-    
+
     /// Custom status code with headers
     pub created_response <HTTP> {
         let resource_id = "new-resource-123";
@@ -130,7 +130,7 @@ endpoint! {
                 .as_secs(),
             "status": "created"
         });
-        
+
         normal_response(StatusCode::CREATED, content.to_string().into_bytes())
             .add_header("Location", format!("/resource/{}", resource_id))
             .add_header("X-Resource-Id", resource_id)
@@ -140,7 +140,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/redirect"),
-    
+
     /// Redirect response
     pub redirect_response <HTTP> {
         normal_response(StatusCode::FOUND, Vec::new())
@@ -155,11 +155,11 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/error/<int:code>"),
-    
+
     /// Standardized error response format
     pub error_response <HTTP> {
         let error_code: String = req.pattern("code").unwrap_or("500".to_string());
-        
+
         let (status, message) = match error_code.as_str() {
             "400" => (StatusCode::BAD_REQUEST, "Bad request"),
             "401" => (StatusCode::UNAUTHORIZED, "Authentication required"),
@@ -168,7 +168,7 @@ endpoint! {
             "500" => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"),
             _ => (StatusCode::INTERNAL_SERVER_ERROR, "Unknown error")
         };
-        
+
         json_response(object!({
             status: "error",
             error_code: error_code,
@@ -188,7 +188,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/cookie"),
-    
+
     /// Response with cookies
     pub cookie_response <HTTP> {
         text_response("Cookies have been set!")
@@ -209,7 +209,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/template"),
-    
+
     /// Template rendering with Akari
     pub template_response <HTTP> {
         // Note: In real app, template file would exist
@@ -228,7 +228,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/plain-template"),
-    
+
     /// Plain template without data
     pub plain_template_example <HTTP> {
         plain_template_response("static_page.html")
@@ -241,15 +241,15 @@ endpoint! {
 
 endpoint! {
     APP.url("/response/download"),
-    
+
     /// File download with proper headers
     pub download_response <HTTP> {
         let file_content = b"This is the content of the downloaded file";
         let filename = "example.txt";
-        
+
         normal_response(StatusCode::OK, file_content.to_vec())
             .add_header("Content-Type", "application/octet-stream")
-            .add_header("Content-Disposition", 
+            .add_header("Content-Disposition",
                        format!("attachment; filename=\"{}\"", filename))
             .add_header("Content-Length", file_content.len().to_string())
     }

@@ -1,13 +1,10 @@
-use hotaru::prelude::*;
-use hotaru::http::{HttpSafety, HttpMethod};
 use h2per::prelude::*;
 use h2per::websocket::{
-    WebSocketProtocol, 
-    is_websocket_upgrade, 
-    is_http2_websocket_upgrade,
-    build_websocket_response,
-    build_http2_websocket_response,
+    build_http2_websocket_response, build_websocket_response, is_http2_websocket_upgrade,
+    is_websocket_upgrade, WebSocketProtocol,
 };
+use hotaru::http::{HttpMethod, HttpSafety};
+use hotaru::prelude::*;
 use serde_json::json;
 // Response, StatusCode, Empty, and Bytes are already imported via h2per::prelude::*
 
@@ -19,7 +16,9 @@ pub static APP: SApp = Lazy::new(|| {
             HandlerBuilder::new()
                 .protocol(ProtocolBuilder::new(HYPER1::new(ProtocolRole::Server)))
                 .protocol(ProtocolBuilder::new(HYPER2::new(ProtocolRole::Server)))
-                .protocol(ProtocolBuilder::new(WebSocketProtocol::new(ProtocolRole::Server)))
+                .protocol(ProtocolBuilder::new(WebSocketProtocol::new(
+                    ProtocolRole::Server,
+                ))),
         )
         .build()
 });
@@ -38,7 +37,7 @@ async fn main() {
 
 endpoint! {
     APP.url("/"),
-    
+
     /// Root endpoint using Hyper HTTP/1.1
     pub index <HYPER1> {
         text_response("Welcome to Hyper-powered Hotaru!")
@@ -47,7 +46,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/api/hello"),
-    
+
     /// JSON API endpoint using Hyper
     pub hello_api <HYPER1> {
         let response_data = json!({
@@ -55,14 +54,14 @@ endpoint! {
             "version": "1.1",
             "powered_by": "hyper"
         });
-        
+
         json_response(response_data)
     }
 }
 
 endpoint! {
     APP.url("/echo/<text>"),
-    
+
     /// Echo endpoint with path parameters
     pub echo <HYPER1> {
         let text = req.pattern("text").unwrap_or("nothing".to_string());
@@ -77,13 +76,13 @@ endpoint! {
 // HYPER1 endpoint - handles upgrade negotiation for /h2/test
 endpoint! {
     APP.url("/h2/test"),
-    
+
     /// HTTP/1.1 endpoint that can upgrade to HTTP/2 or WebSocket
     pub http2_test_upgrade <HYPER1> {
         let headers = req.request().inner.headers();
         let upgrade = headers.get("upgrade").and_then(|v| v.to_str().ok());
         let connection = headers.get("connection").and_then(|v| v.to_str().ok());
-        
+
         // Check what the client is requesting
         match upgrade {
             Some("websocket") => {
@@ -158,7 +157,7 @@ endpoint! {
 // HYPER2 endpoint - handles HTTP/2 requests for /h2/test
 endpoint! {
     APP.url("/h2/test"),
-    
+
     /// HTTP/2 endpoint - handles requests after upgrade or direct HTTP/2
     /// This is the associated endpoint for the HYPER1 handler
     pub http2_test <HYPER2> {
@@ -168,14 +167,14 @@ endpoint! {
             "features": ["multiplexing", "server_push", "header_compression"],
             "note": "Associated with HYPER1 endpoint for upgrade handling"
         });
-        
+
         json_response(response_data)
     }
 }
 
 endpoint! {
     APP.url("/h2/stream"),
-    
+
     /// HTTP/2 streaming example
     pub http2_stream <HYPER2> {
         // In HTTP/2, we can access stream information
@@ -184,12 +183,12 @@ endpoint! {
         } else {
             "Stream info not available".to_string()
         };
-        
+
         let response_data = json!({
             "message": "HTTP/2 Stream Example",
             "stream_info": stream_info
         });
-        
+
         json_response(response_data)
     }
 }
@@ -201,7 +200,7 @@ endpoint! {
 endpoint! {
     APP.url("/api/json"),
     config = [HttpSafety::new().with_allowed_methods(vec![HttpMethod::POST])],
-    
+
     /// JSON POST handler using serde_json
     pub json_handler <HYPER1> {
         // Parse JSON from request body
@@ -228,7 +227,7 @@ endpoint! {
 endpoint! {
     APP.url("/form"),
     config = [HttpSafety::new().with_allowed_methods(vec![HttpMethod::GET, HttpMethod::POST])],
-    
+
     /// Form handling with Hyper
     pub form_handler <HYPER1> {
         if req.method() == &Method::GET {
@@ -261,13 +260,13 @@ endpoint! {
                     let default_email = "no-email".to_string();
                     let name = form.data.get("name").unwrap_or(&default_name);
                     let email = form.data.get("email").unwrap_or(&default_email);
-                    
+
                     let response_data = json!({
                         "message": "Form received",
                         "name": name,
                         "email": email
                     });
-                    
+
                     json_response(response_data)
                 }
                 None => {
@@ -286,9 +285,9 @@ middleware! {
     pub HyperLogger <HYPER1> {
         println!("[HYPER1] Request: {} {}", req.method(), req.path());
         let start = std::time::Instant::now();
-        
+
         let result = next(req).await;
-        
+
         println!("[HYPER1] Response time: {:?}", start.elapsed());
         result
     }
@@ -297,7 +296,7 @@ middleware! {
 endpoint! {
     APP.url("/logged"),
     middleware = [HyperLogger],
-    
+
     /// Endpoint with Hyper logging middleware
     pub logged_endpoint <HYPER1> {
         text_response("This request was logged by Hyper middleware")
@@ -310,24 +309,24 @@ endpoint! {
 
 endpoint! {
     APP.url("/version"),
-    
+
     /// Shows which HTTP version is being used
     pub version_info <HYPER1> {
         // This endpoint can be accessed via both HTTP/1.1 and HTTP/2
         // The actual version used depends on client negotiation
-        
+
         let version = if let Some(ctx) = req.as_any().downcast_ref::<HyperContext>() {
             format!("{:?}", ctx.version)
         } else {
             "Unknown".to_string()
         };
-        
+
         let response_data = json!({
             "message": "Version detection",
             "http_version": version,
             "handler": "HYPER1"
         });
-        
+
         json_response(response_data)
     }
 }
@@ -338,7 +337,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/status"),
-    
+
     /// Server status with protocol info
     pub status <HYPER1> {
         let response_data = json!({
@@ -364,7 +363,7 @@ endpoint! {
                 "/ws2 (HTTP/2 Extended CONNECT WebSocket)"
             ]
         });
-        
+
         json_response(response_data)
     }
 }
@@ -376,7 +375,7 @@ endpoint! {
 // HTTP/1.1 endpoint - handles the upgrade handshake for file download
 endpoint! {
     APP.url("/download"),
-    
+
     /// WebSocket file download endpoint - upgrade handler
     pub download_upgrade <HYPER1> {
         if is_websocket_upgrade(&req.request().inner) {
@@ -384,10 +383,10 @@ endpoint! {
             match build_websocket_response(&req.request().inner) {
                 Ok(response) => {
                     println!("📥 WebSocket download endpoint upgrade initiated");
-                    
+
                     // Signal protocol switch to WebSocket
                     req.switch_to_ws();
-                    
+
                     HyperResponse { inner: response }
                 }
                 Err(e) => {
@@ -579,7 +578,7 @@ endpoint! {
 // HTTP/1.1 endpoint - handles the upgrade handshake only
 endpoint! {
     APP.url("/ws"),
-    
+
     /// HTTP/1.1 WebSocket upgrade endpoint
     /// This handles ONLY the HTTP upgrade negotiation
     pub websocket_upgrade <HYPER1> {
@@ -588,19 +587,19 @@ endpoint! {
             match build_websocket_response(&req.request().inner) {
                 Ok(response) => {
                     println!("✅ HTTP/1.1 → WebSocket upgrade response sent");
-                    
+
                     // Signal protocol switch to WebSocket
                     req.switch_to_ws();
-                    
+
                     println!("📡 Protocol switch signaled to framework");
                     println!("🔄 Connection will switch from HTTP/1.1 → WebSocket");
-                    
+
                     // The framework will:
                     // 1. Detect ConnectionStatus::SwitchProtocol in the context
                     // 2. Use HyperTransport.into_websocket_transport() to convert the transport
                     // 3. Switch to WebSocketProtocol with the new transport
                     // 4. Continue handling the connection with the WebSocket protocol
-                    
+
                     // Return the 101 Switching Protocols response
                     HyperResponse { inner: response }
                 }
@@ -620,13 +619,13 @@ endpoint! {
 // This would be registered for the same URL but different protocol
 endpoint! {
     APP.url("/ws"),
-    
+
     /// Pure WebSocket endpoint - no HTTP logic
     /// This runs AFTER successful protocol switch
     pub websocket_handler <WebSocketProtocol> {
         // This endpoint would only be called after successful upgrade
         // It handles pure WebSocket communication
-        
+
         // In a real implementation, this would work with WebSocket messages:
         // match req.ws_message() {
         //     WsMessage::Text(text) => {
@@ -640,7 +639,7 @@ endpoint! {
         //     }
         //     _ => {}
         // }
-        
+
         // For now, just log that we would handle WebSocket
         println!("🔌 WebSocket endpoint would handle frames here");
         text_response("WebSocket handler active")
@@ -654,7 +653,7 @@ endpoint! {
 // HTTP/2 endpoint - handles Extended CONNECT WebSocket upgrade
 endpoint! {
     APP.url("/ws2"),
-    
+
     /// HTTP/2 WebSocket upgrade endpoint using Extended CONNECT
     /// This demonstrates stream-level protocol switching
     pub http2_websocket_upgrade <HYPER2> {
@@ -663,23 +662,23 @@ endpoint! {
             match build_http2_websocket_response(&req.request().inner) {
                 Ok(response) => {
                     println!("✅ HTTP/2 → WebSocket upgrade via Extended CONNECT");
-                    
+
                     // Get the stream ID if available
                     let stream_id = req.stream_id.unwrap_or(0);
                     println!("📊 Upgrading HTTP/2 stream {}", stream_id);
-                    
+
                     // Signal protocol switch to WebSocket for this stream
                     req.switch_to_ws();
-                    
+
                     println!("📡 Stream-level protocol switch signaled");
                     println!("🔄 Stream {} will switch from HTTP/2 → WebSocket", stream_id);
-                    
+
                     // The framework will:
                     // 1. Detect ConnectionStatus::SwitchProtocol in the context
                     // 2. Use Http2Transport.upgrade_stream_to_websocket(stream_id)
                     // 3. Switch this stream to WebSocketProtocol
                     // 4. Other HTTP/2 streams remain unaffected
-                    
+
                     // Return 200 OK for Extended CONNECT
                     HyperResponse { inner: response }
                 }
@@ -709,7 +708,7 @@ endpoint! {
 // WebSocket endpoint for /ws2 - handles frames after HTTP/2 upgrade
 endpoint! {
     APP.url("/ws2"),
-    
+
     /// Pure WebSocket handler for HTTP/2 upgraded streams
     pub http2_websocket_handler <WebSocketProtocol> {
         println!("🔌 HTTP/2 WebSocket stream handler active");

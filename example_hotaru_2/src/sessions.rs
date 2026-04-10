@@ -1,5 +1,5 @@
-use hotaru::prelude::*; 
-use hotaru::http::*;  
+use hotaru::http::*;
+use hotaru::prelude::*;
 use htmstd::{CookieSession, Cors};
 
 use crate::APP;
@@ -11,7 +11,7 @@ use crate::APP;
 endpoint! {
     APP.url("/session/test"),
     middleware = [CookieSession],
-    
+
     /// Session test endpoint
     pub session_test <HTTP> {
         let session = req.params.get_mut::<htmstd::session::cookie_session::CSessionRW>().unwrap();
@@ -31,7 +31,7 @@ endpoint! {
 endpoint! {
     APP.url("/api/data"),
     middleware = [Cors],
-    
+
     /// API endpoint with CORS
     pub api_data <HTTP> {
         let message = "This endpoint has CORS enabled";
@@ -49,18 +49,18 @@ endpoint! {
 endpoint! {
     APP.url("/api/protected"),
     middleware = [CookieSession, Cors],
-    
+
     /// Protected API endpoint with session and CORS
     pub api_protected <HTTP> {
         let session = req.params.get_mut::<htmstd::session::cookie_session::CSessionRW>().unwrap();
-        
-        // Check if user is authenticated  
+
+        // Check if user is authenticated
         let is_authenticated = if let Some(v) = session.get("authenticated") {
             v.to_string() == "true"
         } else {
             false
         };
-        
+
         if is_authenticated {
             json_response(object!({
                 status: "success",
@@ -82,7 +82,7 @@ endpoint! {
 endpoint! {
     APP.url("/api/login"),
     middleware = [CookieSession],
-    
+
     /// Login endpoint
     pub api_login <HTTP> {
         if req.method() == POST {
@@ -90,13 +90,13 @@ endpoint! {
                 Some(json) => {
                     let username = json.get("username").to_string();
                     let password = json.get("password").to_string();
-                    
+
                     // Simple authentication check (in real app, verify against database)
                     if username == "\"admin\"" && password == "\"password\"" {
                         let session = req.params.get_mut::<htmstd::session::cookie_session::CSessionRW>().unwrap();
                         session.insert("authenticated".to_string(), Value::new("true"));
                         session.insert("username".to_string(), Value::new(username));
-                        
+
                         json_response(object!({
                             status: "success",
                             message: "Login successful"

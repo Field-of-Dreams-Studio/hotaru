@@ -8,7 +8,7 @@ pub mod types;
 
 pub use context::RequestContext;
 pub use error::{
-    ProtocolError, ProtocolErrorBox, ProtocolErrorKind, ProtocolResult, IoProtocolError,
+    IoProtocolError, ProtocolError, ProtocolErrorBox, ProtocolErrorKind, ProtocolResult,
     StaticProtocolError,
 };
 pub use message::Message;

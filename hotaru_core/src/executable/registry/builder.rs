@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use crate::{
     connection::{Protocol, TransportSpec},
-    executable::{entry::ProtocolEntryTrait, registry::ProtocolEntryRegistry, ProtocolEntryBuilder},
+    executable::{
+        ProtocolEntryBuilder, entry::ProtocolEntryTrait, registry::ProtocolEntryRegistry,
+    },
 };
 
 /// Builder for protocol registries assembled from neutral protocol entries.
@@ -12,7 +14,9 @@ pub struct ProtocolRegistryBuilder<TS: TransportSpec> {
 
 impl<TS: TransportSpec> ProtocolRegistryBuilder<TS> {
     pub fn new() -> Self {
-        Self { handlers: Vec::new() }
+        Self {
+            handlers: Vec::new(),
+        }
     }
 
     pub fn protocol<P: Protocol<Wire = TS::Wire, Spec = TS> + Clone + 'static>(

@@ -36,13 +36,13 @@ impl HttpResponse {
     pub async fn parse_body(&mut self, safety_setting: &HttpSafety) {
         let body = std::mem::take(&mut self.body);
         self.body = body.parse_buffer(safety_setting);
-    } 
+    }
 
-    /// Get the parsed HTTP Body 
+    /// Get the parsed HTTP Body
     pub async fn get_parsed_body(&mut self, safety: HttpSafety) -> HttpBody {
-        self.parse_body(&safety).await; 
-        self.body.clone() 
-    } 
+        self.parse_body(&safety).await;
+        self.body.clone()
+    }
 
     /// Add a cookie into the response metadata.
     /// Insert an empty cookie to delete the cookie.
@@ -77,10 +77,7 @@ impl HttpResponse {
 
     /// Send the response
     /// When this method is changed, please also check Request::send()
-    pub async fn send<W: AsyncWrite + Unpin>(
-        self,
-        writer: &mut W,
-    ) -> std::io::Result<()> {
+    pub async fn send<W: AsyncWrite + Unpin>(self, writer: &mut W) -> std::io::Result<()> {
         net::send(self.meta, self.body, writer).await
     }
 

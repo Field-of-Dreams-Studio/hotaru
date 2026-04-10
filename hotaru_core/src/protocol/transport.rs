@@ -5,7 +5,7 @@ use std::any::Any;
 // ----------------------------------------------------------------------------
 
 /// Protocol-defined connection abstraction.
-/// 
+///
 /// This trait represents whatever "connection" means for your protocol.
 /// It could be:
 /// - A simple wrapper around a TCP connection ID
@@ -17,10 +17,10 @@ pub trait Transport: Send + Sync + 'static {
 
     /// Returns an identifier for this connection.
     fn id(&self) -> Self::Id;
-    
+
     /// Returns a reference to the transport as `Any` for downcasting.
     fn as_any(&self) -> &dyn Any;
-    
+
     /// Returns a mutable reference to the transport as `Any`.
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
@@ -28,7 +28,13 @@ pub trait Transport: Send + Sync + 'static {
 /// Unit type transport for protocols that don't need connection state.
 impl Transport for () {
     type Id = i128;
-    fn id(&self) -> i128 { 0 }
-    fn as_any(&self) -> &dyn Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn Any { self }
+    fn id(&self) -> i128 {
+        0
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
 }

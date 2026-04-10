@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use crate::connection::RequestContext;
 
-use super::middleware::{
-    AsyncFinalHandler, AsyncMiddleware, AsyncMiddlewareChain, BoxFuture,
-};
+use super::middleware::{AsyncFinalHandler, AsyncMiddleware, AsyncMiddlewareChain, BoxFuture};
 
 /// A route- or node-level executable binding.
 ///

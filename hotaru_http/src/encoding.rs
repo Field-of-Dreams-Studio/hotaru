@@ -47,7 +47,7 @@ pub enum TransferCoding {
     /// Chunked transfer encoding, where the message body is divided into a series
     /// of chunks, each with its own size indicator.
     Chunked,
-    
+
     /// Any other transfer encoding not explicitly defined in this enum.
     Other(Box<str>),
 }
@@ -115,19 +115,19 @@ impl TransferCoding {
 pub enum ContentCoding {
     /// gzip compression algorithm
     Gzip,
-    
+
     /// deflate compression algorithm
     Deflate,
-    
+
     /// compress compression algorithm
     Compress,
-    
+
     /// Brotli compression algorithm (represented as "br" in HTTP headers)
     Brotli,
-    
+
     /// Zstandard compression algorithm (represented as "zstd" in HTTP headers)
     Zstd,
-    
+
     /// Any other content coding not explicitly defined in this enum
     Other(Box<str>),
 }
@@ -193,7 +193,7 @@ impl ContentCoding {
             Self::Zstd => "zstd",
             Self::Other(s) => s,
         }
-    } 
+    }
 
     pub fn decode_compressed(encoding: &ContentCoding, data: &[u8]) -> std::io::Result<Vec<u8>> {
         match encoding {
@@ -207,7 +207,7 @@ impl ContentCoding {
             )),
             _ => Ok(data.to_vec()), // Identity or unsupported
         }
-    } 
+    }
 
     pub fn encode_compressed(encoding: &ContentCoding, data: &[u8]) -> std::io::Result<Vec<u8>> {
         match encoding {
@@ -221,7 +221,7 @@ impl ContentCoding {
             )),
             _ => Ok(data.to_vec()), // Identity or unsupported
         }
-    } 
+    }
 }
 
 /// A collection of transfer codings with validation according to HTTP standards.
@@ -291,13 +291,21 @@ impl TransferCodings {
     /// ```
     pub fn push(&mut self, coding: TransferCoding) -> Result<(), &'static str> {
         if matches!(coding, TransferCoding::Chunked) {
-            if self.codings.iter().any(|c| matches!(c, TransferCoding::Chunked)) {
+            if self
+                .codings
+                .iter()
+                .any(|c| matches!(c, TransferCoding::Chunked))
+            {
                 return Err("chunked can only appear once");
             }
-        } else if self.codings.last().is_some_and(|c| matches!(c, TransferCoding::Chunked)) {
+        } else if self
+            .codings
+            .last()
+            .is_some_and(|c| matches!(c, TransferCoding::Chunked))
+        {
             return Err("no coding can follow chunked");
         }
-        
+
         self.codings.push(coding);
         Ok(())
     }
@@ -320,7 +328,9 @@ impl TransferCodings {
     /// assert!(codings.is_chunked());
     /// ```
     pub fn is_chunked(&self) -> bool {
-        self.codings.iter().any(|c| matches!(c, TransferCoding::Chunked))
+        self.codings
+            .iter()
+            .any(|c| matches!(c, TransferCoding::Chunked))
     }
 
     /// Checks if identity transfer encoding is used (no transfer encoding).
@@ -458,20 +468,20 @@ impl ContentCodings {
             .map(|c| c.as_str())
             .collect::<Vec<_>>()
             .join(", ")
-    } 
+    }
 
-    /// Decodes compressed data using the content codings in this collection. 
-    /// 
-    /// # Arguments 
-    /// 
-    /// * `data` - The compressed data to decode 
-    /// 
-    /// # Returns 
-    /// 
-    /// A `Result` containing the decompressed data as a `Vec<u8>`, or an error if decoding fails. 
-    /// 
-    /// # Examples 
-    /// 
+    /// Decodes compressed data using the content codings in this collection.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The compressed data to decode
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the decompressed data as a `Vec<u8>`, or an error if decoding fails.
+    ///
+    /// # Examples
+    ///
     /// ```
     /// use hotaru_core::http::encoding::ContentCodings;
     /// let codings = ContentCodings::new();
@@ -490,18 +500,18 @@ impl ContentCodings {
             result = ContentCoding::decode_compressed(coding, &result)?;
         }
         Ok(result)
-    } 
+    }
 
-    /// Encodes data using the content codings in this collection. 
-    /// 
+    /// Encodes data using the content codings in this collection.
+    ///
     /// # Arguments
-    /// 
-    /// * `data` - The data to encode 
-    /// 
+    ///
+    /// * `data` - The data to encode
+    ///
     /// # Returns
-    /// 
+    ///
     /// A `Result` containing the encoded data as a `Vec<u8>`, or an error if encoding fails.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use hotaru_core::http::encoding::ContentCodings;
@@ -521,7 +531,7 @@ impl ContentCodings {
             result = ContentCoding::encode_compressed(coding, &result)?;
         }
         Ok(result)
-    } 
+    }
 }
 
 /// Combines HTTP transfer and content encodings into a single structure.
@@ -558,10 +568,7 @@ impl HttpEncoding {
     /// assert!(encoding.transfer().is_chunked());
     /// assert!(!encoding.content().is_identity());
     /// ```
-    pub fn from_headers(
-        transfer_header: Option<String>,
-        content_header: Option<String>,
-    ) -> Self {
+    pub fn from_headers(transfer_header: Option<String>, content_header: Option<String>) -> Self {
         let mut transfer = TransferCodings::new();
         let mut content = ContentCodings::new();
 
@@ -668,4 +675,4 @@ impl HttpEncoding {
     pub fn content(&self) -> &ContentCodings {
         &self.content
     }
-} 
+}

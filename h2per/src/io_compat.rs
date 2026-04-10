@@ -1,11 +1,11 @@
 //! IO compatibility layer between Hotaru's TcpConnectionStream and Hyper's requirements
 
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::io;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use hotaru_core::connection::{TcpConnectionStream, TcpReader, TcpWriter};
 use hyper::rt::{Read, Write};
+use std::io;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 /// Wrapper to make TcpConnectionStream compatible with Hyper's IO traits
 pub struct HyperIoCompat {
@@ -22,12 +22,11 @@ impl HyperIoCompat {
     pub fn new(stream: TcpConnectionStream) -> Self {
         Self { inner: stream }
     }
-    
+
     pub fn new_buffered(reader: TcpReader, writer: TcpWriter) -> BufferedHyperIoCompat {
         BufferedHyperIoCompat { reader, writer }
     }
 }
-
 
 // Implement tokio's AsyncRead
 impl AsyncRead for HyperIoCompat {
@@ -67,10 +66,8 @@ impl Read for HyperIoCompat {
         mut buf: hyper::rt::ReadBufCursor<'_>,
     ) -> Poll<io::Result<()>> {
         // Create a tokio ReadBuf from the hyper ReadBufCursor
-        let mut read_buf = unsafe {
-            ReadBuf::uninit(buf.as_mut())
-        };
-        
+        let mut read_buf = unsafe { ReadBuf::uninit(buf.as_mut()) };
+
         // Use our AsyncRead implementation
         match Pin::new(&mut self.inner).poll_read(cx, &mut read_buf) {
             Poll::Ready(Ok(())) => {
@@ -141,10 +138,8 @@ impl Read for BufferedHyperIoCompat {
         mut buf: hyper::rt::ReadBufCursor<'_>,
     ) -> Poll<io::Result<()>> {
         // Create a tokio ReadBuf from the hyper ReadBufCursor
-        let mut read_buf = unsafe {
-            ReadBuf::uninit(buf.as_mut())
-        };
-        
+        let mut read_buf = unsafe { ReadBuf::uninit(buf.as_mut()) };
+
         // Use our buffered reader
         match Pin::new(&mut self.reader).poll_read(cx, &mut read_buf) {
             Poll::Ready(Ok(())) => {

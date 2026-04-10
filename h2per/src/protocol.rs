@@ -1,25 +1,22 @@
 //! Hyper-based protocol implementations for HTTP/1, HTTP/2, and HTTP/3.
 
-use std::sync::Arc;
-use std::error::Error;
 use async_trait::async_trait;
 use hyper::server::conn::{http1, http2};
-use hyper_util::rt::{TokioIo, TokioExecutor};
+use hyper_util::rt::{TokioExecutor, TokioIo};
+use std::error::Error;
+use std::sync::Arc;
 
 use hotaru_core::{
     app::application::App,
-    connection::{
-        Protocol, Transport, Stream, Message,
-        ProtocolRole, TcpReader, TcpWriter,
-    },
+    connection::{Message, Protocol, ProtocolRole, Stream, TcpReader, TcpWriter, Transport},
 };
 
-use crate::transport::{HyperTransport, Http2Transport, Http3Transport};
-use crate::stream::{Http2Stream, Http3Stream};
-use crate::message::{Http1Message, Http2Message, Http3Message};
 use crate::context::HyperContext;
 use crate::io_compat::HyperIoCompat;
+use crate::message::{Http1Message, Http2Message, Http3Message};
 use crate::service::HotaruService;
+use crate::stream::{Http2Stream, Http3Stream};
+use crate::transport::{Http2Transport, Http3Transport, HyperTransport};
 
 // ============================================================================
 // HTTP/1.1 Protocol Implementation
@@ -44,10 +41,10 @@ impl HyperHttp1 {
 #[async_trait]
 impl Protocol for HyperHttp1 {
     type Transport = HyperTransport;
-    type Stream = ();  // HTTP/1.1 doesn't have multiplexed streams
+    type Stream = (); // HTTP/1.1 doesn't have multiplexed streams
     type Message = Http1Message;
     type Context = HyperContext;
-    
+
     fn detect(initial_bytes: &[u8]) -> bool {
         // Check for HTTP/1.x methods
         initial_bytes.starts_with(b"GET ") ||
@@ -62,11 +59,11 @@ impl Protocol for HyperHttp1 {
         // Check for HTTP/1.x response
         initial_bytes.starts_with(b"HTTP/1.")
     }
-    
+
     fn role(&self) -> ProtocolRole {
         self.role
     }
-    
+
     async fn handle(
         &mut self,
         reader: TcpReader,
@@ -80,19 +77,19 @@ impl Protocol for HyperHttp1 {
 
                 // Create the service that will handle HTTP requests
                 let service = HotaruService::<HyperHttp1>::new(app, self.role);
-                
+
                 // Build the HTTP/1.1 connection handler
                 let conn = http1::Builder::new()
                     // Support HTTP upgrades (e.g., WebSocket)
                     .serve_connection(io, service)
                     .with_upgrades();
-                
+
                 // Handle the connection until completion or error
                 if let Err(err) = conn.await {
                     eprintln!("HTTP/1.1 server error: {:?}", err);
                     return Err(Box::new(err));
                 }
-                
+
                 Ok(())
             }
             ProtocolRole::Client => {
@@ -130,7 +127,7 @@ impl Protocol for HyperHttp2 {
     type Stream = Http2Stream;
     type Message = Http2Message;
     type Context = HyperContext;
-    
+
     fn detect(initial_bytes: &[u8]) -> bool {
         // Check for HTTP/2 connection preface
         // "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -141,11 +138,11 @@ impl Protocol for HyperHttp2 {
          initial_bytes[0..3] == [0x00, 0x00, 0x00] && // Frame length
          initial_bytes[3] <= 0x0A) // Valid frame type (0x00-0x0A)
     }
-    
+
     fn role(&self) -> ProtocolRole {
         self.role
     }
-    
+
     async fn handle(
         &mut self,
         reader: TcpReader,
@@ -159,28 +156,28 @@ impl Protocol for HyperHttp2 {
 
                 // Create the service that will handle HTTP/2 requests
                 let service = HotaruService::<HyperHttp2>::new(app, self.role);
-                
+
                 // Build the HTTP/2 connection handler
                 let mut h2_builder = http2::Builder::new(TokioExecutor::new());
-                
+
                 // Configure HTTP/2 settings
                 h2_builder
                     .initial_stream_window_size(1024 * 1024)
                     .initial_connection_window_size(1024 * 1024)
                     .max_concurrent_streams(100);
-                
+
                 // Enable Extended CONNECT for WebSocket over HTTP/2
                 // Note: Extended CONNECT support in Hyper is still evolving
                 // This prepares for RFC 8441 support
-                
+
                 let conn = h2_builder.serve_connection(io, service);
-                
+
                 // Handle the connection until completion or error
                 if let Err(err) = conn.await {
                     eprintln!("HTTP/2 server error: {:?}", err);
                     return Err(Box::new(err));
                 }
-                
+
                 Ok(())
             }
             ProtocolRole::Client => {
@@ -218,18 +215,18 @@ impl Protocol for HyperHttp3 {
     type Stream = Http3Stream;
     type Message = Http3Message;
     type Context = HyperContext;
-    
+
     fn detect(initial_bytes: &[u8]) -> bool {
         // HTTP/3 runs over QUIC, not TCP
         // This would typically be detected at the transport layer
         // For now, return false as HTTP/3 detection needs QUIC transport
         false
     }
-    
+
     fn role(&self) -> ProtocolRole {
         self.role
     }
-    
+
     async fn handle(
         &mut self,
         _reader: TcpReader,
@@ -242,7 +239,7 @@ impl Protocol for HyperHttp3 {
         // 2. Need to integrate quinn or similar QUIC library
         // 3. Use h3 crate for HTTP/3 implementation
         // 4. Bridge QUIC streams to Hotaru handlers
-        
+
         unimplemented!("HTTP/3 requires QUIC transport, not TCP - implementation pending")
     }
 }

@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use crate::{
-    app::common::{builder::ClientRole, AppBuilder, OperationalConfig, RunMode, RuntimeConfig},
+    app::common::{AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole},
     connection::{Protocol, TransportSpec},
     url::{UrlError, UrlNode, UrlRoot},
-}; 
+};
 
-pub use registry::ProtocolRegistryKind; 
+pub use registry::ProtocolRegistryKind;
 
-pub mod registry; 
+pub mod registry;
 
 /// Outbound runtime for protocol-routed requests.
 ///
@@ -79,8 +79,8 @@ impl<TS: TransportSpec> Client<TS> {
         self.client.worker()
     }
 
-    /// Returns the configured maximum connection lifetime in seconds.
-    pub fn get_max_connection_time(self: &Arc<Self>) -> usize {
+    /// Returns the configured maximum connection lifetime setting.
+    pub fn get_max_connection_time(self: &Arc<Self>) -> TimeoutSetting {
         self.client.max_connection_time()
     }
 

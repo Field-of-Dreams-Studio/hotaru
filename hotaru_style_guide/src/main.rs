@@ -3,22 +3,18 @@
 // ============================================================================
 
 // Import Conventions - Always use prelude
-use hotaru::prelude::*;
 use hotaru::http::*;
-use htmstd::{Cors, CookieSession};
-use tokio::time::sleep;
+use hotaru::prelude::*;
+use htmstd::{CookieSession, Cors};
 use std::time::Duration;
+use tokio::time::sleep;
 
 // ============================================================================
 // Application Setup - Static APP Pattern
 // ============================================================================
 
 // Single protocol app
-pub static APP: SApp = Lazy::new(|| {
-    App::new()
-        .binding("127.0.0.1:3000")
-        .build()
-});
+pub static APP: SApp = Lazy::new(|| App::new().binding("127.0.0.1:3000").build());
 
 // Multi-protocol app example (commented out to avoid conflicts)
 // pub static MULTI_APP: SApp = Lazy::new(|| {
@@ -38,15 +34,15 @@ pub static APP: SApp = Lazy::new(|| {
 // ============================================================================
 mod endpoints;
 mod middleware;
-mod response_patterns;
 mod request_handling;
+mod response_patterns;
 mod security;
 
 // ============================================================================
 // Main Entry Point
 // ============================================================================
 
-#[tokio::main(worker_threads = 16)]  // Custom worker threads for I/O-heavy workloads
+#[tokio::main(worker_threads = 16)] // Custom worker threads for I/O-heavy workloads
 async fn main() {
     println!("=================================================");
     println!("     Hotaru Style Guide Example Server");
@@ -65,7 +61,7 @@ async fn main() {
     println!("  curl http://localhost:3000/user/123");
     println!("  curl -X POST http://localhost:3000/api/json -H 'Content-Type: application/json' -d '{{\"test\":\"data\"}}'");
     println!("=================================================\n");
-    
+
     APP.clone().run().await;
 }
 
@@ -75,7 +71,7 @@ async fn main() {
 
 endpoint! {
     APP.url("/"),
-    
+
     /// Home page endpoint
     pub index <HTTP> {
         html_response(r#"
@@ -110,7 +106,7 @@ endpoint! {
 // Anonymous endpoint example
 endpoint! {
     APP.url("/anonymous"),
-    
+
     _ <HTTP> {
         text_response("This is an anonymous endpoint")
     }
@@ -122,21 +118,21 @@ endpoint! {
 
 endpoint! {
     APP.url("/user/<int:id>"),
-    
+
     /// # Request
-    /// 
+    ///
     /// `GET /user/{id}`
-    /// 
+    ///
     /// # Response
-    /// 
+    ///
     /// `JSON { "id": 123, "name": "John Doe", "email": "john@example.com" }`
-    /// 
+    ///
     /// # Comments
-    /// 
+    ///
     /// Demonstrates URL pattern matching with typed parameters
     pub get_user <HTTP> {
         let id: String = req.pattern("id").unwrap_or("0".to_string());
-        
+
         json_response(object!({
             id: id.clone(),
             name: format!("User {}", id.clone()),
@@ -148,12 +144,12 @@ endpoint! {
 
 endpoint! {
     APP.url("/product/<category>/<int:id>"),
-    
+
     /// Pattern matching with multiple parameters
     pub get_product <HTTP> {
         let category: String = req.pattern("category").unwrap_or("unknown".to_string());
         let id: String = req.pattern("id").unwrap_or("0".to_string());
-        
+
         json_response(object!({
             product_id: id.clone(),
             category: category.clone(),
@@ -169,15 +165,15 @@ endpoint! {
 
 endpoint! {
     APP.url("/docs"),
-    
+
     /// # Request
-    /// 
+    ///
     /// `GET /docs`
-    /// 
+    ///
     /// # Response
-    /// 
+    ///
     /// Returns HTML documentation page
-    /// 
+    ///
     /// # Test Commands
     /// ```bash
     /// curl http://localhost:3000/docs
@@ -215,17 +211,17 @@ GET  /session       - Session counter
 
 endpoint! {
     APP.url("/async"),
-    
+
     /// Demonstrates async operations - automatically async
     pub async_example <HTTP> {
         // Simulate async work
         sleep(Duration::from_millis(100)).await;
-        
+
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         json_response(object!({
             message: "Async operation completed",
             duration_ms: 100,
@@ -236,18 +232,18 @@ endpoint! {
 
 endpoint! {
     APP.url("/blocking"),
-    
+
     /// Handling blocking operations properly
     pub blocking_example <HTTP> {
         use tokio::task;
-        
+
         // Spawn blocking operation
         let result = task::spawn_blocking(|| {
             // Simulate CPU-intensive work
             std::thread::sleep(Duration::from_millis(50));
             "Blocking operation completed"
         }).await.unwrap();
-        
+
         text_response(result)
     }
 }

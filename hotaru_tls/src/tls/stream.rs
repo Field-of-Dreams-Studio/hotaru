@@ -17,8 +17,12 @@ pub struct TlsMeta {
 }
 
 impl ConnMeta for TlsMeta {
-    fn local_addr(&self) -> Option<SocketAddr> { self.local }
-    fn remote_addr(&self) -> Option<SocketAddr> { self.remote }
+    fn local_addr(&self) -> Option<SocketAddr> {
+        self.local
+    }
+    fn remote_addr(&self) -> Option<SocketAddr> {
+        self.remote
+    }
 }
 
 // ============================================================================
@@ -49,7 +53,11 @@ impl AsyncRead for TlsStream {
 }
 
 impl AsyncWrite for TlsStream {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
         match self.get_mut() {
             TlsStream::Client(s) => Pin::new(s).poll_write(cx, buf),
             TlsStream::Server(s) => Pin::new(s).poll_write(cx, buf),

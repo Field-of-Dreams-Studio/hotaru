@@ -120,7 +120,9 @@ impl StepName {
     /// assert_eq!(names.iter().count(), 1);
     /// ```
     pub fn iter(&self) -> impl Iterator<Item = (&str, usize)> + '_ {
-        self.inner.iter().map(|(name, index)| (name.as_str(), *index))
+        self.inner
+            .iter()
+            .map(|(name, index)| (name.as_str(), *index))
     }
 }
 

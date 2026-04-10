@@ -56,10 +56,17 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let function_tokens: Vec<_> = tokens.collect();
 
     // Extract function name for generating unique static name
-    let fn_name = function_tokens.iter()
+    let fn_name = function_tokens
+        .iter()
         .skip_while(|t| !matches!(t, TokenTree::Ident(id) if id.to_string() == "fn"))
         .nth(1)
-        .and_then(|t| if let TokenTree::Ident(id) = t { Some(id.to_string()) } else { None })
+        .and_then(|t| {
+            if let TokenTree::Ident(id) = t {
+                Some(id.to_string())
+            } else {
+                None
+            }
+        })
         .unwrap_or_else(|| "unknown".to_string());
 
     let mut output = TokenStream::new();
@@ -79,7 +86,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 TokenTree::Ident(Ident::new("allow", Span::call_site())),
                 TokenTree::Group(Group::new(Delimiter::Parenthesis, {
                     let mut inner = TokenStream::new();
-                    inner.extend(vec![TokenTree::Ident(Ident::new("unsafe_code", Span::call_site()))]);
+                    inner.extend(vec![TokenTree::Ident(Ident::new(
+                        "unsafe_code",
+                        Span::call_site(),
+                    ))]);
                     inner
                 })),
             ]);
@@ -92,7 +102,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
         TokenTree::Punct(Punct::new('#', Spacing::Alone)),
         TokenTree::Group(Group::new(Delimiter::Bracket, {
             let mut attr = TokenStream::new();
-            attr.extend(vec![TokenTree::Ident(Ident::new("used", Span::call_site()))]);
+            attr.extend(vec![TokenTree::Ident(Ident::new(
+                "used",
+                Span::call_site(),
+            ))]);
             attr
         })),
     ]);
@@ -196,7 +209,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // static __CTOR_<name>: extern "C" fn() = { extern "C" fn __wrapper() { <fn_name>() }; __wrapper };
     static_decl.extend(vec![
         TokenTree::Ident(Ident::new("static", Span::call_site())),
-        TokenTree::Ident(Ident::new(&format!("__CTOR_{}", fn_name.to_uppercase()), Span::call_site())),
+        TokenTree::Ident(Ident::new(
+            &format!("__CTOR_{}", fn_name.to_uppercase()),
+            Span::call_site(),
+        )),
         TokenTree::Punct(Punct::new(':', Spacing::Alone)),
         TokenTree::Ident(Ident::new("extern", Span::call_site())),
         TokenTree::Literal(Literal::string("C")),
@@ -209,7 +225,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 TokenTree::Ident(Ident::new("extern", Span::call_site())),
                 TokenTree::Literal(Literal::string("C")),
                 TokenTree::Ident(Ident::new("fn", Span::call_site())),
-                TokenTree::Ident(Ident::new(&format!("__wrapper_{}", fn_name), Span::call_site())),
+                TokenTree::Ident(Ident::new(
+                    &format!("__wrapper_{}", fn_name),
+                    Span::call_site(),
+                )),
                 TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
                 TokenTree::Group(Group::new(Delimiter::Brace, {
                     let mut call = TokenStream::new();
@@ -220,7 +239,10 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     call
                 })),
                 TokenTree::Punct(Punct::new(';', Spacing::Alone)),
-                TokenTree::Ident(Ident::new(&format!("__wrapper_{}", fn_name), Span::call_site())),
+                TokenTree::Ident(Ident::new(
+                    &format!("__wrapper_{}", fn_name),
+                    Span::call_site(),
+                )),
             ]);
             inner
         })),
@@ -229,4 +251,4 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     output.extend(static_decl);
     output
-} 
+}

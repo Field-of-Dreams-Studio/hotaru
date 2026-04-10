@@ -1,11 +1,11 @@
-use hotaru::prelude::*;
 use hotaru::http::*;
+use hotaru::prelude::*;
 
 // Use the main APP and global middleware from main.rs
-use crate::{APP, GlobalLogger, GlobalMetrics};
+use crate::{GlobalLogger, GlobalMetrics, APP};
 
 // ============================================================================
-// Local Middleware 
+// Local Middleware
 // ============================================================================
 
 middleware! {
@@ -33,7 +33,7 @@ middleware! {
 endpoint! {
     APP.url("/test-global-first"),
     middleware = [.., LocalAuth],
-    
+
     /// Test: Global middleware first, then local
     pub test_global_first <HTTP> {
         println!("🎯 Handler: test_global_first executing");
@@ -44,7 +44,7 @@ endpoint! {
 endpoint! {
     APP.url("/test-local-first"),
     middleware = [LocalAuth, ..],
-    
+
     /// Test: Local middleware first, then global
     pub test_local_first <HTTP> {
         println!("🎯 Handler: test_local_first executing");
@@ -55,7 +55,7 @@ endpoint! {
 endpoint! {
     APP.url("/test-sandwich"),
     middleware = [LocalAuth, .., LocalCache],
-    
+
     /// Test: Local, then global, then local again
     pub test_sandwich <HTTP> {
         println!("🎯 Handler: test_sandwich executing");
@@ -66,7 +66,7 @@ endpoint! {
 endpoint! {
     APP.url("/test-only-global"),
     middleware = [..],
-    
+
     /// Test: Only inherited global middleware
     pub test_only_global <HTTP> {
         println!("🎯 Handler: test_only_global executing");
@@ -77,7 +77,7 @@ endpoint! {
 endpoint! {
     APP.url("/test-no-inheritance"),
     middleware = [LocalAuth, LocalCache],
-    
+
     /// Test: No inheritance, only local middleware
     pub test_no_inheritance <HTTP> {
         println!("🎯 Handler: test_no_inheritance executing");

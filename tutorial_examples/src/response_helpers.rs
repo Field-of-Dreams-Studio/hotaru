@@ -1,10 +1,10 @@
 //! Helper functions for creating HTTP responses
 //! These should eventually be in hotaru_core but are missing
 
-use hotaru_core::http::response::HttpResponse;
+use hotaru_core::Value;
 use hotaru_core::http::body::HttpBody;
 use hotaru_core::http::http_value::{HttpContentType, StatusCode};
-use hotaru_core::Value;
+use hotaru_core::http::response::HttpResponse;
 
 /// Create a text response
 pub fn text_response<S: Into<String>>(text: S) -> HttpResponse {

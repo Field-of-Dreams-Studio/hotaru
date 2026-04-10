@@ -3,9 +3,9 @@ use crate::http::safety::HttpSafety;
 
 use super::form::*;
 use super::http_value::*;
-use super::meta::HttpMeta; 
+use super::meta::HttpMeta;
 use akari::Value;
-use tokio::io::{AsyncBufRead, AsyncReadExt, AsyncBufReadExt};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt};
 
 static EMPTY: Vec<u8> = Vec::new();
 
@@ -22,41 +22,56 @@ pub enum HttpBody {
     Buffer {
         data: Vec<u8>,
         content_type: HttpContentType,
-        content_coding: ContentCodings, 
+        content_coding: ContentCodings,
     },
-} 
+}
 
-impl HttpBody { 
+impl HttpBody {
     pub async fn read_buffer<R: AsyncBufRead + Unpin>(
         buf_reader: &mut R,
         header: &mut HttpMeta,
         parse_config: &HttpSafety,
     ) -> std::io::Result<Self> {
-        Ok(Self::Buffer { 
-            data: Self::read_binary_info(buf_reader, header, parse_config).await?, 
-            content_type: header.get_content_type().unwrap_or(HttpContentType::from_str("")),
-            content_coding: header.get_encoding().map(|e| e.content().clone()).unwrap_or(ContentCodings::new()), 
-        }) 
-    } 
+        Ok(Self::Buffer {
+            data: Self::read_binary_info(buf_reader, header, parse_config).await?,
+            content_type: header
+                .get_content_type()
+                .unwrap_or(HttpContentType::from_str("")),
+            content_coding: header
+                .get_encoding()
+                .map(|e| e.content().clone())
+                .unwrap_or(ContentCodings::new()),
+        })
+    }
 
     /// Parse a Buffer variant into a more specific type based on content_type
     pub fn parse_buffer(self, safety: &HttpSafety) -> Self {
         match self {
-            Self::Buffer { data, content_type, content_coding } => { 
-                // Check whether the content length is within the safety limits 
+            Self::Buffer {
+                data,
+                content_type,
+                content_coding,
+            } => {
+                // Check whether the content length is within the safety limits
                 if !safety.check_body_size(data.len()) {
                     return Self::Unparsed; // Return Unparsed if size exceeds limits
-                } 
-                // Decode the content based on content coding 
-                let data = content_coding.decode_compressed(data).unwrap_or_else(|_| vec![]); 
+                }
+                // Decode the content based on content coding
+                let data = content_coding
+                    .decode_compressed(data)
+                    .unwrap_or_else(|_| vec![]);
                 match content_type {
                     HttpContentType::Application { subtype, .. } if subtype == "json" => {
                         Self::parse_json(data)
                     }
-                    HttpContentType::Text { subtype, .. } if subtype == "html" || subtype == "plain" => {
+                    HttpContentType::Text { subtype, .. }
+                        if subtype == "html" || subtype == "plain" =>
+                    {
                         Self::parse_text(data)
                     }
-                    HttpContentType::Application { subtype, .. } if subtype == "x-www-form-urlencoded" => {
+                    HttpContentType::Application { subtype, .. }
+                        if subtype == "x-www-form-urlencoded" =>
+                    {
                         Self::parse_form(data)
                     }
                     HttpContentType::Multipart { subtype, boundary } if subtype == "form-data" => {
@@ -68,19 +83,21 @@ impl HttpBody {
             // If already parsed or empty, just return as is
             _ => self,
         }
-    } 
+    }
 
     /// Parse the HTTP body directly from a TCP Stream
     pub async fn direct_parse<R: AsyncBufRead + Unpin>(
         buf_reader: &mut R,
         header: &mut HttpMeta,
         parse_config: &HttpSafety,
-    ) -> Self { 
+    ) -> Self {
         // Create a Buffer variant first
-        let buffer = Self::read_buffer(buf_reader, header, parse_config).await.unwrap_or(Self::Unparsed);
+        let buffer = Self::read_buffer(buf_reader, header, parse_config)
+            .await
+            .unwrap_or(Self::Unparsed);
 
         // Parse the buffer into a more specific type
-        buffer.parse_buffer(parse_config) 
+        buffer.parse_buffer(parse_config)
     }
 
     pub async fn read_binary_info<R: AsyncBufRead + Unpin>(
@@ -88,14 +105,14 @@ impl HttpBody {
         header: &mut HttpMeta,
         parse_config: &HttpSafety,
     ) -> std::io::Result<Vec<u8>> {
-
         /// Reads body with Content-Length
         async fn read_content_length_body<R: AsyncBufRead + Unpin>(
             buf_reader: &mut R,
             safety_setting: &HttpSafety,
             content_length: usize,
         ) -> std::io::Result<Vec<u8>> {
-            let effective_content_length = std::cmp::min(content_length, safety_setting.effective_body_size());
+            let effective_content_length =
+                std::cmp::min(content_length, safety_setting.effective_body_size());
             let mut body_buffer = vec![0; effective_content_length];
             buf_reader.read_exact(&mut body_buffer).await?;
             Ok(body_buffer)
@@ -188,13 +205,21 @@ impl HttpBody {
             }
 
             // Read trailing headers (if any)
-            header.append_from_request_stream(buf_reader, safety_setting, false).await.map_err(|_| std::io::Error::new(std::io::ErrorKind::NetworkUnreachable, "Error parsing headers"))?;
+            header
+                .append_from_request_stream(buf_reader, safety_setting, false)
+                .await
+                .map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::NetworkUnreachable,
+                        "Error parsing headers",
+                    )
+                })?;
 
             Ok(body_buffer)
-        } 
+        }
 
-        // Read raw body data 
-        let encoding = header.get_encoding().unwrap_or_default(); 
+        // Read raw body data
+        let encoding = header.get_encoding().unwrap_or_default();
         let raw_data = if encoding.transfer().is_chunked() {
             read_chunked_body(buf_reader, header, parse_config).await?
         } else {
@@ -203,7 +228,7 @@ impl HttpBody {
         };
 
         // Apply decompression based on Transfer-Encoding
-        let raw_data = encoding.content().decode_compressed(raw_data)?; 
+        let raw_data = encoding.content().decode_compressed(raw_data)?;
 
         Ok(raw_data)
     }
@@ -220,7 +245,7 @@ impl HttpBody {
                 }
                 if let None = meta.get_content_type() {
                     meta.set_content_type(HttpContentType::TextHtml());
-                } 
+                }
                 bin
             }
             Self::Binary(_) => {
@@ -283,12 +308,17 @@ impl HttpBody {
                 if let None = meta.get_content_length() {
                     meta.set_content_length(0);
                 }
-                EMPTY.to_vec() 
+                EMPTY.to_vec()
             }
-        }; 
-        let content_coding = meta.get_encoding().map(|e| e.content().clone()).unwrap_or(ContentCodings::new()); 
-        // If the content coding is not identity, we need to encode the binary data 
-        content_coding.encode_compressed(bin).unwrap_or_else(|_| vec![])  
+        };
+        let content_coding = meta
+            .get_encoding()
+            .map(|e| e.content().clone())
+            .unwrap_or(ContentCodings::new());
+        // If the content coding is not identity, we need to encode the binary data
+        content_coding
+            .encode_compressed(bin)
+            .unwrap_or_else(|_| vec![])
     }
 
     pub fn parse_json(body: Vec<u8>) -> Self {
@@ -333,7 +363,7 @@ impl HttpBody {
     pub fn raw(self) -> Vec<u8> {
         match self {
             Self::Binary(data) => data,
-            _ => EMPTY.to_vec(), 
+            _ => EMPTY.to_vec(),
         }
     }
 

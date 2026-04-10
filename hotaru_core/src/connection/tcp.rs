@@ -16,8 +16,12 @@ pub struct TcpMeta {
 }
 
 impl ConnMeta for TcpMeta {
-    fn local_addr(&self) -> Option<SocketAddr> { self.local }
-    fn remote_addr(&self) -> Option<SocketAddr> { self.remote }
+    fn local_addr(&self) -> Option<SocketAddr> {
+        self.local
+    }
+    fn remote_addr(&self) -> Option<SocketAddr> {
+        self.remote
+    }
 }
 
 impl ConnStream for TcpStream {
@@ -208,10 +212,7 @@ mod tests {
 
         let stream = TcpStream::connect(server_addr).await.unwrap();
 
-        assert_eq!(
-            ConnStream::peer_addr(&stream).unwrap(),
-            server_addr
-        );
+        assert_eq!(ConnStream::peer_addr(&stream).unwrap(), server_addr);
 
         let local = ConnStream::local_addr(&stream).unwrap();
         assert!(local.port() > 0); // Ephemeral port

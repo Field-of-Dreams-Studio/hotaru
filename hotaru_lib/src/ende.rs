@@ -4,9 +4,9 @@ pub mod aes {
         aead::{Aead, KeyInit},
     };
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-    use hkdf::Hkdf; 
+    use hkdf::Hkdf;
+    use rand::TryRngCore;
     use rand::rngs::OsRng;
-    use rand::TryRngCore; 
     use sha2::Sha256;
 
     pub struct EncryptedData {
@@ -26,7 +26,7 @@ pub mod aes {
     //     )
     //     .expect("PBKDF2 should not fail");
     //     key
-    // } 
+    // }
 
     pub fn derive_key(password: &str, salt: &[u8]) -> [u8; 32] {
         let mut key = [0u8; 32];
@@ -35,7 +35,7 @@ pub mod aes {
             .expand(info, &mut key)
             .unwrap();
         key
-    } 
+    }
 
     // Encrypt data with AES-256-GCM
     pub fn encrypt_struct(plaintext: &[u8], password: &str) -> Result<EncryptedData, String> {
@@ -68,15 +68,11 @@ pub mod aes {
     }
 
     pub fn encrypt(plaintext: &str, password: &str) -> Result<String, String> {
-        encrypt_struct(plaintext.as_bytes(), password)
-            .map(|data| serialize_encrypted_data(&data))
+        encrypt_struct(plaintext.as_bytes(), password).map(|data| serialize_encrypted_data(&data))
     }
 
     // Decrypt data with AES-256-GCM
-    pub fn decrypt_struct(
-        encrypted: &EncryptedData,
-        password: &str,
-    ) -> Result<Vec<u8>, String> {
+    pub fn decrypt_struct(encrypted: &EncryptedData, password: &str) -> Result<Vec<u8>, String> {
         // Derive the same key using the stored salt
         let key = derive_key(password, &encrypted.salt);
 
@@ -135,7 +131,7 @@ pub mod aes {
             salt,
             nonce,
             ciphertext,
-        }) 
+        })
     }
 }
 

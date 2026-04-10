@@ -80,7 +80,7 @@
 //     pub struct TcpStream;
 
 //     impl Stream for TcpStream {
-//         type Id = u32; 
+//         type Id = u32;
 
 //         fn id(&self) -> u32 {
 //             0
@@ -221,7 +221,7 @@
 
 //         fn name(&self) -> &'static str {
 //             "tcp_echo"
-//         } 
+//         }
 
 //         fn detect(initial_bytes: &[u8]) -> bool {
 //             // Check if it's NOT an HTTP request first
