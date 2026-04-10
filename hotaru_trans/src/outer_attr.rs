@@ -43,26 +43,18 @@ impl OuterAttr {
         } else {
             None
         }
-    } 
+    }
 
     pub fn get_inners<T: AsRef<str>>(
-        tokens: TokenStream, 
-        error: T
+        tokens: TokenStream,
+        error: T,
     ) -> Result<TokenStream, TokenStream> {
         let mut iter = tokens.into_iter().peekable();
         iter.next(); // consume ident 
         match iter.next() {
-            Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Parenthesis => {
-                Ok(g.stream())
-            }
-            Some(tt) => Err(generate_compile_error(
-                tt.span(),
-                error.as_ref(), 
-            )),
-            None => Err(generate_compile_error(
-                Span::call_site(),
-                error.as_ref(),
-            )),
+            Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Parenthesis => Ok(g.stream()),
+            Some(tt) => Err(generate_compile_error(tt.span(), error.as_ref())),
+            None => Err(generate_compile_error(Span::call_site(), error.as_ref())),
         }
     }
 
@@ -80,15 +72,11 @@ impl OuterAttr {
             ]);
         }
         tokens
-    } 
+    }
 
-    /// FIXME : Reform an inner attribute (e.g., `#![attr]`) into a TokenStream. 
-    /// Check whetger this is correct 
-    fn reform_inner_attr(
-        &self, 
-        name: Ident, 
-        value: TokenStream 
-    ) -> TokenStream {
+    /// FIXME : Reform an inner attribute (e.g., `#![attr]`) into a TokenStream.
+    /// Check whetger this is correct
+    fn reform_inner_attr(&self, name: Ident, value: TokenStream) -> TokenStream {
         let mut tokens = TokenStream::new();
 
         let mut attr_group = Group::new(Delimiter::Bracket, {
@@ -110,8 +98,8 @@ impl OuterAttr {
             TokenTree::Group(attr_group),
         ]);
 
-        tokens 
-    } 
+        tokens
+    }
 }
 
 /// Parses outer attributes (e.g., `#[attr]`) from the start of the token stream.
@@ -356,5 +344,4 @@ fn split_top_level_until_comma(input: TokenStream) -> Vec<TokenStream> {
     }
     vec.push(next_stream);
     vec
-} 
-
+}

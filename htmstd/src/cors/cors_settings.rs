@@ -39,19 +39,19 @@ const DEFAULT_MAX_AGE: u64 = 86400;
 pub struct AppCorsSettings {
     /// Configure allowed request origins
     pub allowed_origins: AllowedOrigins,
-    
+
     /// Configure allowed HTTP methods
     pub allowed_methods: AllowedMethods,
-    
+
     /// Configure allowed HTTP headers
     pub allowed_headers: AllowedHeaders,
-    
+
     /// Enable including credentials (cookies, auth headers)
     /// - `None`: Unset (use default behavior)
     /// - `Some(true)`: Allow credentials
     /// - `Some(false)`: Explicitly disallow credentials
     pub allowed_credentials: Option<bool>,
-    
+
     /// Preflight response cache duration (seconds)
     /// - `None`: Unset (use default)
     /// - `Some(0)`: Disable caching
@@ -64,13 +64,13 @@ pub struct AppCorsSettings {
 pub enum AllowedOrigins {
     /// Not configured (use default behavior)
     Unset,
-    
+
     /// Explicitly deny all origins
     None,
-    
+
     /// Allow only specifically listed origins
     Some(HashSet<String>),
-    
+
     /// Allow any origin (use with caution)
     All,
 }
@@ -80,13 +80,13 @@ pub enum AllowedOrigins {
 pub enum AllowedMethods {
     /// Not configured (use default methods)
     Unset,
-    
+
     /// Explicitly deny all methods
     None,
-    
+
     /// Allow only specifically listed methods
     Some(HashSet<String>),
-    
+
     /// Allow any HTTP method
     All,
 }
@@ -96,13 +96,13 @@ pub enum AllowedMethods {
 pub enum AllowedHeaders {
     /// Not configured (use default headers)
     Unset,
-    
+
     /// Explicitly deny all headers
     None,
-    
+
     /// Allow only specifically listed headers
     Some(HashSet<String>),
-    
+
     /// Allow any HTTP header
     All,
 }
@@ -223,7 +223,7 @@ impl AllowedMethods {
     pub fn remove_all(&mut self) {
         *self = Self::None;
     }
-    
+
     /// Get effective methods (resolve Unset to defaults)
     fn effective_methods(&self) -> HashSet<String> {
         match self {
@@ -282,7 +282,7 @@ impl AllowedHeaders {
     pub fn remove_all(&mut self) {
         *self = Self::None;
     }
-    
+
     /// Get effective headers (resolve Unset to defaults)
     fn effective_headers(&self) -> HashSet<String> {
         match self {
@@ -297,32 +297,32 @@ impl AppCorsSettings {
     /// Create new CORS settings with unset defaults
     pub fn new() -> Self {
         Self::default()
-    } 
+    }
 
     pub fn allowed_origins(mut self, allowed_origins: AllowedOrigins) -> Self {
         self.allowed_origins = allowed_origins;
         self
-    } 
+    }
 
     pub fn allowed_methods(mut self, allowed_methods: AllowedMethods) -> Self {
         self.allowed_methods = allowed_methods;
         self
-    } 
-    
+    }
+
     pub fn allowed_headers(mut self, allowed_headers: AllowedHeaders) -> Self {
         self.allowed_headers = allowed_headers;
         self
-    } 
-    
+    }
+
     pub fn allowed_credentials(mut self, allowed_credentials: bool) -> Self {
         self.allowed_credentials = Some(allowed_credentials);
         self
-    } 
-    
+    }
+
     pub fn max_age(mut self, max_age: u64) -> Self {
         self.max_age = Some(max_age);
         self
-    } 
+    }
 
     /// Merge two CORS configurations
     ///
@@ -366,7 +366,7 @@ impl AppCorsSettings {
             max_age: other.max_age.or(self.max_age),
         }
     }
-    
+
     /// Generate CORS headers based on configuration
     ///
     /// # Arguments
@@ -377,7 +377,7 @@ impl AppCorsSettings {
     /// Vector of (header, value) pairs
     ///
     /// # Header Generation Rules
-    /// - `Access-Control-Allow-Origin`: 
+    /// - `Access-Control-Allow-Origin`:
     ///   - `All`: "*" (unless credentials allowed)
     ///   - `Some`: Specific origin if allowed
     /// - `Access-Control-Allow-Credentials`: Only if credentials allowed
@@ -387,7 +387,7 @@ impl AppCorsSettings {
     ///   - `Access-Control-Max-Age`: Cache duration
     pub fn write_headers(&self, origin: &str, is_preflight: bool) -> Vec<(String, String)> {
         let mut headers = Vec::new();
-        
+
         // Access-Control-Allow-Origin
         match &self.allowed_origins {
             AllowedOrigins::All => {
@@ -405,12 +405,12 @@ impl AppCorsSettings {
                 // If not explicitly allowed, don't set header (browser will block)
             }
         }
-        
+
         // Access-Control-Allow-Credentials
         if self.allowed_credentials == Some(true) {
             headers.push(("Access-Control-Allow-Credentials".into(), "true".into()));
         }
-        
+
         // Preflight-specific headers
         if is_preflight {
             // Access-Control-Allow-Methods
@@ -419,20 +419,20 @@ impl AppCorsSettings {
                 let methods_str = methods.into_iter().collect::<Vec<_>>().join(", ");
                 headers.push(("Access-Control-Allow-Methods".into(), methods_str));
             }
-            
+
             // Access-Control-Allow-Headers
             let header_names = self.allowed_headers.effective_headers();
             if !header_names.is_empty() {
                 let headers_str = header_names.into_iter().collect::<Vec<_>>().join(", ");
                 headers.push(("Access-Control-Allow-Headers".into(), headers_str));
             }
-            
+
             // Access-Control-Max-Age
             if let Some(age) = self.max_age.or(Some(DEFAULT_MAX_AGE)) {
                 headers.push(("Access-Control-Max-Age".into(), age.to_string()));
             }
         }
-        
+
         headers
     }
 }
@@ -451,8 +451,7 @@ impl Default for AppCorsSettings {
             max_age: None,
         }
     }
-} 
- 
+}
 
 #[cfg(test)]
 mod tests {
@@ -461,13 +460,15 @@ mod tests {
     #[test]
     fn test_merge_settings() {
         let base = AppCorsSettings {
-            allowed_origins: AllowedOrigins::Some(vec!["https://base.com".into()].into_iter().collect()),
+            allowed_origins: AllowedOrigins::Some(
+                vec!["https://base.com".into()].into_iter().collect(),
+            ),
             allowed_methods: AllowedMethods::Some(vec!["GET".into()].into_iter().collect()),
             allowed_headers: AllowedHeaders::Unset,
             allowed_credentials: Some(false),
             max_age: Some(300),
         };
-        
+
         let override_settings = AppCorsSettings {
             allowed_origins: AllowedOrigins::All,
             allowed_methods: AllowedMethods::Unset,
@@ -475,67 +476,87 @@ mod tests {
             allowed_credentials: None,
             max_age: Some(600),
         };
-        
+
         let merged = base.merge(&override_settings);
-        
+
         assert!(matches!(merged.allowed_origins, AllowedOrigins::All));
         assert!(matches!(merged.allowed_methods, AllowedMethods::Some(_)));
         assert!(matches!(merged.allowed_headers, AllowedHeaders::All));
         assert_eq!(merged.allowed_credentials, Some(false));
         assert_eq!(merged.max_age, Some(600));
     }
-    
+
     #[test]
     fn test_write_headers() {
         let settings = AppCorsSettings {
-            allowed_origins: AllowedOrigins::Some(vec!["https://trusted.com".into()].into_iter().collect()),
+            allowed_origins: AllowedOrigins::Some(
+                vec!["https://trusted.com".into()].into_iter().collect(),
+            ),
             allowed_methods: AllowedMethods::Unset,
             allowed_headers: AllowedHeaders::Unset,
             allowed_credentials: Some(true),
             max_age: None,
         };
-        
+
         // Simple request
         let headers = settings.write_headers("https://trusted.com", false);
         assert_eq!(headers.len(), 2);
-        assert!(headers.iter().any(|(k, v)| k == "Access-Control-Allow-Origin" && v == "https://trusted.com"));
-        assert!(headers.iter().any(|(k, v)| k == "Access-Control-Allow-Credentials" && v == "true"));
-        
+        assert!(
+            headers
+                .iter()
+                .any(|(k, v)| k == "Access-Control-Allow-Origin" && v == "https://trusted.com")
+        );
+        assert!(
+            headers
+                .iter()
+                .any(|(k, v)| k == "Access-Control-Allow-Credentials" && v == "true")
+        );
+
         // Preflight request
         let headers = settings.write_headers("https://trusted.com", true);
         assert_eq!(headers.len(), 5);
-        assert!(headers.iter().any(|(k, v)| k == "Access-Control-Allow-Methods"));
-        assert!(headers.iter().any(|(k, v)| k == "Access-Control-Allow-Headers"));
+        assert!(
+            headers
+                .iter()
+                .any(|(k, v)| k == "Access-Control-Allow-Methods")
+        );
+        assert!(
+            headers
+                .iter()
+                .any(|(k, v)| k == "Access-Control-Allow-Headers")
+        );
         assert!(headers.iter().any(|(k, v)| k == "Access-Control-Max-Age"));
     }
-    
+
     #[test]
     fn test_effective_values() {
         // Test Unset resolution to defaults
         let methods = AllowedMethods::Unset;
         assert!(methods.is_allowed("GET"));
         assert!(!methods.is_allowed("CUSTOM"));
-        
+
         let headers = AllowedHeaders::Unset;
         assert!(headers.is_allowed("Content-Type"));
         assert!(!headers.is_allowed("X-Custom"));
-        
+
         // Test effective methods/headers
         let settings = AppCorsSettings::default();
         let headers = settings.write_headers("https://any.com", true);
-        
-        let methods_header = headers.iter()
+
+        let methods_header = headers
+            .iter()
             .find(|(k, _)| k == "Access-Control-Allow-Methods")
             .map(|(_, v)| v)
             .unwrap();
-        
+
         assert!(DEFAULT_METHODS.iter().all(|m| methods_header.contains(m)));
-        
-        let headers_header = headers.iter()
+
+        let headers_header = headers
+            .iter()
             .find(|(k, _)| k == "Access-Control-Allow-Headers")
             .map(|(_, v)| v)
             .unwrap();
-        
+
         assert!(DEFAULT_HEADERS.iter().all(|h| headers_header.contains(h)));
     }
-} 
+}

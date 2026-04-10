@@ -1,9 +1,9 @@
 //! Transport implementations for different HTTP versions.
 
-use std::any::Any;
-use std::sync::{Arc, RwLock};
-use std::collections::HashMap;
 use hotaru_core::connection::Transport;
+use std::any::Any;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 // ============================================================================
 // Unified Hyper Transport for HTTP/1.1
@@ -34,12 +34,12 @@ impl HyperTransport {
             request_count: 0,
         }
     }
-    
+
     /// Convert this HTTP/1.1 transport for WebSocket upgrade
     pub fn into_websocket_transport(self) -> crate::websocket::WebSocketTransport {
         crate::websocket::WebSocketTransport::from_http1(self.connection_id)
     }
-    
+
     /// Get the connection ID for protocol switching
     pub fn connection_id(&self) -> i128 {
         self.connection_id
@@ -50,11 +50,11 @@ impl Transport for HyperTransport {
     fn id(&self) -> i128 {
         self.connection_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -123,34 +123,40 @@ impl Http2Transport {
             next_stream_id: Arc::new(RwLock::new(1)),
         }
     }
-    
+
     pub fn create_stream(&self) -> u32 {
         let mut next_id = self.next_stream_id.write().unwrap();
         let stream_id = *next_id;
         *next_id += 2; // HTTP/2 uses odd numbers for client, even for server
-        
+
         let mut streams = self.streams.write().unwrap();
-        streams.insert(stream_id, StreamState {
-            id: stream_id,
-            state: StreamLifecycleState::Open,
-            window_size: self.local_settings.initial_window_size as i32,
-        });
-        
+        streams.insert(
+            stream_id,
+            StreamState {
+                id: stream_id,
+                state: StreamLifecycleState::Open,
+                window_size: self.local_settings.initial_window_size as i32,
+            },
+        );
+
         stream_id
     }
-    
+
     /// Convert a specific HTTP/2 stream for WebSocket upgrade
-    pub fn upgrade_stream_to_websocket(&self, stream_id: u32) -> crate::websocket::WebSocketTransport {
+    pub fn upgrade_stream_to_websocket(
+        &self,
+        stream_id: u32,
+    ) -> crate::websocket::WebSocketTransport {
         // Mark the stream as upgraded in our state
         if let Ok(mut streams) = self.streams.write() {
             if let Some(stream) = streams.get_mut(&stream_id) {
                 stream.state = StreamLifecycleState::Upgraded;
             }
         }
-        
+
         crate::websocket::WebSocketTransport::from_http2_stream(self.connection_id, stream_id)
     }
-    
+
     /// Get the connection ID for protocol switching
     pub fn connection_id(&self) -> i128 {
         self.connection_id
@@ -161,11 +167,11 @@ impl Transport for Http2Transport {
     fn id(&self) -> i128 {
         self.connection_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -228,11 +234,11 @@ impl Transport for Http3Transport {
     fn id(&self) -> i128 {
         self.connection_id
     }
-    
+
     fn as_any(&self) -> &dyn Any {
         self
     }
-    
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }

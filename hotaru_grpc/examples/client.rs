@@ -4,7 +4,7 @@
 
 use tonic::Request;
 
-// Generated protobuf types  
+// Generated protobuf types
 include!(concat!(env!("OUT_DIR"), "/helloworld.rs"));
 
 #[tokio::main]

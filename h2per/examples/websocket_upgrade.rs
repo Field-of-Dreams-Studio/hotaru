@@ -3,16 +3,16 @@
 //! This example shows how to upgrade from HTTP/1.1 to WebSocket protocol.
 //! Note: Protocol switching in Hotaru happens at the connection level.
 
+use h2per::websocket::{WebSocketProtocol, build_websocket_response, is_websocket_upgrade};
+use h2per::{HYPER1, StatusCode};
 use hotaru_core::{
     app::application::{App, AppBuilder},
     app::protocol::{HandlerBuilder, ProtocolBuilder},
-    connection::{ProtocolRole, Protocol, RequestContext},
+    connection::{Protocol, ProtocolRole, RequestContext},
 };
 use hotaru_meta::*;
-use h2per::{HYPER1, StatusCode};
-use h2per::websocket::{WebSocketProtocol, is_websocket_upgrade, build_websocket_response};
-use serde_json::json;
 use once_cell::sync::Lazy;
+use serde_json::json;
 use std::sync::Arc;
 
 // Create the app with both HTTP and WebSocket protocols
@@ -23,8 +23,10 @@ pub static APP: Lazy<Arc<App>> = Lazy::new(|| {
             HandlerBuilder::new()
                 // Register HTTP/1.1 protocol
                 .protocol(ProtocolBuilder::new(HYPER1::new(ProtocolRole::Server)))
-                // Register WebSocket protocol 
-                .protocol(ProtocolBuilder::new(WebSocketProtocol::new(ProtocolRole::Server)))
+                // Register WebSocket protocol
+                .protocol(ProtocolBuilder::new(WebSocketProtocol::new(
+                    ProtocolRole::Server,
+                ))),
         )
         .build()
 });
@@ -43,7 +45,7 @@ async fn main() {
 
 endpoint! {
     APP.url("/"),
-    
+
     /// Root page with WebSocket test interface
     pub index <HYPER1> {
         let html = r#"
@@ -167,29 +169,29 @@ endpoint! {
 </body>
 </html>
         "#;
-        
+
         req.response_mut().html(html.to_string());
     }
 }
 
 endpoint! {
     APP.url("/ws"),
-    
+
     /// WebSocket endpoint - handles the upgrade
     pub websocket <HYPER1> {
         // Check if this is a WebSocket upgrade request
         if is_websocket_upgrade(&req.request().inner) {
             println!("🔄 WebSocket upgrade requested!");
-            
+
             // Build the 101 Switching Protocols response
             match build_websocket_response(&req.request().inner) {
                 Ok(response) => {
                     // Set our response to the switching protocols response
                     req.response_mut().inner = response;
-                    
+
                     // Use the new switch_to_ws convenience method
                     req.switch_to_ws();
-                    
+
                     println!("✅ Sent 101 Switching Protocols response");
                     println!("🚀 Protocol switch to WebSocket initiated");
                 }
@@ -217,7 +219,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/api/status"),
-    
+
     /// API endpoint to check server status
     pub status <HYPER1> {
         req.response_mut().json(json!({

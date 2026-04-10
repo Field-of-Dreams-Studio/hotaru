@@ -7,12 +7,12 @@ use crate::{
     connection::{ConnStream, Protocol, TransportSpec},
     debug_log,
     executable::{
+        ExecutableBinding,
         entry::{ProtocolEntry, ProtocolEntryTrait},
         middleware::{AsyncMiddleware, AsyncMiddlewareChain},
-        ExecutableBinding,
     },
     extensions::ParamsClone,
-    url::{UrlError, UrlNode, UrlRoot},
+    url::{UrlError, UrlRegistration, UrlRoot},
 };
 
 pub mod builder;
@@ -26,7 +26,9 @@ pub struct ProtocolEntryRegistry<TS: TransportSpec> {
 
 impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
     pub fn new() -> Self {
-        Self { handlers: Vec::new() }
+        Self {
+            handlers: Vec::new(),
+        }
     }
 
     /// Register a protocol entry.
@@ -85,7 +87,9 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         }
     }
 
-    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(&self) -> Option<Arc<UrlRoot<P::Context, TS>>> {
+    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+        &self,
+    ) -> Option<Arc<UrlRoot<P::Context, TS>>> {
         for handler in &self.handlers {
             if let Some(ph) = handler.as_any().downcast_ref::<ProtocolEntry<P, TS>>() {
                 return Some(ph.root_handler.clone());
@@ -99,12 +103,11 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         url: T,
         executable: ExecutableBinding<P::Context>,
         config: ParamsClone,
-    ) -> Result<Arc<UrlNode<P::Context, TS>>, UrlError> {
+    ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
         let url = url.into();
-        match self.url::<P>().map(|root| root.clone().literal_url(&url, executable, config)) {
-            Some(Ok(url)) => Ok(url),
-            Some(Err(e)) => Err(e),
-            None => Err(UrlError::InvalidPath(url)),
+        match self.url::<P>().map(|root| root.literal_url(&url, executable, config)) {
+            Some(result) => result,
+            None => Err(UrlError::ProtocolNotFound),
         }
     }
 
@@ -113,15 +116,11 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         pattern: T,
         executable: ExecutableBinding<P::Context>,
         config: ParamsClone,
-    ) -> Result<Arc<UrlNode<P::Context, TS>>, UrlError> {
+    ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
         let pattern = pattern.into();
-        match self
-            .url::<P>()
-            .map(|root| root.clone().sub_url(&pattern, executable, config))
-        {
-            Some(Ok(url)) => Ok(url),
-            Some(Err(e)) => Err(e),
-            None => Err(UrlError::InvalidPath(pattern)),
+        match self.url::<P>().map(|root| root.sub_url(&pattern, executable, config)) {
+            Some(result) => result,
+            None => Err(UrlError::ProtocolNotFound),
         }
     }
 

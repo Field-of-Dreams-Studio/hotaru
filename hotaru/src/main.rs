@@ -1,9 +1,9 @@
 use std::env;
-use std::fs; 
-use std::path::Path; 
+use std::fs;
+use std::path::Path;
 use std::process::{Command, exit};
 
-static VERSION: &str = env!("CARGO_PKG_VERSION"); 
+static VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Launches a cargo command with the given command name and arguments.
 /// Returns the exit status.
@@ -20,7 +20,7 @@ fn run_cargo(cmd: &str, args: &[String]) -> i32 {
         exit(status.code().unwrap_or(1));
     }
     status.code().unwrap_or(0)
-} 
+}
 
 /// Initialize hotaru in an existing Cargo project.
 /// This function creates templates and programfiles directories,
@@ -32,7 +32,7 @@ fn init_project() {
         eprintln!("Please run 'hotaru init' inside an existing Cargo project.");
         exit(1);
     }
-    
+
     // Create templates directory
     let templates_path = Path::new("templates");
     if !templates_path.exists() {
@@ -44,7 +44,7 @@ fn init_project() {
     } else {
         println!("Templates directory already exists");
     }
-    
+
     // Create programfiles directory
     let programfiles_path = Path::new("programfiles");
     if !programfiles_path.exists() {
@@ -56,7 +56,7 @@ fn init_project() {
     } else {
         println!("Programfiles directory already exists");
     }
-    
+
     // Create build.rs
     let build_path = Path::new("build.rs");
     if !build_path.exists() {
@@ -68,7 +68,7 @@ fn init_project() {
     } else {
         println!("build.rs already exists");
     }
-    
+
     println!("\nHotaru has been initialized in this project!");
     println!("Make sure to add the following to your Cargo.toml:");
     println!("\n[package]");
@@ -94,7 +94,7 @@ fn create_new_project(app_name: &str) {
         });
     if !status.success() {
         exit(status.code().unwrap_or(1));
-    } 
+    }
 
     // Write the new main.rs to the src directory of the new project.
     let src_path = Path::new(app_name).join("src").join("main.rs");
@@ -102,7 +102,7 @@ fn create_new_project(app_name: &str) {
         eprintln!("Failed to write to {}: {}", src_path.display(), e);
         exit(1);
     });
-    println!("Created new main.rs at {}", src_path.display()); 
+    println!("Created new main.rs at {}", src_path.display());
 
     // Write the build.rs to the src directory of the new project.
     let src_path = Path::new(app_name).join("build.rs");
@@ -124,21 +124,24 @@ build = "build.rs"
 
 [dependencies]
 hotaru = "{VERSION}"
-{DEPS}"#, 
-    );  
+{DEPS}"#,
+    );
     fs::write(&cargo_toml_path, cargo_toml_cont).unwrap_or_else(|e| {
         eprintln!("Failed to write to {}: {}", src_path.display(), e);
         exit(1);
-    }); 
-    println!("Updated Cargo.toml with extra dependencies and build script."); 
+    });
+    println!("Updated Cargo.toml with extra dependencies and build script.");
 
     // Create a new templates directory at the same level as src.
     let templates_path = Path::new(app_name).join("templates");
     if let Err(e) = fs::create_dir_all(&templates_path) {
         eprintln!("Failed to create templates directory: {}", e);
         exit(1);
-    } 
-    println!("Created templates directory at {}", templates_path.display()); 
+    }
+    println!(
+        "Created templates directory at {}",
+        templates_path.display()
+    );
 
     // Create a new program files directory at the same level as src.
     let programfiles_path = Path::new(app_name).join("programfiles");
@@ -146,42 +149,45 @@ hotaru = "{VERSION}"
         eprintln!("Failed to create programfiles directory: {}", e);
         exit(1);
     }
-    println!("Created programfiles directory at {}", programfiles_path.display());
-} 
+    println!(
+        "Created programfiles directory at {}",
+        programfiles_path.display()
+    );
+}
 
 /// Main entry point for the CLI launcher.
-/// 
+///
 /// # Commands
-/// 
+///
 /// - `build`: Runs `cargo build` with any extra arguments, then copies templates.
 /// - `run`: Runs `cargo run` with any extra arguments.
 /// - `release`: Runs `cargo build --release` with any extra arguments, then copies templates.
 /// - `new <app_name>`: Creates a new project with the given name, writes a default `main.rs`
 ///   with Starberry code, updates `Cargo.toml` with dependencies, and creates a new templates directory.
 /// - `init`: Initialize hotaru in an existing Cargo project.
-/// 
+///
 /// # Example Usage
-/// 
+///
 /// Build a project:
-/// 
+///
 /// ```bash
 /// hotaru build --verbose
 /// ```
-/// 
+///
 /// Run a project:
-/// 
+///
 /// ```bash
 /// hotaru run
 /// ```
-/// 
+///
 /// Build a release version:
-/// 
+///
 /// ```bash
 /// hotaru release --release
 /// ```
-/// 
+///
 /// Create a new project called `my_app`:
-/// 
+///
 /// ```bash
 /// hotaru new my_app
 /// ```
@@ -190,39 +196,41 @@ fn main() {
     let mut args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() {
         eprintln!("Usage: hotaru <command> [arguments]");
-        eprintln!(r#"Usage: hotaru <build|run|release|new|init|version> [arguments]
+        eprintln!(
+            r#"Usage: hotaru <build|run|release|new|init|version> [arguments]
 - `new <app_name>`: Creates a new project with the given name, a hello world program is provided by default. Dependencies are added to the Cargo.toml file. A templates directory is created at the same level as src.
 - `init`: Initialize hotaru in an existing Cargo project. Creates templates/programfiles directories and build.rs.
 - `build [arguments]`: Build the Starberry project (Do not use cargo build since it does not copies template). Any other extra arguments are passed to `cargo build`. 
 - `run`: Runs the hotaru project. 
 - `release`: Build the Starberry project in release mode (Do not use cargo build --release since it does not copies template). Any other extra arguments are passed to `cargo build`.  
 - `version`: Prints the version of Starberry. 
-"#);
+"#
+        );
         exit(1);
     }
-    
+
     // Extract the command.
     let command = args.remove(0);
-    
+
     match command.as_str() {
         "build" => {
             // Run cargo build with remaining arguments.
-            let exit_code = run_cargo("build", &args); 
+            let exit_code = run_cargo("build", &args);
             exit(exit_code);
-        },
+        }
         "run" => {
             // Run cargo run with remaining arguments.
             let exit_code = run_cargo("run", &args);
-            exit(exit_code); 
-        },
+            exit(exit_code);
+        }
         "release" => {
             // Ensure that --release flag is passed.
             if !args.iter().any(|arg| arg == "--release") {
                 args.push("--release".to_string());
             }
-            let exit_code = run_cargo("build", &args); 
+            let exit_code = run_cargo("build", &args);
             exit(exit_code);
-        },
+        }
         "new" => {
             if args.is_empty() {
                 eprintln!("Usage: hotaru new <app_name>");
@@ -230,25 +238,27 @@ fn main() {
             }
             let app_name = &args[0];
             create_new_project(app_name);
-        },
+        }
         "init" => {
             init_project();
-        },
+        }
         "version" => {
-            println!("Starberry version: {}", VERSION); 
-            exit(0); 
-        }, 
+            println!("Starberry version: {}", VERSION);
+            exit(0);
+        }
         _ => {
             eprintln!("Unknown command: {}", command);
-            eprintln!(r#"Usage: hotaru <build|run|release|new|init|version> [arguments]
+            eprintln!(
+                r#"Usage: hotaru <build|run|release|new|init|version> [arguments]
 - `new <app_name>`: Creates a new project with the given name, a hello world program is provided by default. Dependencies are added to the Cargo.toml file. A templates directory is created at the same level as src.
 - `init`: Initialize hotaru in an existing Cargo project. Creates templates/programfiles directories and build.rs.
 - `build [arguments]`: Build the Starberry project (Do not use cargo build since it does not copies template). Any other extra arguments are passed to `cargo build`. 
 - `run`: Runs the hotaru project. 
 - `release`: Build the Starberry project in release mode (Do not use cargo build --release since it does not copies template). Any other extra arguments are passed to `cargo build`.  
 - `version`: Prints the version of Starberry. 
-"#);
-            exit(1); 
+"#
+            );
+            exit(1);
         }
     }
 }
@@ -271,12 +281,12 @@ endpoint!{
         text_response("Hello, world!")
     }
 }
-"#;  
+"#;
 
 const DEPS: &'static str = r#"ctor = "0.4.0"
 once_cell = "1.17"
 tokio = { version = "1", features = ["full"] }
-"#; 
+"#;
 
 const BUILD_RS: &'static str = r###"//! This file is introduced in hotaru since v0.6.3-rc2 
 //! Now hotaru run/build/release behaves the same as cargo run/build 
@@ -537,4 +547,4 @@ fn add_module_to_file(file_path: &Path) {
         }
     }
 } 
-"###; 
+"###;

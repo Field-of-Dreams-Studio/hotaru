@@ -2,12 +2,12 @@
 //!
 //! This module provides the bridge between tonic services and Hotaru's endpoint system.
 
-use std::sync::Arc;
-use tonic::{Status, Code};
 use h2per::HyperContext;
+use std::sync::Arc;
+use tonic::{Code, Status};
 
-use hotaru_core::app::application::App;
 use crate::context::GrpcContext;
+use hotaru_core::app::application::App;
 
 /// gRPC service wrapper that integrates with Hotaru's service system
 pub struct GrpcService {
@@ -18,11 +18,9 @@ pub struct GrpcService {
 impl GrpcService {
     /// Creates a new gRPC service wrapper
     pub fn new(name: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-        }
+        Self { name: name.into() }
     }
-    
+
     /// Handles incoming gRPC requests by converting them to GrpcContext
     pub async fn handle_request(
         &self,
@@ -31,23 +29,26 @@ impl GrpcService {
     ) -> Result<GrpcContext, Status> {
         // Convert HyperContext to GrpcContext
         let grpc_context = GrpcContext::from_hyper_context(hyper_context)?;
-        
+
         // Verify this is for our service
         if grpc_context.service != self.name {
             return Err(Status::new(
-                Code::NotFound, 
-                format!("Service {} not found", grpc_context.service)
+                Code::NotFound,
+                format!("Service {} not found", grpc_context.service),
             ));
         }
-        
+
         Ok(grpc_context)
     }
-    
+
     /// Creates a gRPC error response  
     /// Note: This is a placeholder - would need proper HyperContext initialization
     pub fn error_response(status: Status) -> Result<GrpcContext, Status> {
         // For now, return an error since we can't create HyperContext without a request
-        Err(Status::new(status.code(), "Cannot create error response without request context"))
+        Err(Status::new(
+            status.code(),
+            "Cannot create error response without request context",
+        ))
     }
 }
 

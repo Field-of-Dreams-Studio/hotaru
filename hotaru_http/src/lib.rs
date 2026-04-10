@@ -1,24 +1,22 @@
-pub use hotaru_core::{
-    app, connection, debug, extensions, url, object, TemplateManager, Value,
-};
-pub use hotaru_core::{debug_error, debug_log, debug_trace, debug_warn, debug_value};
+pub use hotaru_core::{TemplateManager, Value, app, connection, debug, extensions, object, url};
+pub use hotaru_core::{debug_error, debug_log, debug_trace, debug_value, debug_warn};
 
-pub mod request;
 pub mod body;
 pub mod context;
 pub mod cookie;
 pub mod encoding;
 pub mod form;
-pub mod meta;
 pub mod http_value;
-pub mod response;
+pub mod meta;
 pub mod net;
-pub mod start_line;
+pub mod request;
+pub mod response;
 pub mod safety;
-pub mod traits;  // Protocol trait implementations for HTTP/1.1
+pub mod start_line;
+pub mod traits; // Protocol trait implementations for HTTP/1.1
 
 #[cfg(test)]
-pub mod test;  // Security tests for HTTP parsing
+pub mod test; // Security tests for HTTP parsing
 
 /// Compatibility namespace so legacy `crate::http::...` imports keep working
 /// after moving HTTP into this standalone crate.
@@ -39,8 +37,7 @@ pub mod http {
 }
 
 pub use traits::{
-    DefaultHttpTransport, Http1Protocol, Http1TcpProtocol, HTTP, HttpTransport,
-    HttpMessage,
+    DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol, HttpMessage, HttpTransport,
 };
 #[cfg(feature = "tls")]
-pub use traits::{Http1TlsProtocol, HTTPS};
+pub use traits::{HTTPS, Http1TlsProtocol};

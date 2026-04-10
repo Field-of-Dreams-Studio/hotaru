@@ -1,12 +1,13 @@
-// pub mod segments; 
-pub mod parser; 
-pub mod pattern; 
-pub mod node;
-pub mod root;
+// pub mod segments;
 pub mod error;
+pub mod node;
+pub mod parser;
+pub mod pattern;
+pub mod root;
 
-// pub use self::segments::{Url, dangling_url}; 
-pub use self::root::UrlRoot;
-pub use self::node::{UrlNode, StepName, Children, ChildrenInner, LiteralChild, RegexChild};
+// pub use self::segments::{Url, dangling_url};
 pub use self::error::UrlError;
-pub use self::pattern::{PathPattern, path_pattern_creator::*}; 
+pub use self::node::{Children, ChildrenInner, LiteralChild, RegexChild, StepName, UrlNode};
+pub use self::pattern::{PathPattern, path_pattern_creator::*};
+pub use self::root::UrlRegistration;
+pub use self::root::UrlRoot;

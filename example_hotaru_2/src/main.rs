@@ -1,5 +1,5 @@
-use hotaru::prelude::*;
 use hotaru::http::*;
+use hotaru::prelude::*;
 
 // Global middleware for the app
 middleware! {
@@ -11,7 +11,7 @@ middleware! {
 }
 
 middleware! {
-    /// Global metrics middleware  
+    /// Global metrics middleware
     pub GlobalMetrics <HTTP> {
         println!("📊 GlobalMetrics: Tracking {}", req.path());
         next(req).await
@@ -26,18 +26,18 @@ pub static APP: SApp = Lazy::new(|| {
         .single_protocol(
             ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
                 .append_middleware::<GlobalLogger>()
-                .append_middleware::<GlobalMetrics>()
-        ) 
+                .append_middleware::<GlobalMetrics>(),
+        )
         .build()
 });
 
 // Import modules
 mod async_endpoints;
 mod forms;
+mod http_client;
 mod middleware_examples;
 mod middleware_inheritance;
 mod sessions;
-mod http_client;
 
 #[tokio::main(worker_threads = 16)]
 async fn main() {
@@ -51,7 +51,7 @@ async fn main() {
 
 endpoint! {
     APP.url("/"),
-    
+
     /// Basic index endpoint using home.html template
     pub index <HTTP> {
         akari_render!(
@@ -62,29 +62,29 @@ endpoint! {
             message = "Framework successfully running!",
             items = [
                 "Protocol Abstraction Layer",
-                "Async/await support", 
+                "Async/await support",
                 "Middleware system",
                 "Template rendering"
             ]
         )
     }
-} 
+}
 
-endpoint! { 
-    APP.url("/new_syntax/<arg>"), 
+endpoint! {
+    APP.url("/new_syntax/<arg>"),
     middleware: [..],
-    config: ["ConfigString"], 
+    config: ["ConfigString"],
 
-    /// Example endpoint using new syntax 
-    pub fn new_syntax_endpoint(context: HTTP) { 
-        let args = context.pattern("arg"); 
-        text_response(format!("New syntax endpoint called with arg: {}", args.unwrap_or_default())) 
+    /// Example endpoint using new syntax
+    pub fn new_syntax_endpoint(context: HTTP) {
+        let args = context.pattern("arg");
+        text_response(format!("New syntax endpoint called with arg: {}", args.unwrap_or_default()))
     }
 }
 
 endpoint! {
     APP.url("/form"),
-    
+
     /// Form page using form.html template
     pub form_page <HTTP> {
         if req.method() == POST {
@@ -108,7 +108,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/cookie"),
-    
+
     /// Cookie page using cookie.html template
     pub cookie_page <HTTP> {
         if req.method() == POST {
@@ -129,7 +129,7 @@ endpoint! {
             for (name, cookie) in cookies.0.iter() {
                 cookie_str.push_str(&format!("{}: {}\n", name, cookie.get_value()));
             }
-            
+
             akari_render!("cookie.html",
                 current_cookie = cookie_str
             )
@@ -139,7 +139,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/health"),
-    
+
     /// Health check endpoint
     pub health_check <HTTP> {
         json_response(object!({

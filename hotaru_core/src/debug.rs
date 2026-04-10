@@ -1,36 +1,36 @@
 //! Debug logging module for development-time diagnostics
-//! 
+//!
 //! This module provides conditional compilation macros that enable detailed logging
 //! during development while ensuring zero runtime overhead in production builds.
 //! All macros are controlled by the `dev-log` feature flag.
-//! 
+//!
 //! # Features
-//! 
+//!
 //! - **Zero-cost abstraction**: Completely removed when `dev-log` is disabled
 //! - **Multiple log levels**: debug, error, warn, and trace
 //! - **Value inspection**: Similar to `dbg!` but feature-gated
 //! - **Type-safe formatting**: All macros use standard Rust formatting
-//! 
+//!
 //! # Usage
-//! 
+//!
 //! Enable the feature in your Cargo.toml or via command line:
 //! ```bash
 //! cargo run --features "dev-log"
 //! ```
-//! 
+//!
 //! Then import and use the macros:
 //! ```rust
 //! use hotaru_core::{debug_log, debug_error};
-//! 
+//!
 //! debug_log!("Server started on port {}", 8080);
 //! debug_error!("Connection failed: {}", err);
 //! ```
 
 /// General-purpose debug logging macro
-/// 
+///
 /// Outputs informational messages prefixed with `[DEBUG]`.
 /// Use for general application state and flow information.
-/// 
+///
 /// # Examples
 /// ```rust
 /// use hotaru_core::debug_log;
@@ -52,10 +52,10 @@ macro_rules! debug_log {
 }
 
 /// Error logging macro for recoverable errors
-/// 
+///
 /// Outputs to stderr with `[ERROR]` prefix.
 /// Use for errors that don't terminate the application.
-/// 
+///
 /// # Examples
 /// ```rust
 /// use hotaru_core::debug_error;
@@ -77,10 +77,10 @@ macro_rules! debug_error {
 }
 
 /// Warning logging macro for potentially problematic conditions
-/// 
+///
 /// Outputs to stderr with `[WARN]` prefix.
 /// Use for deprecations, performance issues, or recoverable problems.
-/// 
+///
 /// # Examples
 /// ```rust
 /// use hotaru_core::debug_warn;
@@ -102,10 +102,10 @@ macro_rules! debug_warn {
 }
 
 /// Detailed trace logging for verbose debugging
-/// 
+///
 /// Outputs with `[TRACE]` prefix.
 /// Use for detailed execution flow and state transitions.
-/// 
+///
 /// # Examples
 /// ```rust
 /// use hotaru_core::debug_trace;
@@ -127,17 +127,17 @@ macro_rules! debug_trace {
 }
 
 /// Value inspection macro similar to `dbg!`
-/// 
+///
 /// Prints file location and expression values.
 /// Returns the value, making it usable in expressions.
-/// 
+///
 /// # Examples
 /// ```rust
 /// use hotaru_core::debug_value;
 /// let result = debug_value!(calculate());
 /// debug_value!(x, y, z);  // Multiple values
 /// ```
-/// 
+///
 /// # Output Format
 /// ```
 /// [src/main.rs:42] calculate() = 42

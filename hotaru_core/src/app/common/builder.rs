@@ -6,11 +6,11 @@ use crate::{
         server::{ProtocolRegistryKind as ServerProtocolRegistryKind, Server},
     },
     connection::{Protocol, TransportSpec},
-    executable::{registry::ProtocolEntryRegistry, ProtocolEntryBuilder, ProtocolRegistryBuilder},
+    executable::{ProtocolEntryBuilder, ProtocolRegistryBuilder, registry::ProtocolEntryRegistry},
     extensions::{Locals, Params},
 };
 
-use super::{OperationalConfig, RunMode, RuntimeConfig};
+use super::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
 
 pub struct ServerRole;
 pub struct ClientRole;
@@ -27,7 +27,7 @@ pub struct AppBuilder<R, TS: TransportSpec = crate::connection::tcp::TcpTranspor
     connector: Option<TS::Connector>,
     mode: Option<RunMode>,
     worker: Option<usize>,
-    max_connection_time: Option<usize>,
+    max_connection_time: Option<TimeoutSetting>,
     max_frame_process_time: Option<usize>,
     config: Params,
     statics: Locals,
@@ -80,7 +80,11 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
         mut self,
         builder: ProtocolEntryBuilder<P, TS>,
     ) -> Self {
-        self.registry = Some(ProtocolRegistryBuilder::<TS>::new().protocol(builder).build());
+        self.registry = Some(
+            ProtocolRegistryBuilder::<TS>::new()
+                .protocol(builder)
+                .build(),
+        );
         self
     }
 
@@ -94,7 +98,7 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
         self
     }
 
-    pub fn max_connection_time(mut self, max_connection_time: usize) -> Self {
+    pub fn max_connection_time(mut self, max_connection_time: TimeoutSetting) -> Self {
         self.max_connection_time = Some(max_connection_time);
         self
     }
@@ -127,7 +131,6 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
         self.config.set(value);
         self
     }
-
 }
 
 impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
@@ -147,7 +150,9 @@ impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
             .unwrap_or_else(|| String::from("127.0.0.1:3003"));
         let mode = self.mode.unwrap_or(RunMode::Development);
         let worker = self.worker.unwrap_or_else(num_cpus);
-        let max_connection_time = self.max_connection_time.unwrap_or(30);
+        let max_connection_time = self
+            .max_connection_time
+            .unwrap_or(TimeoutSetting::Inherit);
         let max_frame_process_time = self.max_frame_process_time.unwrap_or(5);
         let runtime = RuntimeConfig::from_parts(mode, self.config, self.statics);
         let server = OperationalConfig::from_server_parts(
@@ -165,7 +170,7 @@ impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
             server,
         });
 
-        app 
+        app
     }
 }
 
@@ -182,8 +187,13 @@ impl<TS: TransportSpec> AppBuilder<ClientRole, TS> {
             .expect("AppBuilder::connector(...) must be set for Client<TS>");
 
         let mode = self.mode.unwrap_or(RunMode::Development);
-        let connect_timeout = self.max_connection_time.unwrap_or(30);
-        let request_timeout = self.max_frame_process_time.unwrap_or(30);
+        let connect_timeout = self
+            .max_connection_time
+            .unwrap_or(TimeoutSetting::Seconds(30));
+        let request_timeout = self
+            .max_frame_process_time
+            .map(|n| TimeoutSetting::Seconds(n))
+            .unwrap_or(TimeoutSetting::Seconds(30));
         let runtime = Arc::new(RuntimeConfig::from_parts(mode, self.config, self.statics));
         let client = OperationalConfig::from_client_parts(connect_timeout, request_timeout);
 
@@ -203,5 +213,3 @@ fn num_cpus() -> usize {
         Err(_) => 1, // Fallback if we can't determine
     }
 }
- 
- 

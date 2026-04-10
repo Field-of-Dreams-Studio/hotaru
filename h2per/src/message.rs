@@ -1,11 +1,11 @@
 //! Message implementations for different HTTP versions using Hyper.
 
-use std::error::Error;
 use bytes::BytesMut;
 use hotaru_core::connection::Message;
-use hyper::{Request, Response, Version, Method, StatusCode};
 use http::{HeaderMap, HeaderName, HeaderValue};
 use http_body_util::Full;
+use hyper::{Method, Request, Response, StatusCode, Version};
+use std::error::Error;
 
 // ============================================================================
 // Base Hyper Message type
@@ -47,13 +47,9 @@ impl Message for Http1Message {
         match self {
             Http1Message::Request(req) => {
                 // Encode HTTP/1.1 request
-                let request_line = format!("{} {} {:?}\r\n", 
-                    req.method, 
-                    req.uri,
-                    req.version
-                );
+                let request_line = format!("{} {} {:?}\r\n", req.method, req.uri, req.version);
                 buf.extend_from_slice(request_line.as_bytes());
-                
+
                 // Encode headers
                 for (name, value) in &req.headers {
                     buf.extend_from_slice(name.as_str().as_bytes());
@@ -61,22 +57,23 @@ impl Message for Http1Message {
                     buf.extend_from_slice(value.as_bytes());
                     buf.extend_from_slice(b"\r\n");
                 }
-                
+
                 // End of headers
                 buf.extend_from_slice(b"\r\n");
-                
+
                 // Body
                 buf.extend_from_slice(&req.body);
             }
             Http1Message::Response(res) => {
                 // Encode HTTP/1.1 response
-                let status_line = format!("{:?} {} {}\r\n",
+                let status_line = format!(
+                    "{:?} {} {}\r\n",
                     res.version,
                     res.status.as_u16(),
                     res.status.canonical_reason().unwrap_or("")
                 );
                 buf.extend_from_slice(status_line.as_bytes());
-                
+
                 // Encode headers
                 for (name, value) in &res.headers {
                     buf.extend_from_slice(name.as_str().as_bytes());
@@ -84,36 +81,36 @@ impl Message for Http1Message {
                     buf.extend_from_slice(value.as_bytes());
                     buf.extend_from_slice(b"\r\n");
                 }
-                
+
                 // End of headers
                 buf.extend_from_slice(b"\r\n");
-                
+
                 // Body
                 buf.extend_from_slice(&res.body);
             }
         }
         Ok(())
     }
-    
+
     fn decode(buf: &mut BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>>
     where
-        Self: Sized
+        Self: Sized,
     {
         // Simple HTTP/1.1 parser - in production, use httparse crate
         let data = buf.as_ref();
-        
+
         // Look for end of headers
         if let Some(header_end) = find_subsequence(data, b"\r\n\r\n") {
             let header_bytes = &data[..header_end];
             let header_str = std::str::from_utf8(header_bytes)?;
             let lines: Vec<&str> = header_str.split("\r\n").collect();
-            
+
             if lines.is_empty() {
                 return Ok(None);
             }
-            
+
             let first_line = lines[0];
-            
+
             // Check if it's a request or response
             if first_line.starts_with("HTTP/") {
                 // Parse response
@@ -121,10 +118,10 @@ impl Message for Http1Message {
                 if parts.len() < 2 {
                     return Ok(None);
                 }
-                
+
                 let version = parse_version(parts[0])?;
                 let status = StatusCode::from_u16(parts[1].parse()?)?;
-                
+
                 let mut headers = HeaderMap::new();
                 for line in &lines[1..] {
                     if let Some(colon_pos) = line.find(':') {
@@ -132,16 +129,16 @@ impl Message for Http1Message {
                         let value = &line[colon_pos + 1..].trim();
                         headers.insert(
                             HeaderName::from_bytes(name.as_bytes())?,
-                            HeaderValue::from_str(value)?
+                            HeaderValue::from_str(value)?,
                         );
                     }
                 }
-                
+
                 // For now, consume all data as body
                 let body_start = header_end + 4;
                 let body = data[body_start..].to_vec();
                 let _ = buf.split_to(data.len());
-                
+
                 Ok(Some(Http1Message::Response(Http1Response {
                     version,
                     status,
@@ -154,11 +151,11 @@ impl Message for Http1Message {
                 if parts.len() < 3 {
                     return Ok(None);
                 }
-                
+
                 let method = Method::from_bytes(parts[0].as_bytes())?;
                 let uri = parts[1].to_string();
                 let version = parse_version(parts[2])?;
-                
+
                 let mut headers = HeaderMap::new();
                 for line in &lines[1..] {
                     if let Some(colon_pos) = line.find(':') {
@@ -166,16 +163,16 @@ impl Message for Http1Message {
                         let value = &line[colon_pos + 1..].trim();
                         headers.insert(
                             HeaderName::from_bytes(name.as_bytes())?,
-                            HeaderValue::from_str(value)?
+                            HeaderValue::from_str(value)?,
                         );
                     }
                 }
-                
+
                 // For now, consume all data as body
                 let body_start = header_end + 4;
                 let body = data[body_start..].to_vec();
                 let _ = buf.split_to(data.len());
-                
+
                 Ok(Some(Http1Message::Request(Http1Request {
                     method,
                     uri,
@@ -274,10 +271,10 @@ impl Message for Http2Message {
         // This will use the HTTP/2 frame format
         Ok(())
     }
-    
+
     fn decode(buf: &mut BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>>
     where
-        Self: Sized
+        Self: Sized,
     {
         // TODO: Implement HTTP/2 frame decoding
         // This will parse HTTP/2 frames
@@ -334,10 +331,10 @@ impl Message for Http3Message {
         // This will use the HTTP/3 frame format over QUIC
         Ok(())
     }
-    
+
     fn decode(buf: &mut BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>>
     where
-        Self: Sized
+        Self: Sized,
     {
         // TODO: Implement HTTP/3 frame decoding
         // This will parse HTTP/3 frames from QUIC streams
@@ -350,7 +347,8 @@ impl Message for Http3Message {
 // ============================================================================
 
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack.windows(needle.len())
+    haystack
+        .windows(needle.len())
         .position(|window| window == needle)
 }
 

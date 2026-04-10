@@ -6,13 +6,13 @@
 //! The current integration updates signatures/wiring so it works with
 //! `ConnStream` split halves while keeping existing HTTP/1.1 logic.
 
+use std::any::Any;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::{any::Any};
 
 use async_trait::async_trait;
 use bytes::BytesMut;
@@ -22,9 +22,7 @@ use tokio::net::TcpStream;
 
 use crate::{
     app::common::RuntimeConfig,
-    connection::{
-        ConnMeta, ConnStream, Message, Protocol, ProtocolRole, Transport, TransportSpec,
-    },
+    connection::{ConnMeta, ConnStream, Message, Protocol, ProtocolRole, Transport, TransportSpec},
     http::{
         context::HttpContext, request::HttpRequest, response::HttpResponse, safety::HttpSafety,
     },
@@ -92,10 +90,8 @@ pub struct HttpTransport {
 }
 
 /// Placeholder address for uninitialized connections.
-const UNSET_ADDR: SocketAddr = SocketAddr::new(
-    std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
-    0,
-);
+const UNSET_ADDR: SocketAddr =
+    SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)), 0);
 
 impl HttpTransport {
     /// Creates a new HTTP/1.1 transport with socket addresses.
@@ -220,7 +216,7 @@ impl Message for HttpMessage {
 
                 // Add body
                 buf.extend_from_slice(&body_bytes);
-                
+
                 Ok(())
             }
         }
@@ -538,7 +534,8 @@ mod tests {
         // Test request encoding
         let mut request = HttpRequest::default();
         request.meta = HttpMeta::new(Default::default(), Default::default());
-        request.meta
+        request
+            .meta
             .header
             .insert("Host".to_string(), "example.com".into());
 

@@ -1,32 +1,22 @@
-pub mod connection;
-pub mod error;
-pub mod test;
-pub mod stream;
 pub mod accepter;
+pub mod connection;
 pub mod connector;
-pub mod transport_spec;
+pub mod error;
+pub mod stream;
 pub mod tcp;
+pub mod test;
+pub mod transport_spec;
 
 pub use self::accepter::Accepter;
 pub use self::connector::Connector;
-pub use self::transport_spec::TransportSpec;
+pub use self::error::Result;
 pub use self::stream::{ConnMeta, ConnStream};
 pub use self::tcp::{TcpAccepter, TcpConnector, TcpConnectorAddr, TcpMeta, TcpTransport};
-pub use self::error::Result;
+pub use self::transport_spec::TransportSpec;
 
 // New protocol traits
 pub use crate::protocol::{
-    Protocol,
+    IoProtocolError, Message, Protocol, ProtocolError, ProtocolErrorBox, ProtocolErrorKind,
+    ProtocolIndex, ProtocolResult, ProtocolRole, RequestContext, StaticProtocolError, Stream,
     Transport,
-    Stream,
-    Message,
-    RequestContext,
-    ProtocolRole,
-    ProtocolIndex,
-    ProtocolError,
-    ProtocolErrorKind,
-    ProtocolErrorBox,
-    ProtocolResult,
-    IoProtocolError,
-    StaticProtocolError,
 };

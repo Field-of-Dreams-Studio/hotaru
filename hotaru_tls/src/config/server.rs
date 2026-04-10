@@ -5,10 +5,10 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::sync::Arc;
 
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls::{RootCertStore, ServerConfig};
 use rustls::crypto::ring::default_provider;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::server::WebPkiClientVerifier;
+use rustls::{RootCertStore, ServerConfig};
 
 /// TLS configuration for server-side connections.
 ///
@@ -104,12 +104,10 @@ impl TlsConfig {
 
         // Configure client authentication
         let server_config = match &self.client_auth {
-            ClientAuth::None => {
-                builder
-                    .with_no_client_auth()
-                    .with_single_cert(self.cert_chain.clone(), self.private_key.clone_key())
-                    .map_err(|e| TlsConfigError::InvalidCertificate(e.to_string()))?
-            }
+            ClientAuth::None => builder
+                .with_no_client_auth()
+                .with_single_cert(self.cert_chain.clone(), self.private_key.clone_key())
+                .map_err(|e| TlsConfigError::InvalidCertificate(e.to_string()))?,
             ClientAuth::Optional { root_certs } => {
                 let verifier = WebPkiClientVerifier::builder(root_certs.clone())
                     .allow_unauthenticated()
@@ -155,8 +153,7 @@ pub struct TlsConfigBuilder {
 impl TlsConfigBuilder {
     /// Load certificate chain from a PEM file.
     pub fn cert_chain_file(mut self, path: impl AsRef<Path>) -> Result<Self, TlsConfigError> {
-        let file = File::open(path.as_ref())
-            .map_err(|e| TlsConfigError::IoError(e))?;
+        let file = File::open(path.as_ref()).map_err(|e| TlsConfigError::IoError(e))?;
         let mut reader = BufReader::new(file);
 
         let certs = rustls_pemfile::certs(&mut reader)
@@ -164,7 +161,9 @@ impl TlsConfigBuilder {
             .map_err(|e| TlsConfigError::InvalidCertificate(e.to_string()))?;
 
         if certs.is_empty() {
-            return Err(TlsConfigError::InvalidCertificate("No certificates found in file".into()));
+            return Err(TlsConfigError::InvalidCertificate(
+                "No certificates found in file".into(),
+            ));
         }
 
         self.cert_chain = Some(certs);
@@ -178,7 +177,9 @@ impl TlsConfigBuilder {
             .map_err(|e| TlsConfigError::InvalidCertificate(e.to_string()))?;
 
         if certs.is_empty() {
-            return Err(TlsConfigError::InvalidCertificate("No certificates found".into()));
+            return Err(TlsConfigError::InvalidCertificate(
+                "No certificates found".into(),
+            ));
         }
 
         self.cert_chain = Some(certs);
@@ -187,8 +188,7 @@ impl TlsConfigBuilder {
 
     /// Load private key from a PEM file.
     pub fn private_key_file(mut self, path: impl AsRef<Path>) -> Result<Self, TlsConfigError> {
-        let file = File::open(path.as_ref())
-            .map_err(|e| TlsConfigError::IoError(e))?;
+        let file = File::open(path.as_ref()).map_err(|e| TlsConfigError::IoError(e))?;
         let mut reader = BufReader::new(file);
 
         let key = rustls_pemfile::private_key(&mut reader)
@@ -213,7 +213,10 @@ impl TlsConfigBuilder {
     ///
     /// # Arguments
     /// * `ca_certs_path` - Path to CA certificate(s) that will be trusted for client authentication
-    pub fn require_client_auth(mut self, ca_certs_path: impl AsRef<Path>) -> Result<Self, TlsConfigError> {
+    pub fn require_client_auth(
+        mut self,
+        ca_certs_path: impl AsRef<Path>,
+    ) -> Result<Self, TlsConfigError> {
         let root_certs = Self::load_root_certs(ca_certs_path)?;
         self.client_auth = Some(ClientAuth::Required { root_certs });
         Ok(self)
@@ -223,7 +226,10 @@ impl TlsConfigBuilder {
     ///
     /// Clients may present certificates, which will be verified against the provided CA,
     /// but they are not required to do so.
-    pub fn optional_client_auth(mut self, ca_certs_path: impl AsRef<Path>) -> Result<Self, TlsConfigError> {
+    pub fn optional_client_auth(
+        mut self,
+        ca_certs_path: impl AsRef<Path>,
+    ) -> Result<Self, TlsConfigError> {
         let root_certs = Self::load_root_certs(ca_certs_path)?;
         self.client_auth = Some(ClientAuth::Optional { root_certs });
         Ok(self)
@@ -247,9 +253,11 @@ impl TlsConfigBuilder {
 
     /// Build the TLS configuration.
     pub fn build(self) -> Result<TlsConfig, TlsConfigError> {
-        let cert_chain = self.cert_chain
+        let cert_chain = self
+            .cert_chain
             .ok_or_else(|| TlsConfigError::MissingField("certificate chain"))?;
-        let private_key = self.private_key
+        let private_key = self
+            .private_key
             .ok_or_else(|| TlsConfigError::MissingField("private key"))?;
 
         Ok(TlsConfig {
@@ -262,8 +270,7 @@ impl TlsConfigBuilder {
 
     /// Helper to load root certificates from a PEM file.
     fn load_root_certs(path: impl AsRef<Path>) -> Result<Arc<RootCertStore>, TlsConfigError> {
-        let file = File::open(path.as_ref())
-            .map_err(|e| TlsConfigError::IoError(e))?;
+        let file = File::open(path.as_ref()).map_err(|e| TlsConfigError::IoError(e))?;
         let mut reader = BufReader::new(file);
 
         let certs = rustls_pemfile::certs(&mut reader)
@@ -274,7 +281,9 @@ impl TlsConfigBuilder {
         let (added, _ignored) = root_store.add_parsable_certificates(certs);
 
         if added == 0 {
-            return Err(TlsConfigError::InvalidCertificate("No valid CA certificates found".into()));
+            return Err(TlsConfigError::InvalidCertificate(
+                "No valid CA certificates found".into(),
+            ));
         }
 
         Ok(Arc::new(root_store))

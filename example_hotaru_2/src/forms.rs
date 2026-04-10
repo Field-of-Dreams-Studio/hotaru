@@ -1,5 +1,5 @@
+use hotaru::http::*;
 use hotaru::prelude::*;
-use hotaru::http::*; 
 
 use crate::APP;
 
@@ -9,7 +9,7 @@ use crate::APP;
 
 endpoint! {
     APP.url("/form/url_encoded"),
-    
+
     /// Form URL-encoded data handling
     pub form_url_encoded <HTTP> {
         if req.method() == POST {
@@ -37,7 +37,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/form/multipart"),
-    
+
     /// Multipart form data handling (file uploads)
     pub form_multipart <HTTP> {
         if req.method() == POST {
@@ -64,7 +64,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/form/cookie"),
-    
+
     /// Cookie handling example
     pub form_cookie <HTTP> {
         if req.method() == POST {
@@ -88,7 +88,7 @@ endpoint! {
                     value: cookie.get_value()
                 }));
             }
-            
+
             akari_render!("forms/cookie.html",
                 title = "Cookie Test",
                 cookies = cookie_list
@@ -99,7 +99,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/form/json"),
-    
+
     /// JSON data handling
     pub form_json <HTTP> {
         if req.method() == POST {

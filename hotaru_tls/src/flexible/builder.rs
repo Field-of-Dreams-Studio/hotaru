@@ -1,17 +1,17 @@
 //! ConnectionBuilder — runtime TCP/TLS connection factory.
 
+use rustls::crypto::ring::default_provider;
+use rustls::{ClientConfig, RootCertStore, pki_types::ServerName};
+use rustls_pemfile::Item;
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
-use rustls_pemfile::Item;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
-use rustls::{ClientConfig, RootCertStore, pki_types::ServerName};
-use rustls::crypto::ring::default_provider;
 use webpki_roots::TLS_SERVER_ROOTS;
 
-use hotaru_core::debug_log;
 use hotaru_core::connection::error::{ConnectionError, Result};
+use hotaru_core::debug_log;
 
 use super::stream::TcpOrTlsStream;
 
@@ -34,13 +34,13 @@ pub enum Protocol {
 impl fmt::Display for Protocol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Postgres  => write!(f, "postgres"),
-            Self::MySQL     => write!(f, "mysql"),
-            Self::MongoDB   => write!(f, "mongodb"),
-            Self::Redis     => write!(f, "redis"),
-            Self::HTTP      => write!(f, "http"),
+            Self::Postgres => write!(f, "postgres"),
+            Self::MySQL => write!(f, "mysql"),
+            Self::MongoDB => write!(f, "mongodb"),
+            Self::Redis => write!(f, "redis"),
+            Self::HTTP => write!(f, "http"),
             Self::WebSocket => write!(f, "ws"),
-            Self::Custom    => write!(f, "custom"),
+            Self::Custom => write!(f, "custom"),
         }
     }
 }
@@ -105,12 +105,14 @@ impl ConnectionBuilder {
     pub fn protocol(mut self, protocol: Protocol) -> Self {
         self.protocol = protocol;
         match protocol {
-            Protocol::Postgres  if self.port == 0 => self.port = 5432,
-            Protocol::MySQL     if self.port == 0 => self.port = 3306,
-            Protocol::MongoDB   if self.port == 0 => self.port = 27017,
-            Protocol::Redis     if self.port == 0 => self.port = 6379,
-            Protocol::HTTP      if self.port == 0 => self.port = if self.use_tls { 443 } else { 80 },
-            Protocol::WebSocket if self.port == 0 => self.port = if self.use_tls { 443 } else { 80 },
+            Protocol::Postgres if self.port == 0 => self.port = 5432,
+            Protocol::MySQL if self.port == 0 => self.port = 3306,
+            Protocol::MongoDB if self.port == 0 => self.port = 27017,
+            Protocol::Redis if self.port == 0 => self.port = 6379,
+            Protocol::HTTP if self.port == 0 => self.port = if self.use_tls { 443 } else { 80 },
+            Protocol::WebSocket if self.port == 0 => {
+                self.port = if self.use_tls { 443 } else { 80 }
+            }
             _ => {}
         }
         self
@@ -170,7 +172,9 @@ impl ConnectionBuilder {
     pub fn root_certificate(mut self, path: impl AsRef<Path>) -> Result<Self> {
         let file = File::open(path.as_ref()).map_err(ConnectionError::IoError)?;
         let mut buf = Vec::new();
-        BufReader::new(file).read_to_end(&mut buf).map_err(ConnectionError::IoError)?;
+        BufReader::new(file)
+            .read_to_end(&mut buf)
+            .map_err(ConnectionError::IoError)?;
         self.root_cert_pem = Some(buf);
         Ok(self)
     }
@@ -184,13 +188,55 @@ impl ConnectionBuilder {
         };
 
         let scheme = match self.protocol {
-            Protocol::Postgres  => if self.use_tls { "postgresql+ssl" } else { "postgresql" },
-            Protocol::MySQL     => if self.use_tls { "mysql+ssl"       } else { "mysql"       },
-            Protocol::MongoDB   => if self.use_tls { "mongodb+ssl"     } else { "mongodb"     },
-            Protocol::Redis     => if self.use_tls { "redis+ssl"       } else { "redis"       },
-            Protocol::HTTP      => if self.use_tls { "https"           } else { "http"        },
-            Protocol::WebSocket => if self.use_tls { "wss"             } else { "ws"          },
-            Protocol::Custom    => if self.use_tls { "tls"             } else { "tcp"         },
+            Protocol::Postgres => {
+                if self.use_tls {
+                    "postgresql+ssl"
+                } else {
+                    "postgresql"
+                }
+            }
+            Protocol::MySQL => {
+                if self.use_tls {
+                    "mysql+ssl"
+                } else {
+                    "mysql"
+                }
+            }
+            Protocol::MongoDB => {
+                if self.use_tls {
+                    "mongodb+ssl"
+                } else {
+                    "mongodb"
+                }
+            }
+            Protocol::Redis => {
+                if self.use_tls {
+                    "redis+ssl"
+                } else {
+                    "redis"
+                }
+            }
+            Protocol::HTTP => {
+                if self.use_tls {
+                    "https"
+                } else {
+                    "http"
+                }
+            }
+            Protocol::WebSocket => {
+                if self.use_tls {
+                    "wss"
+                } else {
+                    "ws"
+                }
+            }
+            Protocol::Custom => {
+                if self.use_tls {
+                    "tls"
+                } else {
+                    "tcp"
+                }
+            }
         };
 
         let path_or_db = match self.protocol {
@@ -202,12 +248,17 @@ impl ConnectionBuilder {
         if !self.additional_params.is_empty() {
             params.push('?');
             for (i, (k, v)) in self.additional_params.iter().enumerate() {
-                if i > 0 { params.push('&'); }
+                if i > 0 {
+                    params.push('&');
+                }
                 params.push_str(&format!("{}={}", k, v));
             }
         }
 
-        format!("{}://{}{}:{}{}{}", scheme, auth_str, self.host, self.port, path_or_db, params)
+        format!(
+            "{}://{}{}:{}{}{}",
+            scheme, auth_str, self.host, self.port, path_or_db, params
+        )
     }
 
     /// Establish a connection with retry logic.
@@ -220,7 +271,9 @@ impl ConnectionBuilder {
                 Ok(conn) => return Ok(conn),
                 Err(e) => {
                     last_error = Some(e);
-                    if attempts == self.retry_attempts { break; }
+                    if attempts == self.retry_attempts {
+                        break;
+                    }
                     attempts += 1;
                     tokio::time::sleep(self.retry_delay).await;
                 }
@@ -232,11 +285,8 @@ impl ConnectionBuilder {
 
     async fn try_connect(&self) -> Result<TcpOrTlsStream> {
         let addr = format!("{}:{}", self.host, self.port);
-        let tcp = tokio::time::timeout(
-            self.max_connection_time,
-            TcpStream::connect(&addr),
-        )
-        .await??;
+        let tcp =
+            tokio::time::timeout(self.max_connection_time, TcpStream::connect(&addr)).await??;
 
         if !self.use_tls {
             return Ok(TcpOrTlsStream::Tcp(tcp));

@@ -1,9 +1,7 @@
-use crate::connection::error::ConnectionError;
-use crate::connection::{
-    ConnStream, Connector, ProtocolRole, RequestContext, TransportSpec,
-};
+use crate::app::common::{RunMode, RuntimeConfig};
 use crate::connection::connection::ConnectionStatus;
-use std::net::{IpAddr, SocketAddr};
+use crate::connection::error::ConnectionError;
+use crate::connection::{ConnStream, Connector, ProtocolRole, RequestContext, TransportSpec};
 use crate::debug_log;
 use crate::extensions::{Locals, Params};
 use crate::http::cookie::{Cookie, CookieMap};
@@ -16,11 +14,11 @@ use crate::http::{
     meta::HttpMeta,
     response::HttpResponse,
 };
-use crate::app::common::{RunMode, RuntimeConfig};
 use crate::url::UrlNode;
-use akari::Value; 
+use akari::Value;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::io::{AsyncBufRead, AsyncWrite, BufReader, BufWriter};
 
@@ -67,10 +65,8 @@ pub type HttpReqCtx<TS = crate::connection::tcp::TcpTransport> = HttpContext<TS>
 
 /// Placeholder address for uninitialized or unknown connections.
 /// `0.0.0.0:0` indicates that no socket address information is available.
-const UNSET_ADDR: SocketAddr = SocketAddr::new(
-    std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
-    0,
-);
+const UNSET_ADDR: SocketAddr =
+    SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)), 0);
 
 impl<TS: TransportSpec> HttpContext<TS> {
     /// Creates a new server context with socket addresses.
@@ -155,7 +151,9 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// Returns just the client's IP address without the port, or `0.0.0.0` if unknown.
     #[inline]
     pub fn client_ip_only_or_default(&self) -> IpAddr {
-        self.remote_addr.map(|addr| addr.ip()).unwrap_or(UNSET_ADDR.ip())
+        self.remote_addr
+            .map(|addr| addr.ip())
+            .unwrap_or(UNSET_ADDR.ip())
     }
 
     /// Returns the server's bound socket address.
@@ -215,10 +213,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     }
 
     /// Sends the response
-    pub async fn send_response<W>(
-        response: HttpResponse,
-        writer: &mut W,
-    )
+    pub async fn send_response<W>(response: HttpResponse, writer: &mut W)
     where
         W: AsyncWrite + Unpin,
     {
@@ -375,10 +370,11 @@ impl<TS: TransportSpec> HttpContext<TS> {
         }
     }
 
-    /// Get a path segment by index position
+    /// Get a path segment by index position, skipping the implicit leading empty
+    /// segment produced by the leading `/` in HTTP paths.
     /// For example, in "/api/users/123", segment(0) = "api", segment(1) = "users", segment(2) = "123"
     pub fn segment(&mut self, index: usize) -> String {
-        self.request.meta.get_path(index)
+        self.request.meta.get_path(index + 1)
     }
 
     /// Get the whole path
@@ -668,16 +664,12 @@ impl HttpContext<crate::connection::tcp::TcpTransport> {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        http::{
-            context::HttpResCtx,
-            request::request_templates::get_request,
-            safety::HttpSafety,
-        },
+    use crate::http::{
+        context::HttpResCtx, request::request_templates::get_request, safety::HttpSafety,
     };
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     #[cfg(feature = "tls")]
     use hotaru_tls::{TlsClientConfig, TlsConnector, TlsTransport};
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     // =========================================================================
     // Socket Address Accessor Tests
@@ -696,21 +688,21 @@ mod test {
         let remote = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 54321);
         let local = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8080);
 
-        let ctx = super::HttpContext::new_server(
-            app,
-            endpoint,
-            request,
-            Some(remote),
-            Some(local),
-        );
+        let ctx = super::HttpContext::new_server(app, endpoint, request, Some(remote), Some(local));
 
         // Test client_ip()
         assert_eq!(ctx.client_ip(), Some(remote));
         assert_eq!(ctx.client_ip_or_default(), remote);
 
         // Test client_ip_only()
-        assert_eq!(ctx.client_ip_only(), Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100))));
-        assert_eq!(ctx.client_ip_only_or_default(), IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)));
+        assert_eq!(
+            ctx.client_ip_only(),
+            Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)))
+        );
+        assert_eq!(
+            ctx.client_ip_only_or_default(),
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100))
+        );
 
         // Test server_addr()
         assert_eq!(ctx.server_addr(), Some(local));
@@ -735,11 +727,8 @@ mod test {
         let request = HttpRequest::default();
 
         let ctx = super::HttpContext::new_server(
-            app,
-            endpoint,
-            request,
-            None,  // No remote address
-            None,  // No local address
+            app, endpoint, request, None, // No remote address
+            None, // No local address
         );
 
         let unset = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
@@ -750,7 +739,10 @@ mod test {
 
         // Test client_ip_only() returns None
         assert_eq!(ctx.client_ip_only(), None);
-        assert_eq!(ctx.client_ip_only_or_default(), IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)));
+        assert_eq!(
+            ctx.client_ip_only_or_default(),
+            IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))
+        );
 
         // Test server_addr() returns None
         assert_eq!(ctx.server_addr(), None);
@@ -788,23 +780,17 @@ mod test {
         let request = HttpRequest::default();
         let remote = SocketAddr::new(
             IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
-            54321
+            54321,
         );
-        let local = SocketAddr::new(
-            IpAddr::V6(Ipv6Addr::LOCALHOST),
-            8080
-        );
+        let local = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 8080);
 
-        let ctx = super::HttpContext::new_server(
-            app,
-            endpoint,
-            request,
-            Some(remote),
-            Some(local),
-        );
+        let ctx = super::HttpContext::new_server(app, endpoint, request, Some(remote), Some(local));
 
         assert_eq!(ctx.client_ip(), Some(remote));
-        assert_eq!(ctx.client_ip_only(), Some(IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1))));
+        assert_eq!(
+            ctx.client_ip_only(),
+            Some(IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)))
+        );
         assert_eq!(ctx.server_addr(), Some(local));
     }
 

@@ -1,7 +1,7 @@
-use crate::url::{parser::parser::PatternError, PathPattern};
+use crate::url::{PathPattern, parser::parser::PatternError};
 
-pub(self) mod lexer; 
-pub(self) mod parser; 
+pub(self) mod lexer;
+pub(self) mod parser;
 
 // # `parse` – Compile a URL pattern string into matchable path patterns and capture names
 
@@ -102,7 +102,9 @@ pub(self) mod parser;
 
 // Notes:
 // - Type-to-regex mapping is handled by TypeKind::to_regex (e.g., int, uint, decimal, str, uuid). The special Path kind (for <**path>) does not expand to a regex here.
-// - The parse function intentionally returns names as a compact list of declared names only, not a parallel vector to patterns. Use the order to align with your generated capture groups during regex building. 
-pub fn parse<T: AsRef<str>>(input: T) -> Result<(Vec<PathPattern>, Vec<Option<String>>), PatternError> {
-    parser::tokens_to_patterns(&lexer::tokenize(input.as_ref())) 
-} 
+// - The parse function intentionally returns names as a compact list of declared names only, not a parallel vector to patterns. Use the order to align with your generated capture groups during regex building.
+pub fn parse<T: AsRef<str>>(
+    input: T,
+) -> Result<(Vec<PathPattern>, Vec<Option<String>>), PatternError> {
+    parser::tokens_to_patterns(&lexer::tokenize(input.as_ref()))
+}

@@ -1,18 +1,17 @@
 //! Simple TCP Chat Protocol Implementation for Chapter 4
 
-use std::sync::Arc;
-use std::error::Error;
 use async_trait::async_trait;
+use std::collections::HashMap;
+use std::error::Error;
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::RwLock;
-use std::collections::HashMap;
 
-use hotaru_core::connection::{
-    Protocol, Transport, Stream, Message,
-    RequestContext, ProtocolRole,
-    TcpConnectionStream, TcpReader, TcpWriter,
-};
 use hotaru_core::app::application::App;
+use hotaru_core::connection::{
+    Message, Protocol, ProtocolRole, RequestContext, Stream, TcpConnectionStream, TcpReader,
+    TcpWriter, Transport,
+};
 
 // ============================================================================
 // Shared Chat State
@@ -38,34 +37,34 @@ impl ChatRoom {
             users: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     pub async fn add_message(&self, user: String, content: String) {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         self.messages.write().await.push(ChatMessage {
             user,
             content,
             timestamp,
         });
     }
-    
+
     pub async fn add_user(&self, id: String, name: String) {
         self.users.write().await.insert(id, name);
     }
-    
+
     pub async fn remove_user(&self, id: &str) {
         self.users.write().await.remove(id);
     }
-    
+
     pub async fn get_recent_messages(&self, count: usize) -> Vec<ChatMessage> {
         let messages = self.messages.read().await;
         let start = messages.len().saturating_sub(count);
         messages[start..].to_vec()
     }
-    
+
     pub async fn get_users(&self) -> Vec<String> {
         self.users.read().await.values().cloned().collect()
     }
@@ -88,7 +87,7 @@ impl TcpChat {
             chat_room: ChatRoom::new(),
         }
     }
-    
+
     pub fn with_room(role: ProtocolRole, room: ChatRoom) -> Self {
         Self {
             role,
@@ -102,9 +101,15 @@ impl TcpChat {
 pub struct TcpChatTransport;
 
 impl Transport for TcpChatTransport {
-    fn id(&self) -> i128 { 1 }
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn id(&self) -> i128 {
+        1
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 // Simple stream
@@ -112,9 +117,15 @@ impl Transport for TcpChatTransport {
 pub struct TcpChatStream;
 
 impl Stream for TcpChatStream {
-    fn id(&self) -> u32 { 0 }
-    fn as_any(&self) -> &dyn std::any::Any { self }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    fn id(&self) -> u32 {
+        0
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 // Message type
@@ -131,7 +142,7 @@ pub enum TcpChatMessage {
 impl TcpChatMessage {
     pub fn parse(data: &[u8]) -> Self {
         let text = String::from_utf8_lossy(data).trim().to_string();
-        
+
         if text.starts_with("JOIN ") {
             TcpChatMessage::Join(text[5..].to_string())
         } else if text.starts_with("MSG ") {
@@ -146,7 +157,7 @@ impl TcpChatMessage {
             TcpChatMessage::Message(text)
         }
     }
-    
+
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
             TcpChatMessage::Response(msg) => format!("{}\n", msg).into_bytes(),
@@ -160,7 +171,7 @@ impl Message for TcpChatMessage {
         buf.extend_from_slice(&self.to_bytes());
         Ok(())
     }
-    
+
     fn decode(buf: &mut bytes::BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>>
     where
         Self: Sized,
@@ -183,11 +194,11 @@ pub struct TcpChatContext {
 impl RequestContext for TcpChatContext {
     type Request = TcpChatMessage;
     type Response = TcpChatMessage;
-    
+
     fn handle_error(&mut self) {
         self.response = TcpChatMessage::Response("ERROR".to_string());
     }
-    
+
     fn role(&self) -> ProtocolRole {
         self.role
     }
@@ -199,55 +210,63 @@ impl Protocol for TcpChat {
     type Stream = TcpChatStream;
     type Message = TcpChatMessage;
     type Context = TcpChatContext;
-    
+
     fn detect(initial_bytes: &[u8]) -> bool {
         let text = String::from_utf8_lossy(initial_bytes);
-        text.starts_with("JOIN ") ||
-        text.starts_with("MSG ") ||
-        text.starts_with("LIST") ||
-        text.starts_with("HISTORY") ||
-        text.starts_with("CHAT:")
+        text.starts_with("JOIN ")
+            || text.starts_with("MSG ")
+            || text.starts_with("LIST")
+            || text.starts_with("HISTORY")
+            || text.starts_with("CHAT:")
     }
-    
+
     fn role(&self) -> ProtocolRole {
         self.role
     }
-    
+
     async fn handle(
         &mut self,
         mut reader: TcpReader,
         mut writer: TcpWriter,
         _app: Arc<App>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        
         // Send welcome
-        let welcome = "Welcome to TCP Chat! Commands: JOIN <name>, MSG <message>, LIST, HISTORY, LEAVE\n";
+        let welcome =
+            "Welcome to TCP Chat! Commands: JOIN <name>, MSG <message>, LIST, HISTORY, LEAVE\n";
         writer.write_all(welcome.as_bytes()).await?;
         writer.flush().await?;
-        
+
         let user_id = format!("tcp_{}", std::process::id());
         let mut username = String::from("Anonymous");
         let mut buffer = [0u8; 1024];
-        
+
         loop {
             let n = match reader.read(&mut buffer).await {
                 Ok(0) => break,
                 Ok(n) => n,
                 Err(_) => break,
             };
-            
+
             let msg = TcpChatMessage::parse(&buffer[..n]);
-            
+
             let response = match msg {
                 TcpChatMessage::Join(name) => {
                     username = name.clone();
-                    self.chat_room.add_user(user_id.clone(), username.clone()).await;
-                    self.chat_room.add_message("System".to_string(), 
-                        format!("{} joined the chat", username)).await;
+                    self.chat_room
+                        .add_user(user_id.clone(), username.clone())
+                        .await;
+                    self.chat_room
+                        .add_message(
+                            "System".to_string(),
+                            format!("{} joined the chat", username),
+                        )
+                        .await;
                     format!("Welcome, {}!\n", username)
                 }
                 TcpChatMessage::Message(content) => {
-                    self.chat_room.add_message(username.clone(), content.clone()).await;
+                    self.chat_room
+                        .add_message(username.clone(), content.clone())
+                        .await;
                     format!("Message sent: {}\n", content)
                 }
                 TcpChatMessage::List => {
@@ -264,19 +283,20 @@ impl Protocol for TcpChat {
                 }
                 TcpChatMessage::Leave => {
                     self.chat_room.remove_user(&user_id).await;
-                    self.chat_room.add_message("System".to_string(), 
-                        format!("{} left the chat", username)).await;
+                    self.chat_room
+                        .add_message("System".to_string(), format!("{} left the chat", username))
+                        .await;
                     writer.write_all(b"Goodbye!\n").await?;
                     writer.flush().await?;
                     break;
                 }
                 _ => "Unknown command\n".to_string(),
             };
-            
+
             writer.write_all(response.as_bytes()).await?;
             writer.flush().await?;
         }
-        
+
         self.chat_room.remove_user(&user_id).await;
         Ok(())
     }

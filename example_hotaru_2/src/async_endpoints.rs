@@ -1,5 +1,5 @@
+use hotaru::http::*;
 use hotaru::prelude::*;
-use hotaru::http::*;  
 use tokio::time::sleep;
 
 use crate::APP;
@@ -10,7 +10,7 @@ use crate::APP;
 
 endpoint! {
     APP.url("/async/channel1"),
-    
+
     /// Async test endpoint with delays
     pub async_test <HTTP> {
         sleep(Duration::from_secs(1)).await;
@@ -25,7 +25,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/async/channel2"),
-    
+
     /// Another async test endpoint
     pub async_test2 <HTTP> {
         sleep(Duration::from_secs(1)).await;
@@ -36,12 +36,12 @@ endpoint! {
         println!("Channel 2: 3");
         text_response("Async Test Page 2")
     }
-} 
+}
 
-endpoint!{ 
+endpoint! {
     APP.url("/async/whoami"),
-    
-    /// Return the IP address of the client 
+
+    /// Return the IP address of the client
     pub whoami<HTTP> {
         // Get client's full socket address (IP + port)
         match req.client_ip() {
@@ -53,7 +53,7 @@ endpoint!{
 
 endpoint! {
     APP.url("/async/<int:number>"),
-    
+
     /// Pattern matching for numbers
     pub number_page <HTTP> {
         let number = req.pattern("number").unwrap_or("unknown".to_string());
@@ -63,7 +63,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/async/get_secret_key"),
-    
+
     /// Get a value from app config
     pub get_secret_key <HTTP> {
         let key = req.app()
@@ -75,7 +75,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/async/file"),
-    
+
     /// File download example
     pub file_download <HTTP> {
         let file_path = "Cargo.toml"; // Example file to serve
@@ -92,7 +92,7 @@ endpoint! {
 endpoint! {
     APP.url("/async/get"),
     config = [HttpSafety::new().with_allowed_method(GET)],
-    
+
     /// GET-only endpoint
     pub get_only <HTTP> {
         text_response("GET only endpoint")
@@ -102,7 +102,7 @@ endpoint! {
 endpoint! {
     APP.url("/async/post"),
     config = [HttpSafety::new().with_allowed_methods(vec![POST])],
-    
+
     /// POST-only endpoint
     pub post_only <HTTP> {
         text_response("POST only endpoint")

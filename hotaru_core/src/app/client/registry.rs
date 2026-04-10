@@ -1,16 +1,19 @@
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, Protocol, TransportSpec}, 
+    connection::{ConnStream, Protocol, TransportSpec},
     executable::{
-        ExecutableBinding, entry::{ProtocolEntry, ProtocolEntryTrait}, middleware::{AsyncMiddleware, AsyncMiddlewareChain}, registry::ProtocolEntryRegistry
+        ExecutableBinding,
+        entry::{ProtocolEntry, ProtocolEntryTrait},
+        middleware::{AsyncMiddleware, AsyncMiddlewareChain},
+        registry::ProtocolEntryRegistry,
     },
     extensions::ParamsClone,
-    url::{UrlError, UrlNode, UrlRoot},
+    url::{UrlError, UrlRegistration, UrlRoot},
 };
 use std::{any::TypeId, sync::Arc};
 use tokio::io::BufReader;
 
-/// Optimization for single-protocol servers, which are common in practice. 
+/// Optimization for single-protocol servers, which are common in practice.
 pub enum ProtocolRegistryKind<TS: TransportSpec> {
     Single(Arc<dyn ProtocolEntryTrait<TS>>),
     Multi(ProtocolEntryRegistry<TS>),
@@ -68,7 +71,9 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
-    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(&self) -> Option<Arc<UrlRoot<P::Context, TS>>> {
+    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+        &self,
+    ) -> Option<Arc<UrlRoot<P::Context, TS>>> {
         match self {
             Self::Single(handler) => handler
                 .as_any()
@@ -90,12 +95,11 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         url: T,
         executable: ExecutableBinding<P::Context>,
         config: ParamsClone,
-    ) -> Result<Arc<UrlNode<P::Context, TS>>, UrlError> {
+    ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
         let url = url.into();
-        match self.url::<P>().map(|root| root.clone().literal_url(&url, executable, config)) {
-            Some(Ok(url)) => Ok(url),
-            Some(Err(e)) => Err(e),
-            None => Err(UrlError::InvalidPath(url)),
+        match self.url::<P>().map(|root| root.literal_url(&url, executable, config)) {
+            Some(result) => result,
+            None => Err(UrlError::ProtocolNotFound),
         }
     }
 
@@ -104,15 +108,11 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         pattern: T,
         executable: ExecutableBinding<P::Context>,
         config: ParamsClone,
-    ) -> Result<Arc<UrlNode<P::Context, TS>>, UrlError> {
+    ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
         let pattern = pattern.into();
-        match self
-            .url::<P>()
-            .map(|root| root.clone().sub_url(&pattern, executable, config))
-        {
-            Some(Ok(url)) => Ok(url),
-            Some(Err(e)) => Err(e),
-            None => Err(UrlError::InvalidPath(pattern)),
+        match self.url::<P>().map(|root| root.sub_url(&pattern, executable, config)) {
+            Some(result) => result,
+            None => Err(UrlError::ProtocolNotFound),
         }
     }
 

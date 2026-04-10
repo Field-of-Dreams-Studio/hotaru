@@ -1,16 +1,21 @@
+use std::time::Duration;
+
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, Protocol, TransportSpec}, 
+    connection::{ConnStream, Protocol, TransportSpec},
     executable::{
-        ExecutableBinding, entry::{ProtocolEntry, ProtocolEntryTrait}, middleware::{AsyncMiddleware, AsyncMiddlewareChain}, registry::ProtocolEntryRegistry
+        ExecutableBinding,
+        entry::{ProtocolEntry, ProtocolEntryTrait},
+        middleware::{AsyncMiddleware, AsyncMiddlewareChain},
+        registry::ProtocolEntryRegistry,
     },
     extensions::ParamsClone,
-    url::{UrlError, UrlNode, UrlRoot},
+    url::{UrlError, UrlRegistration, UrlRoot},
 };
 use std::{any::TypeId, sync::Arc};
 use tokio::io::BufReader;
 
-/// Optimization for single-protocol servers, which are common in practice. 
+/// Optimization for single-protocol servers, which are common in practice.
 pub enum ProtocolRegistryKind<TS: TransportSpec> {
     Single(Arc<dyn ProtocolEntryTrait<TS>>),
     Multi(ProtocolEntryRegistry<TS>),
@@ -68,7 +73,9 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
-    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(&self) -> Option<Arc<UrlRoot<P::Context, TS>>> {
+    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+        &self,
+    ) -> Option<Arc<UrlRoot<P::Context, TS>>> {
         match self {
             Self::Single(handler) => handler
                 .as_any()
@@ -90,12 +97,11 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         url: T,
         executable: ExecutableBinding<P::Context>,
         config: ParamsClone,
-    ) -> Result<Arc<UrlNode<P::Context, TS>>, UrlError> {
+    ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
         let url = url.into();
-        match self.url::<P>().map(|root| root.clone().literal_url(&url, executable, config)) {
-            Some(Ok(url)) => Ok(url),
-            Some(Err(e)) => Err(e),
-            None => Err(UrlError::InvalidPath(url)),
+        match self.url::<P>().map(|root| root.literal_url(&url, executable, config)) {
+            Some(result) => result,
+            None => Err(UrlError::ProtocolNotFound),
         }
     }
 
@@ -104,15 +110,49 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         pattern: T,
         executable: ExecutableBinding<P::Context>,
         config: ParamsClone,
-    ) -> Result<Arc<UrlNode<P::Context, TS>>, UrlError> {
+    ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
         let pattern = pattern.into();
-        match self
-            .url::<P>()
-            .map(|root| root.clone().sub_url(&pattern, executable, config))
-        {
-            Some(Ok(url)) => Ok(url),
-            Some(Err(e)) => Err(e),
-            None => Err(UrlError::InvalidPath(pattern)),
+        match self.url::<P>().map(|root| root.sub_url(&pattern, executable, config)) {
+            Some(result) => result,
+            None => Err(UrlError::ProtocolNotFound),
+        }
+    }
+
+    /// Returns the default connection-timeout to use when [`TimeoutSetting::Inherit`]
+    /// is configured.
+    ///
+    /// For `Single`, delegates directly to the protocol.
+    ///
+    /// For `Multi`, returns the **longest** default across all registered protocols
+    /// so no protocol's connections are prematurely cut off. `None` (no timeout)
+    /// beats any finite duration; among finite durations the maximum wins.
+    ///
+    /// TODO: This is an interim heuristic. The correct fix is to resolve `Inherit`
+    /// *after* protocol detection so each connection uses the matched protocol's
+    /// own default. That requires moving timeout application inside the serve path.
+    pub fn default_connection_timeout(&self) -> Option<Duration> {
+        match self {
+            Self::Single(handler) => handler.default_connection_timeout(),
+            Self::Multi(registry) => {
+                let mut longest: Option<Duration> = Some(Duration::ZERO);
+                for h in &registry.handlers {
+                    match (longest, h.default_connection_timeout()) {
+                        // None (infinite) beats everything.
+                        (_, None) => return None,
+                        // Accumulate the maximum finite duration.
+                        (Some(acc), Some(d)) => longest = Some(acc.max(d)),
+                        // Already infinite — unreachable given the None arm above,
+                        // but silence the exhaustiveness warning.
+                        (None, _) => {}
+                    }
+                }
+                // Empty registry: fall back to a safe 30-second default.
+                if longest == Some(Duration::ZERO) && registry.handlers.is_empty() {
+                    Some(Duration::from_secs(30))
+                } else {
+                    longest
+                }
+            }
         }
     }
 

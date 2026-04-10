@@ -3,6 +3,7 @@ use std::{
     future::Future,
     pin::Pin,
     sync::{Arc, RwLock},
+    time::Duration,
 };
 
 use akari::extensions::{Locals, Params};
@@ -69,6 +70,11 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
         locals: RwLock<Locals>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
 
+    /// Returns the protocol's default connection-timeout policy.
+    ///
+    /// Used to resolve [`TimeoutSetting::Inherit`] at connection time.
+    fn default_connection_timeout(&self) -> Option<Duration>;
+
     /// Allows downcasting.
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
@@ -110,6 +116,10 @@ where
 {
     fn test(&self, buf: &[u8]) -> bool {
         P::detect(buf)
+    }
+
+    fn default_connection_timeout(&self) -> Option<Duration> {
+        self.protocol.default_connection_timeout()
     }
 
     fn serve(

@@ -2,8 +2,8 @@
 // Security Pattern Examples
 // ============================================================================
 
-use hotaru::prelude::*;
 use hotaru::http::*;
+use hotaru::prelude::*;
 use htmstd::Cors;
 use serde_json::json;
 
@@ -16,7 +16,7 @@ use crate::APP;
 endpoint! {
     APP.url("/api/data"),
     config = [HttpSafety::new().with_allowed_method(GET)],
-    
+
     /// GET-only endpoint
     pub get_only_endpoint <HTTP> {
         json_response(object!({
@@ -30,7 +30,7 @@ endpoint! {
 endpoint! {
     APP.url("/api/resource"),
     config = [HttpSafety::new().with_allowed_methods(vec![GET, POST, PUT, DELETE])],
-    
+
     /// Multi-method endpoint with explicit allowed methods
     pub resource_endpoint <HTTP> {
         match req.method() {
@@ -80,7 +80,7 @@ endpoint! {
 endpoint! {
     APP.url("/api/public"),
     middleware = [Cors],
-    
+
     /// Public API endpoint with CORS enabled
     pub public_api <HTTP> {
         json_response(object!({
@@ -94,7 +94,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/api/restricted"),
-    
+
     /// API endpoint without CORS (restricted to same origin)
     pub restricted_api <HTTP> {
         json_response(object!({
@@ -119,7 +119,7 @@ fn get_user_role(token: &str) -> String {
     match token {
         "admin-token-456" => "admin".to_string(),
         "valid-token-123" => "user".to_string(),
-        _ => "guest".to_string()
+        _ => "guest".to_string(),
     }
 }
 
@@ -131,7 +131,7 @@ middleware! {
             .and_then(|h| h.as_str().ok())
             .and_then(|h| h.strip_prefix("Bearer "))
             .unwrap_or("");
-        
+
         if !validate_token(token) {
             req.response = json_response(object!({
                 status: "error",
@@ -152,12 +152,12 @@ middleware! {
 endpoint! {
     APP.url("/api/protected"),
     middleware = [RequireAuth],
-    
+
     /// Protected endpoint requiring authentication
     pub protected_api <HTTP> {
         let user_role = req.locals.get::<String>("user_role")
             .unwrap_or(&"unknown".to_string());
-        
+
         json_response(object!({
             status: "success",
             message: "Access granted to protected resource",
@@ -181,7 +181,7 @@ middleware! {
         // First check if authenticated
         let is_authenticated = req.locals.get::<bool>("authenticated")
             .unwrap_or(&false);
-        
+
         if !is_authenticated {
             req.response = json_response(object!({
                 status: "error",
@@ -189,12 +189,12 @@ middleware! {
             })).status(StatusCode::UNAUTHORIZED);
             return req;
         }
-        
+
         // Check role for admin endpoints
         if req.path().starts_with("/api/admin/") {
             let user_role = req.locals.get::<String>("user_role")
                 .unwrap_or(&"guest".to_string());
-            
+
             if user_role != "admin" {
                 req.response = json_response(object!({
                     status: "error",
@@ -204,7 +204,7 @@ middleware! {
                 return req;
             }
         }
-        
+
         next(req).await
     }
 }
@@ -212,7 +212,7 @@ middleware! {
 endpoint! {
     APP.url("/api/admin/users"),
     middleware = [RequireAuth, RequireRole],
-    
+
     /// Admin-only endpoint
     pub admin_users <HTTP> {
         json_response(object!({
@@ -233,7 +233,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/api/search"),
-    
+
     /// Endpoint with input validation
     pub search_endpoint <HTTP> {
         // Get query parameter
@@ -241,7 +241,7 @@ endpoint! {
             .get("q")
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         // Validate input length
         if query.is_empty() {
             return json_response(object!({
@@ -249,14 +249,14 @@ endpoint! {
                 message: "Search query is required"
             })).status(StatusCode::BAD_REQUEST);
         }
-        
+
         if query.len() > 100 {
             return json_response(object!({
                 status: "error",
                 message: "Search query too long (max 100 characters)"
             })).status(StatusCode::BAD_REQUEST);
         }
-        
+
         // Check for potentially dangerous patterns
         if query.contains("<script>") || query.contains("javascript:") {
             return json_response(object!({
@@ -264,7 +264,7 @@ endpoint! {
                 message: "Invalid characters in search query"
             })).status(StatusCode::BAD_REQUEST);
         }
-        
+
         // Perform search (simulated)
         json_response(object!({
             status: "success",
@@ -295,11 +295,11 @@ middleware! {
                     .and_then(|h| h.as_str().ok())
             })
             .unwrap_or("unknown");
-        
+
         // In real app, check against rate limit store (Redis, etc.)
         // This is a simplified example
         let is_rate_limited = false; // Would check actual rate limit
-        
+
         if is_rate_limited {
             req.response = json_response(object!({
                 status: "error",
@@ -325,7 +325,7 @@ middleware! {
 endpoint! {
     APP.url("/api/rate-limited"),
     middleware = [RateLimiter],
-    
+
     /// Rate-limited endpoint
     pub rate_limited_api <HTTP> {
         json_response(object!({
@@ -343,7 +343,7 @@ middleware! {
     /// Adds security headers to responses
     pub SecurityHeaders <HTTP> {
         let mut result = next(req).await;
-        
+
         // Add security headers
         result.response = result.response
             .add_header("X-Content-Type-Options", "nosniff")
@@ -351,7 +351,7 @@ middleware! {
             .add_header("X-XSS-Protection", "1; mode=block")
             .add_header("Referrer-Policy", "strict-origin-when-cross-origin")
             .add_header("Content-Security-Policy", "default-src 'self'");
-        
+
         result
     }
 }
@@ -359,7 +359,7 @@ middleware! {
 endpoint! {
     APP.url("/api/secure"),
     middleware = [SecurityHeaders],
-    
+
     /// Endpoint with security headers
     pub secure_endpoint <HTTP> {
         json_response(object!({

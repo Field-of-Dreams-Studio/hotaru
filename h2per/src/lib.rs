@@ -3,23 +3,23 @@
 //! This crate provides Protocol trait implementations for all HTTP versions
 //! using the hyper library as the underlying engine.
 
-pub mod protocol;
 pub mod context;
-pub mod transport;
-pub mod stream;
+pub mod hyper_exports;
+mod io_compat;
 pub mod message;
+pub mod prelude;
+pub mod protocol;
 pub mod request;
 pub mod response;
-pub mod prelude;
-pub mod hyper_exports;
+mod service;
+pub mod stream;
+pub mod transport;
 pub mod upgrade;
 pub mod websocket;
-mod io_compat;
-mod service;
 
 // Re-export protocol implementations
-pub use protocol::{HyperHttp1, HyperHttp2, HyperHttp3};
 pub use context::{HyperContext, HyperRequest, HyperResponse};
+pub use protocol::{HyperHttp1, HyperHttp2, HyperHttp3};
 
 // Type aliases to distinguish from core HTTP implementation
 pub type HYPER1 = HyperHttp1;
@@ -28,8 +28,5 @@ pub type HYPER3 = HyperHttp3;
 
 // Re-export commonly used Hyper types for convenience
 pub use hyper_exports::{
-    Method, StatusCode, Version, Uri,
-    HeaderMap, HeaderName, HeaderValue,
-    Request, Response,
-    Body,
+    Body, HeaderMap, HeaderName, HeaderValue, Method, Request, Response, StatusCode, Uri, Version,
 };

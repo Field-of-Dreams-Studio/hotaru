@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
 use akari::Value;
-use hotaru_core::app::middleware::AsyncMiddleware;
-use hotaru_core::{connection::Protocol, http::traits::HTTP};
-use hotaru_core::http::cookie::Cookie;
+use hotaru_core::executable::middleware::AsyncMiddleware;
+use hotaru_http::cookie::Cookie;
+use hotaru_core::connection::Protocol;
+use hotaru_http::traits::HTTP;
 use hotaru_meta::middleware;
 
 use hotaru_lib::ende::aes;
@@ -54,30 +55,30 @@ impl Default for CSessionRW {
 }
 
 middleware!(
-    pub CookieSession<HTTP> { 
+    pub CookieSession<HTTP> {
 
-        // println!("{:?}", req.get_cookies()); 
-        let mut new_id_generated = false; 
+        // println!("{:?}", req.get_cookies());
+        let mut new_id_generated = false;
 
         let session_id: u64 = match req
             .get_cookie_or_default("session_id")
             .get_value()
-            .parse() { 
+            .parse() {
                 Ok(id) => id,
                 Err(_) => {
-                    // If parsing fails, generate a new session ID 
-                    new_id_generated = true; 
-                    session_counter::generate_session_id() 
-                } 
-            }; 
+                    // If parsing fails, generate a new session ID
+                    new_id_generated = true;
+                    session_counter::generate_session_id()
+                }
+            };
 
         let serect_key = req
-            .app()
-            .and_then(|app| app.config.get::<String>().cloned())
+            .runtime()
+            .and_then(|rt| rt.get_config::<String>())
             .unwrap_or("super_secret_key".to_string());
         let password = format!("{}{}", serect_key, session_id);
- 
-        let session_raw = req.get_cookie("session_cont").map(|c| c.get_value().to_owned()).unwrap_or("No Cookie Cont".to_owned()); 
+
+        let session_raw = req.get_cookie("session_cont").map(|c| c.get_value().to_owned()).unwrap_or("No Cookie Cont".to_owned());
 
         // println!("Session ID: {}, Session: {}", session_id, session_raw);
 
@@ -85,7 +86,7 @@ middleware!(
             if let Value::Dict(map) = Value::from_json(
                 &aes::decrypt(
                     &session_raw,
-                    &password, 
+                    &password,
                 )
                 .unwrap_or(String::from("Decrypt Error")),
             )
@@ -101,7 +102,7 @@ middleware!(
         req.params.set(session);
         println!("CookieSession: About to call next middleware");
         let mut req = next(req).await; // Continue middleware chain
-        println!("CookieSession: Returned from middleware chain"); 
+        println!("CookieSession: Returned from middleware chain");
 
         let (session, is_modified) = req
             .params
@@ -111,8 +112,8 @@ middleware!(
 
         // println!("Cookie Session: {}", session);
 
-        if is_modified|new_id_generated { 
-            println!("Session modified, saving to cookies... {} ", session); 
+        if is_modified|new_id_generated {
+            println!("Session modified, saving to cookies... {} ", session);
             req.response = req
                 .response
                 .add_cookie("session_id", Cookie::new(session_id.to_string()).path("/"))
@@ -122,9 +123,9 @@ middleware!(
                         aes::encrypt(&session.into_json(), &password).unwrap_or("".to_string()),
                     )
                     .path("/"),
-                ); // Set cookie with session ID 
+                ); // Set cookie with session ID
         }
 
         req
     }
-); 
+);

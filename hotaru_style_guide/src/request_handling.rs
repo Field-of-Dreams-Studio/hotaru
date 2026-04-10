@@ -2,8 +2,8 @@
 // Request Handling Examples
 // ============================================================================
 
-use hotaru::prelude::*;
 use hotaru::http::*;
+use hotaru::prelude::*;
 use htmstd::CookieSession;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -16,7 +16,7 @@ use crate::APP;
 
 endpoint! {
     APP.url("/request/method"),
-    
+
     /// Handles different HTTP methods
     pub method_handler <HTTP> {
         if req.method() == POST {
@@ -49,7 +49,7 @@ endpoint! {
 
 endpoint! {
     APP.url("/request/form"),
-    
+
     /// Handles form submissions
     pub form_handler <HTTP> {
         if req.method() == GET {
@@ -88,7 +88,7 @@ endpoint! {
                     let age = form.data.get("age")
                         .and_then(|s| s.parse::<u32>().ok())
                         .unwrap_or(0);
-                    
+
                     json_response(object!({
                         status: "success",
                         message: "Form data received",
@@ -125,7 +125,7 @@ struct UserInput {
 endpoint! {
     APP.url("/api/json"),
     config = [HttpSafety::new().with_allowed_method(POST)],
-    
+
     /// Generic JSON handling
     pub json_handler <HTTP> {
         match req.json::<serde_json::Value>().await {
@@ -154,7 +154,7 @@ endpoint! {
 endpoint! {
     APP.url("/api/typed-json"),
     config = [HttpSafety::new().with_allowed_method(POST)],
-    
+
     /// Typed JSON handling
     pub typed_json_handler <HTTP> {
         match req.json::<UserInput>().await {
@@ -193,21 +193,21 @@ endpoint! {
 
 endpoint! {
     APP.url("/request/cookies"),
-    
+
     /// Cookie reading and setting
     pub cookie_handler <HTTP> {
         if req.method() == GET {
             // Read cookies
             let cookies = req.get_cookies();
             let mut cookie_list = Vec::new();
-            
+
             for (name, cookie) in cookies.0.iter() {
                 cookie_list.push(object!({
                     name: name,
                     value: cookie.get_value()
                 }));
             }
-            
+
             json_response(object!({
                 status: "success",
                 cookies: cookie_list,
@@ -216,12 +216,12 @@ endpoint! {
         } else {
             // Set new cookie
             let cookie_name = "test_cookie";
-            let cookie_value = format!("value_{}", 
+            let cookie_value = format!("value_{}",
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
                     .as_secs());
-            
+
             json_response(object!({
                 status: "success",
                 message: "Cookie set",
@@ -244,12 +244,12 @@ endpoint! {
 endpoint! {
     APP.url("/session"),
     middleware = [CookieSession],
-    
+
     /// Session counter example
     pub session_handler <HTTP> {
         let session = req.params.get_mut::<htmstd::session::cookie_session::CSessionRW>()
             .unwrap();
-        
+
         // Get visit count from session
         let count = session.get("visit_count")
             .cloned()
@@ -257,27 +257,27 @@ endpoint! {
             .to_string()
             .parse::<i32>()
             .unwrap_or(0);
-        
+
         // Increment and save
         let new_count = count + 1;
-        session.insert("visit_count".to_string(), 
+        session.insert("visit_count".to_string(),
                       Value::new(new_count.to_string()));
-        
+
         // Get session ID (if available)
         let session_id = session.get("session_id")
             .cloned()
             .unwrap_or(Value::new("new-session"));
-        
+
         if count == 0 {
             // First visit - set session ID
-            let new_session_id = format!("session_{}", 
+            let new_session_id = format!("session_{}",
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
                     .as_secs());
-            session.insert("session_id".to_string(), 
+            session.insert("session_id".to_string(),
                           Value::new(new_session_id.clone()));
-            
+
             json_response(object!({
                 status: "success",
                 message: "Welcome! New session created",
@@ -301,11 +301,11 @@ endpoint! {
 
 endpoint! {
     APP.url("/request/headers"),
-    
+
     /// Access request headers
     pub headers_handler <HTTP> {
         let mut headers_list = Vec::new();
-        
+
         for (name, value) in req.headers().iter() {
             if let Ok(v) = value.as_str() {
                 headers_list.push(object!({
@@ -314,18 +314,18 @@ endpoint! {
                 }));
             }
         }
-        
+
         // Access specific headers
         let user_agent = req.headers()
             .get("User-Agent")
             .and_then(|h| h.as_str().ok())
             .unwrap_or("Unknown");
-        
+
         let content_type = req.headers()
             .get("Content-Type")
             .and_then(|h| h.as_str().ok())
             .unwrap_or("Not specified");
-        
+
         json_response(object!({
             status: "success",
             user_agent: user_agent,
@@ -342,11 +342,11 @@ endpoint! {
 
 endpoint! {
     APP.url("/request/safe/<action>"),
-    
+
     /// Demonstrates graceful error handling
     pub safe_handler <HTTP> {
         let action = req.pattern("action").unwrap_or("default".to_string());
-        
+
         match action.as_str() {
             "success" => {
                 json_response(object!({

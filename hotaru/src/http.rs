@@ -1,5 +1,5 @@
 //! HTTP-specific re-exports for standard Hotaru HTTP implementation
-//! 
+//!
 //! Use this module when working with the standard HTTP protocol:
 //! ```rust
 //! use hotaru::http::*;
@@ -10,19 +10,19 @@ pub use crate::{HTTP, HttpContext};
 // Re-export type alias for backward compatibility
 pub use hotaru_http::context::HttpReqCtx;
 // HttpResCtx was for client-side in old Starberry - use HttpContext for both now
-pub type HttpResCtx = HttpContext; 
+pub type HttpResCtx = HttpContext;
 
 // Re-export HTTP types
-pub use hotaru_http::response::HttpResponse;  
-pub use hotaru_http::request::HttpRequest;
-pub use hotaru_http::safety::HttpSafety;
-pub use hotaru_http::http_value::HttpMethod::*; 
-pub use hotaru_http::meta::*; 
-pub use hotaru_http::http_value::*; 
-pub use hotaru_http::cookie::*; 
-pub use hotaru_http::body::*; 
-pub use hotaru_http::form::*; 
+pub use hotaru_http::body::*;
+pub use hotaru_http::cookie::*;
 pub use hotaru_http::encoding::*;
+pub use hotaru_http::form::*;
+pub use hotaru_http::http_value::HttpMethod::*;
+pub use hotaru_http::http_value::*;
+pub use hotaru_http::meta::*;
+pub use hotaru_http::request::HttpRequest;
+pub use hotaru_http::response::HttpResponse;
+pub use hotaru_http::safety::HttpSafety;
 
 // Re-export request and response templates
 pub use crate::request_templates;

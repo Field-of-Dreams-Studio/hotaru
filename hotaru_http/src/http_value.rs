@@ -1,132 +1,132 @@
-#![allow(non_snake_case)] 
-#![allow(non_camel_case_types)] 
+#![allow(non_snake_case)]
+#![allow(non_camel_case_types)]
 
-use std::{collections::HashMap, hash::Hash}; 
-use hotaru_lib::url_encoding::*; 
+use hotaru_lib::url_encoding::*;
+use std::{collections::HashMap, hash::Hash};
 
-#[derive(Debug, Clone)]  
-pub enum HttpVersion { 
+#[derive(Debug, Clone)]
+pub enum HttpVersion {
     Http09,
     Http10,
     Http11,
     Http20,
-    Http30, 
-    Unknown, 
-} 
+    Http30,
+    Unknown,
+}
 
-impl HttpVersion { 
-    pub fn to_string(&self) -> String { 
-        match self { 
-            HttpVersion::Http09 => "HTTP/0.9".to_string(), 
-            HttpVersion::Http10 => "HTTP/1.0".to_string(), 
-            HttpVersion::Http11 => "HTTP/1.1".to_string(), 
-            HttpVersion::Http20 => "HTTP/2.0".to_string(), 
-            HttpVersion::Http30 => "HTTP/3.0".to_string(), 
-            _ => "UNKNOWN".to_string(), 
-        } 
-    } 
+impl HttpVersion {
+    pub fn to_string(&self) -> String {
+        match self {
+            HttpVersion::Http09 => "HTTP/0.9".to_string(),
+            HttpVersion::Http10 => "HTTP/1.0".to_string(),
+            HttpVersion::Http11 => "HTTP/1.1".to_string(),
+            HttpVersion::Http20 => "HTTP/2.0".to_string(),
+            HttpVersion::Http30 => "HTTP/3.0".to_string(),
+            _ => "UNKNOWN".to_string(),
+        }
+    }
 
-    pub fn from_string(version: &str) -> Self { 
-        match version { 
-            "HTTP/0.9" => HttpVersion::Http09, 
-            "HTTP/1.0" => HttpVersion::Http10, 
-            "HTTP/1.1" => HttpVersion::Http11, 
-            "HTTP/2.0" => HttpVersion::Http20, 
-            "HTTP/3.0" => HttpVersion::Http30, 
-            _ => HttpVersion::Unknown,  
-        }  
-    }  
-} 
+    pub fn from_string(version: &str) -> Self {
+        match version {
+            "HTTP/0.9" => HttpVersion::Http09,
+            "HTTP/1.0" => HttpVersion::Http10,
+            "HTTP/1.1" => HttpVersion::Http11,
+            "HTTP/2.0" => HttpVersion::Http20,
+            "HTTP/3.0" => HttpVersion::Http30,
+            _ => HttpVersion::Unknown,
+        }
+    }
+}
 
-impl std::fmt::Display for HttpVersion { 
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { 
-        write!(f, "{}", self.to_string()) 
-    } 
-} 
+impl std::fmt::Display for HttpVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
 
-#[derive(Debug, Clone, PartialEq)] 
-pub enum HttpMethod { 
-    GET, 
-    POST, 
-    PUT, 
-    DELETE, 
-    HEAD, 
-    OPTIONS, 
-    PATCH, 
-    TRACE, 
-    CONNECT, 
-    UNKNOWN, 
-} 
+#[derive(Debug, Clone, PartialEq)]
+pub enum HttpMethod {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    HEAD,
+    OPTIONS,
+    PATCH,
+    TRACE,
+    CONNECT,
+    UNKNOWN,
+}
 
-impl HttpMethod { 
-    pub fn to_string(&self) -> String { 
-        match self { 
-            HttpMethod::GET => "GET".to_string(), 
-            HttpMethod::POST => "POST".to_string(), 
-            HttpMethod::PUT => "PUT".to_string(), 
-            HttpMethod::DELETE => "DELETE".to_string(), 
-            HttpMethod::HEAD => "HEAD".to_string(), 
-            HttpMethod::OPTIONS => "OPTIONS".to_string(), 
-            HttpMethod::PATCH => "PATCH".to_string(), 
-            HttpMethod::TRACE => "TRACE".to_string(), 
-            HttpMethod::CONNECT => "CONNECT".to_string(), 
-            _ => "UNKNOWN".to_string(), 
-        } 
-    } 
+impl HttpMethod {
+    pub fn to_string(&self) -> String {
+        match self {
+            HttpMethod::GET => "GET".to_string(),
+            HttpMethod::POST => "POST".to_string(),
+            HttpMethod::PUT => "PUT".to_string(),
+            HttpMethod::DELETE => "DELETE".to_string(),
+            HttpMethod::HEAD => "HEAD".to_string(),
+            HttpMethod::OPTIONS => "OPTIONS".to_string(),
+            HttpMethod::PATCH => "PATCH".to_string(),
+            HttpMethod::TRACE => "TRACE".to_string(),
+            HttpMethod::CONNECT => "CONNECT".to_string(),
+            _ => "UNKNOWN".to_string(),
+        }
+    }
 
-    pub fn from_string(method: &str) -> Self { 
-        match method { 
-            "GET" => HttpMethod::GET, 
-            "POST" => HttpMethod::POST, 
-            "PUT" => HttpMethod::PUT, 
-            "DELETE" => HttpMethod::DELETE, 
-            "HEAD" => HttpMethod::HEAD, 
-            "OPTIONS" => HttpMethod::OPTIONS, 
-            "PATCH" => HttpMethod::PATCH, 
-            "TRACE" => HttpMethod::TRACE, 
-            "CONNECT" => HttpMethod::CONNECT, 
-            _ => HttpMethod::UNKNOWN,  
-        }  
-    }  
+    pub fn from_string(method: &str) -> Self {
+        match method {
+            "GET" => HttpMethod::GET,
+            "POST" => HttpMethod::POST,
+            "PUT" => HttpMethod::PUT,
+            "DELETE" => HttpMethod::DELETE,
+            "HEAD" => HttpMethod::HEAD,
+            "OPTIONS" => HttpMethod::OPTIONS,
+            "PATCH" => HttpMethod::PATCH,
+            "TRACE" => HttpMethod::TRACE,
+            "CONNECT" => HttpMethod::CONNECT,
+            _ => HttpMethod::UNKNOWN,
+        }
+    }
 
-    pub fn get_full_list() -> Vec<HttpMethod> { 
-        vec![ 
-            HttpMethod::GET, 
-            HttpMethod::POST, 
-            HttpMethod::PUT, 
-            HttpMethod::DELETE, 
-            HttpMethod::HEAD, 
-            HttpMethod::OPTIONS, 
-            HttpMethod::PATCH, 
-            HttpMethod::TRACE, 
-            HttpMethod::CONNECT, 
-        ] 
-    } 
-} 
+    pub fn get_full_list() -> Vec<HttpMethod> {
+        vec![
+            HttpMethod::GET,
+            HttpMethod::POST,
+            HttpMethod::PUT,
+            HttpMethod::DELETE,
+            HttpMethod::HEAD,
+            HttpMethod::OPTIONS,
+            HttpMethod::PATCH,
+            HttpMethod::TRACE,
+            HttpMethod::CONNECT,
+        ]
+    }
+}
 
-impl std::fmt::Display for HttpMethod { 
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { 
-        write!(f, "{}", self.to_string()) 
-    } 
-} 
+impl std::fmt::Display for HttpMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
 
-impl Default for HttpMethod { 
-    fn default() -> Self { 
-        HttpMethod::GET  
-    } 
-} 
+impl Default for HttpMethod {
+    fn default() -> Self {
+        HttpMethod::GET
+    }
+}
 
-impl PartialEq<&HttpMethod> for HttpMethod { 
-    fn eq(&self, other: &&HttpMethod) -> bool { 
-        self == *other 
-    } 
-} 
+impl PartialEq<&HttpMethod> for HttpMethod {
+    fn eq(&self, other: &&HttpMethod) -> bool {
+        self == *other
+    }
+}
 
 impl PartialEq<HttpMethod> for &HttpMethod {
     fn eq(&self, other: &HttpMethod) -> bool {
         **self == *other
     }
-} 
+}
 
 /// Represents HTTP status codes.
 ///
@@ -248,7 +248,7 @@ impl StatusCode {
             StatusCode::SWITCHING_PROTOCOLS => "101 Switching Protocols",
             StatusCode::PROCESSING => "102 Processing",
             StatusCode::EARLY_HINTS => "103 Early Hints",
-            
+
             StatusCode::OK => "200 OK",
             StatusCode::CREATED => "201 Created",
             StatusCode::ACCEPTED => "202 Accepted",
@@ -259,7 +259,7 @@ impl StatusCode {
             StatusCode::MULTI_STATUS => "207 Multi-Status",
             StatusCode::ALREADY_REPORTED => "208 Already Reported",
             StatusCode::IM_USED => "226 IM Used",
-            
+
             StatusCode::MULTIPLE_CHOICES => "300 Multiple Choices",
             StatusCode::MOVED_PERMANENTLY => "301 Moved Permanently",
             StatusCode::FOUND => "302 Found",
@@ -268,7 +268,7 @@ impl StatusCode {
             StatusCode::USE_PROXY => "305 Use Proxy",
             StatusCode::TEMPORARY_REDIRECT => "307 Temporary Redirect",
             StatusCode::PERMANENT_REDIRECT => "308 Permanent Redirect",
-            
+
             StatusCode::BAD_REQUEST => "400 Bad Request",
             StatusCode::UNAUTHORIZED => "401 Unauthorized",
             StatusCode::PAYMENT_REQUIRED => "402 Payment Required",
@@ -298,7 +298,7 @@ impl StatusCode {
             StatusCode::TOO_MANY_REQUESTS => "429 Too Many Requests",
             StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE => "431 Request Header Fields Too Large",
             StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS => "451 Unavailable For Legal Reasons",
-            
+
             StatusCode::INTERNAL_SERVER_ERROR => "500 Internal Server Error",
             StatusCode::NOT_IMPLEMENTED => "501 Not Implemented",
             StatusCode::BAD_GATEWAY => "502 Bad Gateway",
@@ -310,9 +310,10 @@ impl StatusCode {
             StatusCode::LOOP_DETECTED => "508 Loop Detected",
             StatusCode::NOT_EXTENDED => "510 Not Extended",
             StatusCode::NETWORK_AUTHENTICATION_REQUIRED => "511 Network Authentication Required",
-            
+
             StatusCode::UNKNOWN => "0 Unknown",
-        }.to_string()
+        }
+        .to_string()
     }
 
     /// Gets only the reason phrase part of the status code.
@@ -326,7 +327,7 @@ impl StatusCode {
             StatusCode::SWITCHING_PROTOCOLS => "Switching Protocols",
             StatusCode::PROCESSING => "Processing",
             StatusCode::EARLY_HINTS => "Early Hints",
-            
+
             StatusCode::OK => "OK",
             StatusCode::CREATED => "Created",
             StatusCode::ACCEPTED => "Accepted",
@@ -337,7 +338,7 @@ impl StatusCode {
             StatusCode::MULTI_STATUS => "Multi-Status",
             StatusCode::ALREADY_REPORTED => "Already Reported",
             StatusCode::IM_USED => "IM Used",
-            
+
             StatusCode::MULTIPLE_CHOICES => "Multiple Choices",
             StatusCode::MOVED_PERMANENTLY => "Moved Permanently",
             StatusCode::FOUND => "Found",
@@ -346,7 +347,7 @@ impl StatusCode {
             StatusCode::USE_PROXY => "Use Proxy",
             StatusCode::TEMPORARY_REDIRECT => "Temporary Redirect",
             StatusCode::PERMANENT_REDIRECT => "Permanent Redirect",
-            
+
             StatusCode::BAD_REQUEST => "Bad Request",
             StatusCode::UNAUTHORIZED => "Unauthorized",
             StatusCode::PAYMENT_REQUIRED => "Payment Required",
@@ -376,7 +377,7 @@ impl StatusCode {
             StatusCode::TOO_MANY_REQUESTS => "Too Many Requests",
             StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE => "Request Header Fields Too Large",
             StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS => "Unavailable For Legal Reasons",
-            
+
             StatusCode::INTERNAL_SERVER_ERROR => "Internal Server Error",
             StatusCode::NOT_IMPLEMENTED => "Not Implemented",
             StatusCode::BAD_GATEWAY => "Bad Gateway",
@@ -388,7 +389,7 @@ impl StatusCode {
             StatusCode::LOOP_DETECTED => "Loop Detected",
             StatusCode::NOT_EXTENDED => "Not Extended",
             StatusCode::NETWORK_AUTHENTICATION_REQUIRED => "Network Authentication Required",
-            
+
             StatusCode::UNKNOWN => "Unknown",
         }
     }
@@ -408,7 +409,7 @@ impl StatusCode {
             101 => StatusCode::SWITCHING_PROTOCOLS,
             102 => StatusCode::PROCESSING,
             103 => StatusCode::EARLY_HINTS,
-            
+
             200 => StatusCode::OK,
             201 => StatusCode::CREATED,
             202 => StatusCode::ACCEPTED,
@@ -419,7 +420,7 @@ impl StatusCode {
             207 => StatusCode::MULTI_STATUS,
             208 => StatusCode::ALREADY_REPORTED,
             226 => StatusCode::IM_USED,
-            
+
             300 => StatusCode::MULTIPLE_CHOICES,
             301 => StatusCode::MOVED_PERMANENTLY,
             302 => StatusCode::FOUND,
@@ -428,7 +429,7 @@ impl StatusCode {
             305 => StatusCode::USE_PROXY,
             307 => StatusCode::TEMPORARY_REDIRECT,
             308 => StatusCode::PERMANENT_REDIRECT,
-            
+
             400 => StatusCode::BAD_REQUEST,
             401 => StatusCode::UNAUTHORIZED,
             402 => StatusCode::PAYMENT_REQUIRED,
@@ -458,7 +459,7 @@ impl StatusCode {
             429 => StatusCode::TOO_MANY_REQUESTS,
             431 => StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
             451 => StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS,
-            
+
             500 => StatusCode::INTERNAL_SERVER_ERROR,
             501 => StatusCode::NOT_IMPLEMENTED,
             502 => StatusCode::BAD_GATEWAY,
@@ -470,7 +471,7 @@ impl StatusCode {
             508 => StatusCode::LOOP_DETECTED,
             510 => StatusCode::NOT_EXTENDED,
             511 => StatusCode::NETWORK_AUTHENTICATION_REQUIRED,
-            
+
             _ => StatusCode::UNKNOWN,
         }
     }
@@ -489,14 +490,14 @@ impl StatusCode {
         if let Ok(num) = code.split_whitespace().next().unwrap_or("").parse::<u16>() {
             return StatusCode::from_u16(num);
         }
-        
+
         // If that fails, try matching the full string
         match code {
             "100 Continue" => StatusCode::CONTINUE,
             "101 Switching Protocols" => StatusCode::SWITCHING_PROTOCOLS,
             "102 Processing" => StatusCode::PROCESSING,
             "103 Early Hints" => StatusCode::EARLY_HINTS,
-            
+
             "200 OK" => StatusCode::OK,
             "201 Created" => StatusCode::CREATED,
             "202 Accepted" => StatusCode::ACCEPTED,
@@ -507,7 +508,7 @@ impl StatusCode {
             "207 Multi-Status" => StatusCode::MULTI_STATUS,
             "208 Already Reported" => StatusCode::ALREADY_REPORTED,
             "226 IM Used" => StatusCode::IM_USED,
-            
+
             "300 Multiple Choices" => StatusCode::MULTIPLE_CHOICES,
             "301 Moved Permanently" => StatusCode::MOVED_PERMANENTLY,
             "302 Found" => StatusCode::FOUND,
@@ -516,7 +517,7 @@ impl StatusCode {
             "305 Use Proxy" => StatusCode::USE_PROXY,
             "307 Temporary Redirect" => StatusCode::TEMPORARY_REDIRECT,
             "308 Permanent Redirect" => StatusCode::PERMANENT_REDIRECT,
-            
+
             "400 Bad Request" => StatusCode::BAD_REQUEST,
             "401 Unauthorized" => StatusCode::UNAUTHORIZED,
             "402 Payment Required" => StatusCode::PAYMENT_REQUIRED,
@@ -546,7 +547,7 @@ impl StatusCode {
             "429 Too Many Requests" => StatusCode::TOO_MANY_REQUESTS,
             "431 Request Header Fields Too Large" => StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
             "451 Unavailable For Legal Reasons" => StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS,
-            
+
             "500 Internal Server Error" => StatusCode::INTERNAL_SERVER_ERROR,
             "501 Not Implemented" => StatusCode::NOT_IMPLEMENTED,
             "502 Bad Gateway" => StatusCode::BAD_GATEWAY,
@@ -558,7 +559,7 @@ impl StatusCode {
             "508 Loop Detected" => StatusCode::LOOP_DETECTED,
             "510 Not Extended" => StatusCode::NOT_EXTENDED,
             "511 Network Authentication Required" => StatusCode::NETWORK_AUTHENTICATION_REQUIRED,
-            
+
             _ => StatusCode::UNKNOWN,
         }
     }
@@ -657,7 +658,7 @@ impl StatusCode {
     pub fn is_created(&self) -> bool {
         *self == StatusCode::CREATED
     }
-    
+
     /// Checks if the status code indicates that the client is not authorized (401 Unauthorized).
     ///
     /// # Returns
@@ -702,37 +703,58 @@ impl From<StatusCode> for String {
     fn from(code: StatusCode) -> Self {
         code.to_string()
     }
-} 
+}
 
-/// Represents the content type of an HTTP message. 
-/// This enum is used to parse and construct HTTP headers related to content type. 
-/// It includes well-known content types like text, application, image, audio, video, and multipart. 
-/// It also includes a generic Other variant for any other content types. 
+/// Represents the content type of an HTTP message.
+/// This enum is used to parse and construct HTTP headers related to content type.
+/// It includes well-known content types like text, application, image, audio, video, and multipart.
+/// It also includes a generic Other variant for any other content types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HttpContentType {
     // Well-known content types
-    Text { subtype: String, charset: Option<String> },
-    Application { subtype: String, parameters: Option<Vec<(String, String)>> },
-    Image { subtype: String },
-    Audio { subtype: String },
-    Video { subtype: String }, 
-    Model { subtype: String }, 
-    Multipart { subtype: String, boundary: Option<String> },
-    Other { type_name: String, subtype: String, parameters: Option<Vec<(String, String)>> },
-} 
+    Text {
+        subtype: String,
+        charset: Option<String>,
+    },
+    Application {
+        subtype: String,
+        parameters: Option<Vec<(String, String)>>,
+    },
+    Image {
+        subtype: String,
+    },
+    Audio {
+        subtype: String,
+    },
+    Video {
+        subtype: String,
+    },
+    Model {
+        subtype: String,
+    },
+    Multipart {
+        subtype: String,
+        boundary: Option<String>,
+    },
+    Other {
+        type_name: String,
+        subtype: String,
+        parameters: Option<Vec<(String, String)>>,
+    },
+}
 
 impl HttpContentType {
-    /// Converts a string into an HttpContentType enum variant 
+    /// Converts a string into an HttpContentType enum variant
     /// This function parses the content type string and extracts the main type, subtype, and any parameters.
     /// It supports well-known content types like text, application, image, audio, video, and multipart. ]
-    /// 
-    /// # Examples 
-    /// 
-    /// ```rust 
-    /// use hotaru_core::http::http_value::HttpContentType; 
-    /// let content_type = HttpContentType::from_str("text/html; charset=UTF-8"); 
-    /// assert_eq!(content_type, HttpContentType::Text { subtype: "html".to_string(), charset: Some("UTF-8".to_string()) }); 
-    /// ``` 
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use hotaru_core::http::http_value::HttpContentType;
+    /// let content_type = HttpContentType::from_str("text/html; charset=UTF-8");
+    /// assert_eq!(content_type, HttpContentType::Text { subtype: "html".to_string(), charset: Some("UTF-8".to_string()) });
+    /// ```
     pub fn from_str(content_type: &str) -> Self {
         let parts: Vec<&str> = content_type.split(';').collect();
         let main_part = parts[0].trim();
@@ -741,7 +763,10 @@ impl HttpContentType {
         for part in &parts[1..] {
             let param_parts: Vec<&str> = part.split('=').collect();
             if param_parts.len() == 2 {
-                parameters.push((param_parts[0].trim().to_string(), param_parts[1].trim().to_string()));
+                parameters.push((
+                    param_parts[0].trim().to_string(),
+                    param_parts[1].trim().to_string(),
+                ));
             }
         }
 
@@ -752,63 +777,66 @@ impl HttpContentType {
         };
 
         match type_name {
-            "text" => Self::Text { 
-                subtype: subtype.to_string(), 
+            "text" => Self::Text {
+                subtype: subtype.to_string(),
                 charset: Self::find_value_from_vec(&parameters, "charset"),
-            }, 
-            "application" => Self::Application { 
-                subtype: subtype.to_string(), 
-                parameters: Some(parameters) 
             },
-            "image" => Self::Image { 
-                subtype: subtype.to_string() 
+            "application" => Self::Application {
+                subtype: subtype.to_string(),
+                parameters: Some(parameters),
             },
-            "audio" => Self::Audio { 
-                subtype: subtype.to_string() 
+            "image" => Self::Image {
+                subtype: subtype.to_string(),
             },
-            "video" => Self::Video { 
-                subtype: subtype.to_string() 
-            }, 
-            "model" => Self::Model { 
-                subtype: subtype.to_string() 
-            }, 
-            "multipart" => Self::Multipart { 
-                subtype: subtype.to_string(), 
-                boundary: Self::find_value_from_vec(&parameters, "boundary"),  
+            "audio" => Self::Audio {
+                subtype: subtype.to_string(),
+            },
+            "video" => Self::Video {
+                subtype: subtype.to_string(),
+            },
+            "model" => Self::Model {
+                subtype: subtype.to_string(),
+            },
+            "multipart" => Self::Multipart {
+                subtype: subtype.to_string(),
+                boundary: Self::find_value_from_vec(&parameters, "boundary"),
             },
             _ => Self::Other {
-                type_name: type_name.to_string(), 
-                subtype: subtype.to_string(), 
-                parameters: Some(parameters) 
+                type_name: type_name.to_string(),
+                subtype: subtype.to_string(),
+                parameters: Some(parameters),
             },
-        } 
-    } 
+        }
+    }
 
-    /// Find value from Vec<(String, String)> 
-    /// # Examples 
-    /// ```rust 
-    /// use hotaru_core::http::http_value::HttpContentType; 
-    /// let vec = vec![("key1".to_string(), "value1".to_string()), ("key2".to_string(), "value2".to_string())]; 
-    /// let value = HttpContentType::find_value_from_vec(&vec, "key1"); 
-    /// assert_eq!(value, Some("value1".to_string())); 
-    /// ``` 
-    pub fn find_value_from_vec(vec: &Vec<(String, String)>, key: &str) -> Option<String> { 
-        for (k, v) in vec { 
-            if k == key { 
-                return Some(v.clone()); 
-            } 
-        } 
-        None 
-    } 
+    /// Find value from Vec<(String, String)>
+    /// # Examples
+    /// ```rust
+    /// use hotaru_core::http::http_value::HttpContentType;
+    /// let vec = vec![("key1".to_string(), "value1".to_string()), ("key2".to_string(), "value2".to_string())];
+    /// let value = HttpContentType::find_value_from_vec(&vec, "key1");
+    /// assert_eq!(value, Some("value1".to_string()));
+    /// ```
+    pub fn find_value_from_vec(vec: &Vec<(String, String)>, key: &str) -> Option<String> {
+        for (k, v) in vec {
+            if k == key {
+                return Some(v.clone());
+            }
+        }
+        None
+    }
 
     /// Converts an HttpContentType enum variant into its string representation
     pub fn to_string(&self) -> String {
         match self {
             HttpContentType::Text { subtype, charset } => match charset {
                 Some(cs) => format!("text/{}; charset={}", subtype, cs),
-                None => format!("text/{}", subtype)
-            }, 
-            HttpContentType::Application { subtype, parameters } => {
+                None => format!("text/{}", subtype),
+            },
+            HttpContentType::Application {
+                subtype,
+                parameters,
+            } => {
                 let mut result = format!("application/{}", subtype);
                 if let Some(params) = parameters {
                     for (key, value) in params {
@@ -816,19 +844,23 @@ impl HttpContentType {
                     }
                 }
                 result
-            },
+            }
             HttpContentType::Image { subtype } => format!("image/{}", subtype),
             HttpContentType::Audio { subtype } => format!("audio/{}", subtype),
             HttpContentType::Video { subtype } => format!("video/{}", subtype),
-            HttpContentType::Model { subtype } => format!("model/{}", subtype), 
+            HttpContentType::Model { subtype } => format!("model/{}", subtype),
             HttpContentType::Multipart { subtype, boundary } => {
                 if let Some(b) = boundary {
                     format!("multipart/{}; boundary={}", subtype, b)
                 } else {
                     format!("multipart/{}", subtype)
                 }
-            },
-            HttpContentType::Other { type_name, subtype, parameters } => {
+            }
+            HttpContentType::Other {
+                type_name,
+                subtype,
+                parameters,
+            } => {
                 let mut result = format!("{}/{}", type_name, subtype);
                 if let Some(params) = parameters {
                     for (key, value) in params {
@@ -836,15 +868,15 @@ impl HttpContentType {
                     }
                 }
                 result
-            } 
+            }
         }
-    } 
+    }
 
     /// Get content type based on file extension
     /// # Examples
     /// ```
     /// use hotaru_core::http::http_value::HttpContentType;
-    /// 
+    ///
     /// let content_type = HttpContentType::from_extension("html");
     /// assert_eq!(content_type, HttpContentType::TextHtml());
     ///
@@ -867,7 +899,7 @@ impl HttpContentType {
             "zip" | "jar" | "war" => Self::ApplicationZip(),
             "wasm" => Self::ApplicationWasm(),
             "bin" => Self::ApplicationOctetStream(),
-            
+
             // Image types
             "png" => Self::ImagePng(),
             "jpg" | "jpeg" | "jpe" | "jif" | "jfif" => Self::ImageJpeg(),
@@ -875,46 +907,90 @@ impl HttpContentType {
             "svg" | "svgz" => Self::ImageSvg(),
             "webp" => Self::ImageWebp(),
             "bmp" | "dib" => Self::ImageBmp(),
-            "ico" => Self::Image { subtype: "x-icon".to_string() },
-            "tiff" | "tif" => Self::Image { subtype: "tiff".to_string() },
+            "ico" => Self::Image {
+                subtype: "x-icon".to_string(),
+            },
+            "tiff" | "tif" => Self::Image {
+                subtype: "tiff".to_string(),
+            },
 
             // Audio types
             "mp3" => Self::AudioMpeg(),
-            "wav" => Self::Audio { subtype: "wav".to_string() },
-            "ogg" => Self::Audio { subtype: "ogg".to_string() },
-            "flac" => Self::Audio { subtype: "flac".to_string() },
+            "wav" => Self::Audio {
+                subtype: "wav".to_string(),
+            },
+            "ogg" => Self::Audio {
+                subtype: "ogg".to_string(),
+            },
+            "flac" => Self::Audio {
+                subtype: "flac".to_string(),
+            },
 
             // Video types
             "mp4" | "m4v" => Self::VideoMp4(),
-            "mov" => Self::Video { subtype: "quicktime".to_string() },
-            "webm" => Self::Video { subtype: "webm".to_string() },
-            "avi" => Self::Video { subtype: "x-msvideo".to_string() },
+            "mov" => Self::Video {
+                subtype: "quicktime".to_string(),
+            },
+            "webm" => Self::Video {
+                subtype: "webm".to_string(),
+            },
+            "avi" => Self::Video {
+                subtype: "x-msvideo".to_string(),
+            },
 
             // Model types
             "stl" => Self::ModelStl(),
             "obj" => Self::ModelObj(),
-            "glb" => Self::Model { subtype: "gltf-binary".to_string() },
-            "gltf" => Self::Model { subtype: "gltf+json".to_string() },
+            "glb" => Self::Model {
+                subtype: "gltf-binary".to_string(),
+            },
+            "gltf" => Self::Model {
+                subtype: "gltf+json".to_string(),
+            },
 
             // Documents
-            "doc" => Self::Application { subtype: "msword".to_string(), parameters: None },
-            "docx" => Self::Application { subtype: "vnd.openxmlformats-officedocument.wordprocessingml.document".to_string(), parameters: None },
-            "xls" => Self::Application { subtype: "vnd.ms-excel".to_string(), parameters: None },
-            "xlsx" => Self::Application { subtype: "vnd.openxmlformats-officedocument.spreadsheetml.sheet".to_string(), parameters: None },
-            "ppt" => Self::Application { subtype: "vnd.ms-powerpoint".to_string(), parameters: None },
-            "pptx" => Self::Application { subtype: "vnd.openxmlformats-officedocument.presentationml.presentation".to_string(), parameters: None },
-            
+            "doc" => Self::Application {
+                subtype: "msword".to_string(),
+                parameters: None,
+            },
+            "docx" => Self::Application {
+                subtype: "vnd.openxmlformats-officedocument.wordprocessingml.document".to_string(),
+                parameters: None,
+            },
+            "xls" => Self::Application {
+                subtype: "vnd.ms-excel".to_string(),
+                parameters: None,
+            },
+            "xlsx" => Self::Application {
+                subtype: "vnd.openxmlformats-officedocument.spreadsheetml.sheet".to_string(),
+                parameters: None,
+            },
+            "ppt" => Self::Application {
+                subtype: "vnd.ms-powerpoint".to_string(),
+                parameters: None,
+            },
+            "pptx" => Self::Application {
+                subtype: "vnd.openxmlformats-officedocument.presentationml.presentation"
+                    .to_string(),
+                parameters: None,
+            },
+
             // Archive formats
-            "tar" => Self::Application { subtype: "x-tar".to_string(), parameters: None },
-            "gz" | "tgz" => Self::Application { subtype: "gzip".to_string(), parameters: None },
+            "tar" => Self::Application {
+                subtype: "x-tar".to_string(),
+                parameters: None,
+            },
+            "gz" | "tgz" => Self::Application {
+                subtype: "gzip".to_string(),
+                parameters: None,
+            },
 
             // Special cases
             "form" => Self::ApplicationUrlEncodedForm(),
             // "multipart" => Self::MultipartFormData(),
-            
             _ => Self::ApplicationOctetStream(),
         }
-    } 
+    }
 
     /// Get content type based on file name
     /// This function extracts the extension from the file name and determines the appropriate content type.
@@ -924,7 +1000,7 @@ impl HttpContentType {
     ///
     /// ```rust
     /// use hotaru_core::http::http_value::HttpContentType;
-    /// 
+    ///
     /// let content_type = HttpContentType::from_file_name("index.html");
     /// assert_eq!(content_type, HttpContentType::TextHtml());
     ///
@@ -948,124 +1024,148 @@ impl HttpContentType {
             },
             None => Self::ApplicationOctetStream(),
         }
-    } 
-    
+    }
+
     // ======================
     // TEXT Content Types
-    // ====================== 
-    pub fn TextHtml() -> Self { 
-        Self::Text { subtype: "html".to_string(), charset: Some("UTF-8".to_string()) } 
-    } 
+    // ======================
+    pub fn TextHtml() -> Self {
+        Self::Text {
+            subtype: "html".to_string(),
+            charset: Some("UTF-8".to_string()),
+        }
+    }
 
-    pub fn TextPlain() -> Self { 
-        Self::Text { subtype: "plain".to_string(), charset: Some("UTF-8".to_string()) } 
-    } 
+    pub fn TextPlain() -> Self {
+        Self::Text {
+            subtype: "plain".to_string(),
+            charset: Some("UTF-8".to_string()),
+        }
+    }
 
     pub fn TextCss() -> Self {
-        Self::Text { 
-            subtype: "css".to_string(), 
-            charset: Some("UTF-8".to_string()) 
+        Self::Text {
+            subtype: "css".to_string(),
+            charset: Some("UTF-8".to_string()),
         }
-    } 
+    }
 
     pub fn TextXml() -> Self {
-        Self::Text { 
-            subtype: "xml".to_string(), 
-            charset: Some("UTF-8".to_string()) 
+        Self::Text {
+            subtype: "xml".to_string(),
+            charset: Some("UTF-8".to_string()),
         }
     }
 
     pub fn TextCsv() -> Self {
-        Self::Text { 
-            subtype: "csv".to_string(), 
-            charset: Some("UTF-8".to_string()) 
+        Self::Text {
+            subtype: "csv".to_string(),
+            charset: Some("UTF-8".to_string()),
         }
-    } 
+    }
 
     // ======================
     // APPLICATION Content Types
-    // ====================== 
+    // ======================
     pub fn ApplicationJavascript() -> Self {
-        Self::Application { 
-            subtype: "javascript".to_string(), 
-            parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]) 
+        Self::Application {
+            subtype: "javascript".to_string(),
+            parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]),
         }
-    } 
-
-    pub fn ApplicationJson() -> Self { 
-        Self::Application { subtype: "json".to_string(), parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]) } 
-    } 
-
-    pub fn ApplicationUrlEncodedForm() -> Self { 
-        Self::Application { subtype: "x-www-form-urlencoded".to_string(), parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]) } 
     }
 
-    pub fn ApplicationXml() -> Self { 
-        Self::Application { subtype: "xml".to_string(), parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]) } 
-    } 
+    pub fn ApplicationJson() -> Self {
+        Self::Application {
+            subtype: "json".to_string(),
+            parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]),
+        }
+    }
 
-    pub fn ApplicationOctetStream() -> Self { 
-        Self::Application { subtype: "octet-stream".to_string(), parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]) } 
-    } 
+    pub fn ApplicationUrlEncodedForm() -> Self {
+        Self::Application {
+            subtype: "x-www-form-urlencoded".to_string(),
+            parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]),
+        }
+    }
+
+    pub fn ApplicationXml() -> Self {
+        Self::Application {
+            subtype: "xml".to_string(),
+            parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]),
+        }
+    }
+
+    pub fn ApplicationOctetStream() -> Self {
+        Self::Application {
+            subtype: "octet-stream".to_string(),
+            parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]),
+        }
+    }
 
     pub fn ApplicationPdf() -> Self {
-        Self::Application { 
-            subtype: "pdf".to_string(), 
-            parameters: None 
+        Self::Application {
+            subtype: "pdf".to_string(),
+            parameters: None,
         }
     }
 
     pub fn ApplicationZip() -> Self {
-        Self::Application { 
-            subtype: "zip".to_string(), 
-            parameters: None 
+        Self::Application {
+            subtype: "zip".to_string(),
+            parameters: None,
         }
-    } 
+    }
 
     pub fn ApplicationPkcs8() -> Self {
-        Self::Application { 
-            subtype: "pkcs8".to_string(), 
-            parameters: None 
+        Self::Application {
+            subtype: "pkcs8".to_string(),
+            parameters: None,
         }
     }
 
     pub fn ApplicationWasm() -> Self {
-        Self::Application { 
-            subtype: "wasm".to_string(), 
-            parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]) 
+        Self::Application {
+            subtype: "wasm".to_string(),
+            parameters: Some(vec![("charset".to_string(), "UTF-8".to_string())]),
         }
-    } 
+    }
 
     // ======================
     // IMAGE Content Types
-    // ====================== 
+    // ======================
     pub fn ImagePng() -> Self {
-        Self::Image { subtype: "png".to_string() }
+        Self::Image {
+            subtype: "png".to_string(),
+        }
     }
 
     pub fn ImageJpeg() -> Self {
-        Self::Image { subtype: "jpeg".to_string() }
+        Self::Image {
+            subtype: "jpeg".to_string(),
+        }
     }
 
     pub fn ImageGif() -> Self {
-        Self::Image { subtype: "gif".to_string() }
-    } 
+        Self::Image {
+            subtype: "gif".to_string(),
+        }
+    }
 
     pub fn ImageSvg() -> Self {
-        Self::Image { 
-            subtype: "svg+xml".to_string() 
+        Self::Image {
+            subtype: "svg+xml".to_string(),
         }
     }
 
     pub fn ImageWebp() -> Self {
-        Self::Image { 
-            subtype: "webp".to_string() 
+        Self::Image {
+            subtype: "webp".to_string(),
         }
     }
 
     pub fn ImageBmp() -> Self {
-        Self::Image { 
-            subtype: "bmp".to_string() 
+        Self::Image {
+            subtype: "bmp".to_string(),
         }
     }
 
@@ -1073,29 +1173,29 @@ impl HttpContentType {
     // AUDIO/VIDEO Content Types
     // ======================
     pub fn AudioMpeg() -> Self {
-        Self::Audio { 
-            subtype: "mpeg".to_string() 
+        Self::Audio {
+            subtype: "mpeg".to_string(),
         }
     }
 
     pub fn VideoMp4() -> Self {
-        Self::Video { 
-            subtype: "mp4".to_string() 
+        Self::Video {
+            subtype: "mp4".to_string(),
         }
-    } 
+    }
 
-    // ====================== 
-    // MODEL Content Types 
-    // ====================== 
+    // ======================
+    // MODEL Content Types
+    // ======================
     pub fn ModelStl() -> Self {
-        Self::Model { 
-            subtype: "stl".to_string() 
+        Self::Model {
+            subtype: "stl".to_string(),
         }
     }
 
     pub fn ModelObj() -> Self {
-        Self::Model { 
-            subtype: "obj".to_string() 
+        Self::Model {
+            subtype: "obj".to_string(),
         }
     }
 }
@@ -1104,17 +1204,17 @@ impl std::fmt::Display for HttpContentType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_string())
     }
-} 
+}
 
-impl Default for HttpContentType { 
+impl Default for HttpContentType {
     fn default() -> Self {
-        Self::Other { 
-            type_name: "Unknown".to_string(), 
-            subtype: "Unknown".to_string(), 
-            parameters: None, 
+        Self::Other {
+            type_name: "Unknown".to_string(),
+            subtype: "Unknown".to_string(),
+            parameters: None,
         }
     }
-} 
+}
 
 /// Error type for Content-Disposition operations
 #[derive(Debug)]
@@ -1136,7 +1236,9 @@ impl std::fmt::Display for ContentDispositionError {
         match self {
             Self::EmptyHeader => write!(f, "Empty Content-Disposition header"),
             Self::InvalidParameterFormat(s) => write!(f, "Invalid parameter format: {}", s),
-            Self::InvalidExtendedParameter(s) => write!(f, "Invalid extended parameter format: {}", s),
+            Self::InvalidExtendedParameter(s) => {
+                write!(f, "Invalid extended parameter format: {}", s)
+            }
             Self::Utf8DecodingError(s) => write!(f, "UTF-8 decoding error: {}", s),
             Self::InvalidCharset(s) => write!(f, "Invalid charset: {}", s),
         }
@@ -1169,7 +1271,7 @@ impl std::error::Error for ContentDispositionError {}
 /// assert_eq!(parsed.filename().unwrap(), "📖.txt");
 /// ```
 #[derive(Debug, Clone, PartialEq)]
-pub struct ContentDisposition { 
+pub struct ContentDisposition {
     disposition_type: ContentDispositionType,
     // Unified parameter storage - stores both regular and extended parameters
     parameters: HashMap<String, ParameterValue>,
@@ -1184,11 +1286,11 @@ pub enum ParameterValue {
     Extended(ExtendedValue),
 }
 
-/// Represents an extended parameter value as defined in RFC 5987. 
-/// 
-/// Note that currently only utf-8 is supported 
+/// Represents an extended parameter value as defined in RFC 5987.
 ///
-/// Extended parameter values have the format: `charset'language'value` 
+/// Note that currently only utf-8 is supported
+///
+/// Extended parameter values have the format: `charset'language'value`
 /// where:
 /// - `charset` is the character encoding (e.g., "UTF-8")
 /// - `language` is an optional language tag (can be empty)
@@ -1211,18 +1313,18 @@ pub struct ExtendedValue {
 /// - `FormData`: Content is part of a multipart form submission
 /// - `Other`: Any other disposition type not covered by the standard types
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ContentDispositionType { 
+pub enum ContentDispositionType {
     /// Content that should be displayed inline in the browser
-    Inline, 
+    Inline,
     /// Content that should be downloaded as a file
-    Attachment, 
+    Attachment,
     /// Content that is part of a multipart form submission
-    FormData, 
+    FormData,
     /// Any other disposition type not covered by the standard types
-    Other(String),  
+    Other(String),
 }
 
-impl ContentDispositionType { 
+impl ContentDispositionType {
     /// Creates a `ContentDispositionType` from a string.
     ///
     /// The comparison is case-insensitive. If the string does not match one of the
@@ -1235,29 +1337,29 @@ impl ContentDispositionType {
     /// # Returns
     ///
     /// A `ContentDispositionType` corresponding to the input string
-    pub fn from_string<A: AsRef<str>>(string: A) -> Self { 
-        let string = string.as_ref().to_lowercase(); 
-        match string.as_str() { 
-            "inline" => ContentDispositionType::Inline, 
-            "attachment" => ContentDispositionType::Attachment, 
-            "form-data" => ContentDispositionType::FormData, 
-            _ => ContentDispositionType::Other(string), 
-        } 
-    } 
+    pub fn from_string<A: AsRef<str>>(string: A) -> Self {
+        let string = string.as_ref().to_lowercase();
+        match string.as_str() {
+            "inline" => ContentDispositionType::Inline,
+            "attachment" => ContentDispositionType::Attachment,
+            "form-data" => ContentDispositionType::FormData,
+            _ => ContentDispositionType::Other(string),
+        }
+    }
 
     /// Converts the `ContentDispositionType` to its string representation.
     ///
     /// # Returns
     ///
     /// A `String` containing the canonical string representation of the type
-    pub fn to_string(&self) -> String { 
-        match self { 
-            ContentDispositionType::Inline => "inline".to_string(), 
-            ContentDispositionType::Attachment => "attachment".to_string(), 
-            ContentDispositionType::FormData => "form-data".to_string(), 
-            ContentDispositionType::Other(s) => s.to_string(), 
-        } 
-    } 
+    pub fn to_string(&self) -> String {
+        match self {
+            ContentDispositionType::Inline => "inline".to_string(),
+            ContentDispositionType::Attachment => "attachment".to_string(),
+            ContentDispositionType::FormData => "form-data".to_string(),
+            ContentDispositionType::Other(s) => s.to_string(),
+        }
+    }
 }
 
 impl ExtendedValue {
@@ -1272,7 +1374,11 @@ impl ExtendedValue {
     /// # Returns
     ///
     /// A new `ExtendedValue`
-    pub fn new<S1: Into<String>, S2: Into<String>, S3: Into<String>>(charset: S1, language: S2, value: S3) -> Self {
+    pub fn new<S1: Into<String>, S2: Into<String>, S3: Into<String>>(
+        charset: S1,
+        language: S2,
+        value: S3,
+    ) -> Self {
         ExtendedValue {
             charset: charset.into(),
             language: language.into(),
@@ -1291,25 +1397,28 @@ impl ExtendedValue {
     /// `Result<ExtendedValue, ContentDispositionError>` containing either the parsed value or an error
     pub fn parse(value: &str) -> Result<Self, ContentDispositionError> {
         let mut parts = value.splitn(3, '\'');
-        
-        let charset = parts.next()
-            .ok_or_else(|| ContentDispositionError::InvalidExtendedParameter("missing charset".to_string()))?;
-        
-        let language = parts.next()
-            .ok_or_else(|| ContentDispositionError::InvalidExtendedParameter("missing language".to_string()))?;
-        
-        let encoded_value = parts.next()
-            .ok_or_else(|| ContentDispositionError::InvalidExtendedParameter("missing value".to_string()))?;
-        
+
+        let charset = parts.next().ok_or_else(|| {
+            ContentDispositionError::InvalidExtendedParameter("missing charset".to_string())
+        })?;
+
+        let language = parts.next().ok_or_else(|| {
+            ContentDispositionError::InvalidExtendedParameter("missing language".to_string())
+        })?;
+
+        let encoded_value = parts.next().ok_or_else(|| {
+            ContentDispositionError::InvalidExtendedParameter("missing value".to_string())
+        })?;
+
         // Decode the percent-encoded value
-        let bytes = percent_decode(encoded_value.as_bytes()).collect::<Vec<u8>>(); 
-        
-        let decoded_value: String  = if charset.eq_ignore_ascii_case("utf-8") { 
+        let bytes = percent_decode(encoded_value.as_bytes()).collect::<Vec<u8>>();
+
+        let decoded_value: String = if charset.eq_ignore_ascii_case("utf-8") {
             String::from_utf8(bytes)
-                .map_err(|e| ContentDispositionError::Utf8DecodingError(e.to_string()))? 
-        } else { 
-            Err(ContentDispositionError::InvalidCharset(charset.into()))? 
-        }; 
+                .map_err(|e| ContentDispositionError::Utf8DecodingError(e.to_string()))?
+        } else {
+            Err(ContentDispositionError::InvalidCharset(charset.into()))?
+        };
 
         Ok(ExtendedValue {
             charset: charset.to_string(),
@@ -1320,8 +1429,8 @@ impl ExtendedValue {
 
     /// Gets the percent-encoded form of the value
     pub fn encoded_value(&self) -> String {
-        encode_url_owned(&self.value) 
-    } 
+        encode_url_owned(&self.value)
+    }
 
     /// Converts the extended value to its string representation.
     ///
@@ -1329,7 +1438,8 @@ impl ExtendedValue {
     ///
     /// A `String` containing the extended parameter value
     pub fn to_string(&self) -> String {
-        format!("{}'{}'{}",
+        format!(
+            "{}'{}'{}",
             self.charset,
             self.language,
             self.encoded_value()
@@ -1428,29 +1538,29 @@ impl ContentDisposition {
     /// ```
     pub fn parse(header: &str) -> Result<Self, ContentDispositionError> {
         let mut parts = header.split(';').map(|s| s.trim());
-        
+
         let first = parts.next().ok_or(ContentDispositionError::EmptyHeader)?;
         let disposition_type = ContentDispositionType::from_string(first);
         let mut disposition = ContentDisposition::new(disposition_type);
-        
+
         // Keep track of regular vs extended parameters for precedence rules
         let mut extended_params = HashMap::new();
         let mut regular_params = HashMap::new();
-        
+
         for part in parts {
             if let Some(idx) = part.find('=') {
                 let (key, value) = part.split_at(idx);
                 let key = key.trim();
                 // Skip the '=' character
                 let value = &value[1..].trim();
-                
+
                 // Check if this is an extended parameter (ends with *)
                 if key.ends_with('*') {
                     let param_name = key[..key.len() - 1].to_lowercase();
                     match ExtendedValue::parse(value) {
                         Ok(extended_value) => {
                             extended_params.insert(param_name.clone(), extended_value.clone());
-                        },
+                        }
                         Err(e) => return Err(e),
                     }
                 } else {
@@ -1460,22 +1570,29 @@ impl ContentDisposition {
                     regular_params.insert(param_name.clone(), param_value.clone());
                 }
             } else if !part.is_empty() {
-                return Err(ContentDispositionError::InvalidParameterFormat(part.to_string()));
+                return Err(ContentDispositionError::InvalidParameterFormat(
+                    part.to_string(),
+                ));
             }
         }
-        
+
         // Apply RFC 6266 precedence rules - extended parameters override regular ones
         for (name, value) in regular_params {
             if !extended_params.contains_key(&name) {
                 disposition.set_parameter(&name, value);
             }
         }
-        
+
         // Extended parameters have precedence
         for (name, value) in extended_params {
-            disposition.set_parameter_extended(&name, &value.charset, &value.language, &value.value);
+            disposition.set_parameter_extended(
+                &name,
+                &value.charset,
+                &value.language,
+                &value.value,
+            );
         }
-        
+
         Ok(disposition)
     }
 
@@ -1554,7 +1671,8 @@ impl ContentDisposition {
     /// * `value` - The parameter value
     pub fn set_parameter<K: Into<String>, V: Into<String>>(&mut self, name: K, value: V) {
         let name = name.into().to_lowercase();
-        self.parameters.insert(name, ParameterValue::Regular(value.into()));
+        self.parameters
+            .insert(name, ParameterValue::Regular(value.into()));
     }
 
     /// Sets an extended parameter value.
@@ -1565,17 +1683,22 @@ impl ContentDisposition {
     /// * `charset` - The character set (e.g., "UTF-8")
     /// * `language` - The language tag (can be empty)
     /// * `value` - The parameter value
-    pub fn set_parameter_extended<K: Into<String>, C: Into<String>, L: Into<String>, V: Into<String>>(
-        &mut self, 
-        name: K, 
-        charset: C, 
-        language: L, 
-        value: V
+    pub fn set_parameter_extended<
+        K: Into<String>,
+        C: Into<String>,
+        L: Into<String>,
+        V: Into<String>,
+    >(
+        &mut self,
+        name: K,
+        charset: C,
+        language: L,
+        value: V,
     ) {
         let name = name.into().to_lowercase();
         self.parameters.insert(
-            name, 
-            ParameterValue::Extended(ExtendedValue::new(charset, language, value))
+            name,
+            ParameterValue::Extended(ExtendedValue::new(charset, language, value)),
         );
     }
 
@@ -1603,29 +1726,34 @@ impl ContentDisposition {
     /// A `String` containing the header value
     pub fn to_string(&self) -> String {
         let mut parts = vec![self.disposition_type.to_string()];
-        
+
         for (key, value) in &self.parameters {
             match value {
                 ParameterValue::Regular(v) => {
                     parts.push(format!("{}=\"{}\"", key, escape_quoted_string(v)));
-                },
+                }
                 ParameterValue::Extended(v) => {
                     parts.push(format!("{}*={}", key, v.to_string()));
-                    
+
                     // If this is a filename, also include a fallback ASCII parameter for better compatibility
                     if key == "filename" {
                         // Don't add ASCII fallback if the value is already ASCII
                         if !v.value.chars().all(|c| c <= '\u{7F}') {
-                            let ascii_fallback = v.value.chars()
+                            let ascii_fallback = v
+                                .value
+                                .chars()
                                 .map(|c| if c > '\u{7F}' { '_' } else { c })
                                 .collect::<String>();
-                            parts.push(format!("filename=\"{}\"", escape_quoted_string(&ascii_fallback)));
+                            parts.push(format!(
+                                "filename=\"{}\"",
+                                escape_quoted_string(&ascii_fallback)
+                            ));
                         }
                     }
-                },
+                }
             }
         }
-        
+
         parts.join("; ")
     }
 
@@ -1645,128 +1773,132 @@ impl ToString for ContentDisposition {
     }
 }
 
-pub struct HeaderConstructor{ 
-    pub headers: Vec<HeaderAttribute>
-} 
+pub struct HeaderConstructor {
+    pub headers: Vec<HeaderAttribute>,
+}
 
-impl HeaderConstructor{ 
-    pub fn build<T: Into<String>>(string: T) -> Self { 
-        let mut headers = Vec::new(); 
-        let string = string.into(); 
-        let parts: Vec<&str> = string.split(';').collect(); 
-        for part in parts { 
-            let part = part.trim(); 
-            if !part.is_empty() { 
-                headers.push(HeaderAttribute::build(part)); 
-            } 
-        } 
-        Self { headers } 
+impl HeaderConstructor {
+    pub fn build<T: Into<String>>(string: T) -> Self {
+        let mut headers = Vec::new();
+        let string = string.into();
+        let parts: Vec<&str> = string.split(';').collect();
+        for part in parts {
+            let part = part.trim();
+            if !part.is_empty() {
+                headers.push(HeaderAttribute::build(part));
+            }
+        }
+        Self { headers }
     }
 }
 
-pub struct HeaderAttribute{ 
-    pub main_value: String, 
-    pub attributes: HashMap<String, String>, 
-} 
+pub struct HeaderAttribute {
+    pub main_value: String,
+    pub attributes: HashMap<String, String>,
+}
 
-impl HeaderAttribute{ 
-    pub fn build<T: Into<String>>(part: T) -> Self{ 
-        let part = part.into(); 
-        let mut attributes = HashMap::new(); 
-        let main_value = part.split(':').next().unwrap_or("").trim().to_string(); 
-        for attr in part.split(';').skip(1) { 
-            let attr_parts: Vec<&str> = attr.split('=').collect(); 
-            if attr_parts.len() == 2 { 
-                attributes.insert(attr_parts[0].trim().to_string(), attr_parts[1].trim().to_string()); 
-            } 
-        } 
-        Self { main_value, attributes } 
+impl HeaderAttribute {
+    pub fn build<T: Into<String>>(part: T) -> Self {
+        let part = part.into();
+        let mut attributes = HashMap::new();
+        let main_value = part.split(':').next().unwrap_or("").trim().to_string();
+        for attr in part.split(';').skip(1) {
+            let attr_parts: Vec<&str> = attr.split('=').collect();
+            if attr_parts.len() == 2 {
+                attributes.insert(
+                    attr_parts[0].trim().to_string(),
+                    attr_parts[1].trim().to_string(),
+                );
+            }
+        }
+        Self {
+            main_value,
+            attributes,
+        }
     }
-}  
+}
 
-#[derive(Debug, Clone)] 
-pub struct RequestPath{ 
-    path: Vec<String>, 
-    arguments: HashMap<String, String>, 
-} 
+#[derive(Debug, Clone)]
+pub struct RequestPath {
+    path: Vec<String>,
+    arguments: HashMap<String, String>,
+}
 
-impl RequestPath{   
-    pub fn new(path: Vec<String>, arguments: HashMap<String, String>) -> Self{ 
-        Self { path, arguments }  
-    } 
+impl RequestPath {
+    pub fn new(path: Vec<String>, arguments: HashMap<String, String>) -> Self {
+        Self { path, arguments }
+    }
 
-    pub fn to_string(&self) -> String{ 
-        let mut result = String::new(); 
-        for part in &self.path { 
-            result.push('/'); 
-            result.push_str(part); 
-        } 
-        result 
-    } 
+    pub fn to_string(&self) -> String {
+        let mut result = String::new();
+        for part in &self.path {
+            result.push('/');
+            result.push_str(part);
+        }
+        result
+    }
 
-    pub fn from_string(url: &str) -> Self{ 
+    pub fn from_string(url: &str) -> Self {
         let (path_str, args_str) = match url.find('?') {
             Some(pos) => (&url[..pos], &url[pos + 1..]),
             None => (url, ""),
-        }; 
-        let mut path = Vec::new(); 
-        let parts: Vec<&str> = path_str.split('/').collect(); 
-        for part in parts { 
-            if !part.is_empty() { 
-                path.push(part.to_string()); 
-            } 
-        } 
-        let mut arguments = HashMap::new(); 
-        for arg in args_str.split('&') { 
-            let arg_parts: Vec<&str> = arg.split('=').collect(); 
-            if arg_parts.len() == 2 { 
-                arguments.insert(arg_parts[0].to_string(), arg_parts[1].to_string()); 
-            } 
-        } 
-        Self { path, arguments } 
-    } 
+        };
+        let mut path = Vec::new();
+        let parts: Vec<&str> = path_str.split('/').collect();
+        for part in parts {
+            path.push(part.to_string());
+        }
+        let mut arguments = HashMap::new();
+        for arg in args_str.split('&') {
+            let arg_parts: Vec<&str> = arg.split('=').collect();
+            if arg_parts.len() == 2 {
+                arguments.insert(arg_parts[0].to_string(), arg_parts[1].to_string());
+            }
+        }
+        Self { path, arguments }
+    }
 
-    pub fn url_part(&self, part: usize) -> String{ 
-        // if part < 0 { 
-        //     return self.path[self.path.len() as usize + part as usize].clone(); 
-        // } else if part >= self.path.len() { 
-        //     return "".to_string(); 
-        // } 
-        // self.path[part].clone()  
-        if part >= self.path.len() { 
-            return "".to_string(); 
-        } 
-        self.path[part].clone()    
-    } 
+    pub fn url_part(&self, part: usize) -> String {
+        // if part < 0 {
+        //     return self.path[self.path.len() as usize + part as usize].clone();
+        // } else if part >= self.path.len() {
+        //     return "".to_string();
+        // }
+        // self.path[part].clone()
+        if part >= self.path.len() {
+            return "".to_string();
+        }
+        self.path[part].clone()
+    }
 
     pub fn get_url_args(&self, key: &str) -> Option<String> {
         self.arguments.get(key).cloned()
-    } 
-} 
+    }
+}
 
 impl Default for RequestPath {
     fn default() -> Self {
-        Self::new(Vec::new(), HashMap::new()) 
+        Self::new(Vec::new(), HashMap::new())
     }
-} 
+}
 
 /// Represents HTTP `Accept-Language` header for client language preferences.
-/// 
+///
 /// Stores language tags with quality weights (q-values) for content negotiation.
-/// 
+///
 /// # RFC 7231 Compliance:
 /// - Language tags are case-insensitive (but stored in original case)
 /// - Default weight = 1.0 if not specified
 /// - Weights range 0.0-1.0 (higher = more preferred)
-/// - Order indicates priority for equal weights 
-#[derive(Debug, Clone, PartialEq)] 
+/// - Order indicates priority for equal weights
+#[derive(Debug, Clone, PartialEq)]
 pub struct AcceptLang {
     langs: Vec<(String, f32)>,
 }
 
 impl AcceptLang {
     /// Parses an `Accept-Language` header string
-    /// 
+    ///
     /// # Example:
     /// ```
     /// use hotaru_core::http::http_value::AcceptLang;
@@ -1775,33 +1907,33 @@ impl AcceptLang {
     /// ```
     pub fn from_str<S: AsRef<str>>(s: S) -> Self {
         let mut langs = Vec::new();
-        
+
         for lang_str in s.as_ref().split(',') {
             let mut parts = lang_str.splitn(2, ';');
             let lang = parts.next().unwrap().trim().to_string();
-            
+
             // Default weight = 1.0
             let mut weight = 1.0;
-            
+
             // Parse q-value if exists
             if let Some(q_part) = parts.next() {
                 if let Some(q_str) = q_part.trim().strip_prefix("q=") {
                     weight = q_str.trim().parse().unwrap_or(1.0);
                 }
-            } 
-            
+            }
+
             langs.push((lang, weight));
         }
-        
+
         AcceptLang { langs }
     }
 
     /// Returns most preferred language (highest weight, original case)
-    /// 
+    ///
     /// # Defaults to "en" if:
     /// - No languages exist
     /// - All weights <= 0.0
-    /// 
+    ///
     /// # Example:
     /// ```
     /// use hotaru_core::http::http_value::AcceptLang;
@@ -1810,11 +1942,12 @@ impl AcceptLang {
     /// assert_eq!(lang, "en-US");
     /// ```
     pub fn most_preferred(&self) -> String {
-        self.langs.iter()
+        self.langs
+            .iter()
             .max_by(|(_, w1), (_, w2)| w1.total_cmp(w2))
             .map(|(lang, _)| lang.clone())
             .unwrap_or_else(|| "en".to_string())
-    } 
+    }
 
     /// Returns all languages in original order
     pub fn all_languages(&self) -> Vec<String> {
@@ -1822,10 +1955,11 @@ impl AcceptLang {
     }
 
     /// Gets weight for a language (case-insensitive)
-    /// 
+    ///
     /// # Returns 0.0 if not found
     pub fn get_weight(&self, lang: &str) -> f32 {
-        self.langs.iter()
+        self.langs
+            .iter()
             .find(|(l, _)| l.eq_ignore_ascii_case(lang))
             .map(|(_, w)| *w)
             .unwrap_or(0.0)
@@ -1842,13 +1976,14 @@ impl AcceptLang {
     }
 
     /// Serializes to `Accept-Language` header format
-    /// 
+    ///
     /// # Formatting rules:
     /// - Omits q-value for 1.0 weights
     /// - Trims trailing zeros (0.7 → "0.7", 0.500 → "0.5")
     /// - Maintains original case
     pub fn to_header_string(&self) -> String {
-        self.langs.iter()
+        self.langs
+            .iter()
             .map(|(lang, weight)| {
                 if (weight - 1.0).abs() < f32::EPSILON {
                     lang.clone()
@@ -1862,9 +1997,9 @@ impl AcceptLang {
             })
             .collect::<Vec<_>>()
             .join(", ")
-    } 
+    }
 
     pub fn to_response_header(&self) -> String {
-        self.most_preferred() 
-    }  
+        self.most_preferred()
+    }
 }

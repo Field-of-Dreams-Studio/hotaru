@@ -1,24 +1,23 @@
-use hotaru::prelude::*;
 use hotaru::http::*;
+use hotaru::prelude::*;
 
 #[tokio::main]
 async fn main() {
     APP.clone().run().await;
 }
 
-LApp!(APP = App::new()
-    .single_protocol(
-        ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
-    )
-    .build()
-); 
+LApp!(
+    APP = App::new()
+        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+        .build()
+);
 
-// Trans 
+// Trans
 
-// endpoint! { 
-//     APP.url("/"), 
-//     middleware = [LoggerMiddleware] 
-    
+// endpoint! {
+//     APP.url("/"),
+//     middleware = [LoggerMiddleware]
+
 //     index <HTTP> {
 //         akari_render!(
 //             "home.html",
@@ -28,27 +27,27 @@ LApp!(APP = App::new()
 //             message = "Framework successfully running!",
 //             items = [
 //                 "Protocol Abstraction Layer",
-//                 "Async/await support", 
+//                 "Async/await support",
 //                 "Middleware system",
 //                 "Template rendering"
 //             ]
 //         )
-//     } 
-// } 
+//     }
+// }
 
-// middleware! { 
+// middleware! {
 //     LoggerMiddleware <HTTP> {
 //         println!("Request received: {} {}", req.method(), req.path());
 //         next(req).await
-//     }  
-// } 
+//     }
+// }
 
-// Semi-trans 
+// Semi-trans
 
-// #[endpoint] 
+// #[endpoint]
 // #[url("/")]
 // #[middleware([logger_middleware])]
-// fn index <HTTP>() { 
+// fn index <HTTP>() {
 //     akari_render!(
 //         "home.html",
 //         title = "Hotaru Example",
@@ -57,23 +56,23 @@ LApp!(APP = App::new()
 //         message = "Framework successfully running!",
 //         items = [
 //             "Protocol Abstraction Layer",
-//             "Async/await support", 
+//             "Async/await support",
 //             "Middleware system",
 //             "Template rendering"
 //         ]
-//     ) 
-// } 
+//     )
+// }
 
-// #[middleware] 
+// #[middleware]
 // fn logger_middleware <HTTP>(context: CustomParam) {
 //     println!("Request received: {} {}", context.method(), context.path());
 //     next(context).await
-// } 
+// }
 
-// Attr 
+// Attr
 
 #[endpoint("/", middleware = [logger_middleware])]
-fn index <HTTP>() { 
+fn index<HTTP>() {
     akari_render!(
         "home.html",
         title = "Hotaru Example",
@@ -82,24 +81,24 @@ fn index <HTTP>() {
         message = "Framework successfully running!",
         items = [
             "Protocol Abstraction Layer",
-            "Async/await support", 
+            "Async/await support",
             "Middleware system",
             "Template rendering"
         ]
-    ) 
-} 
+    )
+}
 
-// #[endpoint("/<i:>")] 
-// fn index_alt <HTTP>() { 
+// #[endpoint("/<i:>")]
+// fn index_alt <HTTP>() {
 //     akari_json!({
-//         message: "This endpoint have an url formatting error! Trans crate will report an error!" 
-//     }) 
-// } 
+//         message: "This endpoint have an url formatting error! Trans crate will report an error!"
+//     })
+// }
 
-#[middleware] 
-fn logger_middleware <HTTP>(context: CustomParam) {
+#[middleware]
+fn logger_middleware<HTTP>(context: CustomParam) {
     println!("Request received: {} {}", context.method(), context.path());
     next(context).await
-} 
+}
 
 // mod resource;

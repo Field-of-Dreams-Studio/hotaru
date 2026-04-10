@@ -8,14 +8,14 @@
 #[cfg(test)]
 mod security_tests {
     use crate::http::{
-        start_line::RequestStartLine,
-        meta::HttpMeta,
         body::HttpBody,
-        safety::HttpSafety,
         http_value::{HttpMethod, HttpVersion},
+        meta::HttpMeta,
+        safety::HttpSafety,
+        start_line::RequestStartLine,
     };
-    use tokio::io::BufReader;
     use std::io::Cursor;
+    use tokio::io::BufReader;
 
     // ============================================================================
     // Malformed Start Line Tests (15 tests)
@@ -24,14 +24,20 @@ mod security_tests {
     #[test]
     fn test_start_line_missing_http_version() {
         let result = RequestStartLine::parse("GET /index.html");
-        assert!(result.is_err(), "Should reject start line without HTTP version");
+        assert!(
+            result.is_err(),
+            "Should reject start line without HTTP version"
+        );
         assert_eq!(result.unwrap_err(), "Malformed request line");
     }
 
     #[test]
     fn test_start_line_missing_request_target() {
         let result = RequestStartLine::parse("GET HTTP/1.1");
-        assert!(result.is_err(), "Should reject start line without request target");
+        assert!(
+            result.is_err(),
+            "Should reject start line without request target"
+        );
     }
 
     #[test]
@@ -123,7 +129,10 @@ mod security_tests {
     #[test]
     fn test_start_line_too_many_parts() {
         let result = RequestStartLine::parse("GET /index.html HTTP/1.1 EXTRA");
-        assert!(result.is_err(), "Should reject start line with too many parts");
+        assert!(
+            result.is_err(),
+            "Should reject start line with too many parts"
+        );
     }
 
     #[test]
@@ -148,7 +157,9 @@ mod security_tests {
         let cursor = Cursor::new(headers.to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, true).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, true)
+            .await;
 
         // The parser should handle this, but we verify headers are parsed
         assert!(result.is_ok());
@@ -164,7 +175,9 @@ mod security_tests {
         let cursor = Cursor::new(headers.to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, true).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, true)
+            .await;
         assert!(result.is_ok());
 
         // Verify null byte is in the header value
@@ -174,7 +187,10 @@ mod security_tests {
                     assert!(s.contains('\0'), "Header contains null byte");
                 }
                 crate::http::meta::HeaderValue::Multiple(v) => {
-                    assert!(v.iter().any(|s| s.contains('\0')), "Header contains null byte");
+                    assert!(
+                        v.iter().any(|s| s.contains('\0')),
+                        "Header contains null byte"
+                    );
                 }
             }
         }
@@ -191,7 +207,9 @@ mod security_tests {
         let cursor = Cursor::new(headers.as_bytes().to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, true).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, true)
+            .await;
 
         // Should be rejected due to size limit
         assert!(result.is_err(), "Should reject oversized header name");
@@ -208,7 +226,9 @@ mod security_tests {
         let cursor = Cursor::new(headers.as_bytes().to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, true).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, true)
+            .await;
 
         // Should be rejected due to size limit
         assert!(result.is_err(), "Should reject oversized header value");
@@ -229,10 +249,15 @@ mod security_tests {
         let cursor = Cursor::new(headers.as_bytes().to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, true).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, true)
+            .await;
 
         // Should be rejected due to cumulative size
-        assert!(result.is_err(), "Should reject too many headers exceeding size limit");
+        assert!(
+            result.is_err(),
+            "Should reject too many headers exceeding size limit"
+        );
     }
 
     #[tokio::test]
@@ -245,7 +270,9 @@ mod security_tests {
         let cursor = Cursor::new(headers.to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, true).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, true)
+            .await;
         assert!(result.is_ok());
 
         // Check which Host header was kept (last one typically)
@@ -265,7 +292,9 @@ mod security_tests {
         let cursor = Cursor::new(headers.to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, true).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, true)
+            .await;
         assert!(result.is_ok());
 
         // Should have content length set
@@ -286,7 +315,9 @@ mod security_tests {
         let cursor = Cursor::new(request.to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, false).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, false)
+            .await;
 
         // Parser should succeed
         assert!(result.is_ok());
@@ -318,7 +349,9 @@ mod security_tests {
         let cursor = Cursor::new(headers.to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, true).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, true)
+            .await;
 
         // Should be rejected or ignored
         assert!(result.is_ok());
@@ -334,7 +367,9 @@ mod security_tests {
         let cursor = Cursor::new(headers.to_vec());
         let mut reader = BufReader::new(cursor);
 
-        let result = meta.append_from_request_stream(&mut reader, &safety, true).await;
+        let result = meta
+            .append_from_request_stream(&mut reader, &safety, true)
+            .await;
 
         // Parser behavior with control characters
         assert!(result.is_ok());
@@ -349,7 +384,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_invalid_hex_size() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -361,13 +397,17 @@ mod security_tests {
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
 
         // Parser rejects invalid hex
-        assert!(result.is_err(), "Parser correctly rejects non-hex chunk size");
+        assert!(
+            result.is_err(),
+            "Parser correctly rejects non-hex chunk size"
+        );
     }
 
     #[tokio::test]
     async fn test_chunked_negative_size() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -385,7 +425,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_size_overflow() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -403,7 +444,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_missing_crlf_after_size() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -415,13 +457,17 @@ mod security_tests {
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
 
         // Should fail or read incorrectly
-        assert!(result.is_err() || result.is_ok(), "Behavior depends on parser");
+        assert!(
+            result.is_err() || result.is_ok(),
+            "Behavior depends on parser"
+        );
     }
 
     #[tokio::test]
     async fn test_chunked_missing_crlf_after_data() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -433,13 +479,17 @@ mod security_tests {
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
 
         // Should fail with invalid terminator
-        assert!(result.is_err(), "Should reject missing CRLF after chunk data");
+        assert!(
+            result.is_err(),
+            "Should reject missing CRLF after chunk data"
+        );
     }
 
     #[tokio::test]
     async fn test_chunked_only_lf_terminator() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -457,7 +507,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_size_exceeds_body_limit() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default().with_max_body_size(100);
 
@@ -469,13 +520,17 @@ mod security_tests {
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
 
         // Should be rejected by safety check
-        assert!(result.is_err(), "Should reject chunk exceeding body size limit");
+        assert!(
+            result.is_err(),
+            "Should reject chunk exceeding body size limit"
+        );
     }
 
     #[tokio::test]
     async fn test_chunked_cumulative_size_exceeds_limit() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default().with_max_body_size(50);
 
@@ -487,13 +542,17 @@ mod security_tests {
         let result = HttpBody::read_buffer(&mut reader, &mut meta, &safety).await;
 
         // Should fail when cumulative size exceeds limit
-        assert!(result.is_err(), "Should reject cumulative size exceeding limit");
+        assert!(
+            result.is_err(),
+            "Should reject cumulative size exceeding limit"
+        );
     }
 
     #[tokio::test]
     async fn test_chunked_zero_size_not_last() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -511,7 +570,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_trailer_header_injection() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -532,7 +592,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_chunk_extension_overflow() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -552,7 +613,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_no_final_zero_chunk() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -570,7 +632,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_valid_simple() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -592,7 +655,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_empty_chunks() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 
@@ -610,7 +674,8 @@ mod security_tests {
     #[tokio::test]
     async fn test_chunked_uppercase_hex() {
         let mut meta = HttpMeta::new(Default::default(), Default::default());
-        meta.header.insert("transfer-encoding".to_string(), "chunked".into());
+        meta.header
+            .insert("transfer-encoding".to_string(), "chunked".into());
 
         let safety = HttpSafety::default();
 

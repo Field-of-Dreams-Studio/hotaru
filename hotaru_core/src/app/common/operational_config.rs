@@ -1,11 +1,38 @@
+use std::time::Duration;
+
+/// Controls how long a timeout is, or whether it is active at all.
+#[derive(Clone, Copy, Debug)]
+pub enum TimeoutSetting {
+    /// Apply the protocol's built-in default.
+    Inherit,
+    /// Disable the timeout entirely (needed for long-lived protocols like MQTT).
+    Disabled,
+    /// Use an explicit duration.
+    Fixed(Duration),
+}
+
+impl TimeoutSetting {
+    /// Convenience constructor: `n` whole seconds.
+    #[allow(non_snake_case)]
+    pub fn Seconds(n: usize) -> Self {
+        Self::Fixed(Duration::from_secs(n as u64))
+    }
+
+    /// Convenience constructor: `n` milliseconds.
+    #[allow(non_snake_case)]
+    pub fn Milliseconds(n: usize) -> Self {
+        Self::Fixed(Duration::from_millis(n as u64))
+    }
+}
+
 /// Shared operational settings used by both server and client runtimes.
 pub struct OperationalConfig {
     binding_address: String,
     worker: usize,
-    max_connection_time: usize,
+    max_connection_time: TimeoutSetting,
     max_frame_process_time: usize,
-    connect_timeout: usize,
-    request_timeout: usize,
+    connect_timeout: TimeoutSetting,
+    request_timeout: TimeoutSetting,
 }
 
 impl Default for OperationalConfig {
@@ -13,10 +40,10 @@ impl Default for OperationalConfig {
         Self {
             binding_address: String::from("127.0.0.1:3003"),
             worker: 1,
-            max_connection_time: 30,
+            max_connection_time: TimeoutSetting::Seconds(30),
             max_frame_process_time: 5,
-            connect_timeout: 30,
-            request_timeout: 30,
+            connect_timeout: TimeoutSetting::Seconds(30),
+            request_timeout: TimeoutSetting::Seconds(30),
         }
     }
 }
@@ -31,10 +58,10 @@ impl OperationalConfig {
     pub fn from_parts(
         binding_address: String,
         worker: usize,
-        max_connection_time: usize,
+        max_connection_time: TimeoutSetting,
         max_frame_process_time: usize,
-        connect_timeout: usize,
-        request_timeout: usize,
+        connect_timeout: TimeoutSetting,
+        request_timeout: TimeoutSetting,
     ) -> Self {
         Self {
             binding_address,
@@ -50,7 +77,7 @@ impl OperationalConfig {
     pub fn from_server_parts(
         binding_address: String,
         worker: usize,
-        max_connection_time: usize,
+        max_connection_time: TimeoutSetting,
         max_frame_process_time: usize,
     ) -> Self {
         Self {
@@ -63,7 +90,7 @@ impl OperationalConfig {
     }
 
     /// Creates a config while overriding only the client-facing settings.
-    pub fn from_client_parts(connect_timeout: usize, request_timeout: usize) -> Self {
+    pub fn from_client_parts(connect_timeout: TimeoutSetting, request_timeout: TimeoutSetting) -> Self {
         Self {
             connect_timeout,
             request_timeout,
@@ -72,7 +99,7 @@ impl OperationalConfig {
     }
 
     /// Consumes the config and returns all stored parts.
-    pub fn into_parts(self) -> (String, usize, usize, usize, usize, usize) {
+    pub fn into_parts(self) -> (String, usize, TimeoutSetting, usize, TimeoutSetting, TimeoutSetting) {
         (
             self.binding_address,
             self.worker,
@@ -93,8 +120,8 @@ impl OperationalConfig {
         self.worker
     }
 
-    /// Returns the maximum connection lifetime in seconds.
-    pub fn max_connection_time(&self) -> usize {
+    /// Returns the maximum connection lifetime setting.
+    pub fn max_connection_time(&self) -> TimeoutSetting {
         self.max_connection_time
     }
 
@@ -103,13 +130,13 @@ impl OperationalConfig {
         self.max_frame_process_time
     }
 
-    /// Returns the connect timeout in seconds.
-    pub fn connect_timeout(&self) -> usize {
+    /// Returns the outbound connect timeout setting.
+    pub fn connect_timeout(&self) -> TimeoutSetting {
         self.connect_timeout
     }
 
-    /// Returns the request timeout in seconds.
-    pub fn request_timeout(&self) -> usize {
+    /// Returns the per-request timeout setting.
+    pub fn request_timeout(&self) -> TimeoutSetting {
         self.request_timeout
     }
 
@@ -123,8 +150,8 @@ impl OperationalConfig {
         self.worker = worker;
     }
 
-    /// Replaces the maximum connection lifetime in seconds.
-    pub fn set_max_connection_time(&mut self, max_connection_time: usize) {
+    /// Replaces the maximum connection lifetime setting.
+    pub fn set_max_connection_time(&mut self, max_connection_time: TimeoutSetting) {
         self.max_connection_time = max_connection_time;
     }
 
@@ -133,13 +160,13 @@ impl OperationalConfig {
         self.max_frame_process_time = max_frame_process_time;
     }
 
-    /// Replaces the connect timeout in seconds.
-    pub fn set_connect_timeout(&mut self, connect_timeout: usize) {
+    /// Replaces the outbound connect timeout setting.
+    pub fn set_connect_timeout(&mut self, connect_timeout: TimeoutSetting) {
         self.connect_timeout = connect_timeout;
     }
 
-    /// Replaces the request timeout in seconds.
-    pub fn set_request_timeout(&mut self, request_timeout: usize) {
+    /// Replaces the per-request timeout setting.
+    pub fn set_request_timeout(&mut self, request_timeout: TimeoutSetting) {
         self.request_timeout = request_timeout;
     }
 }

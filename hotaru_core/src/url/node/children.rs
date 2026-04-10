@@ -1,6 +1,8 @@
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
-use crate::{alias::PRwLock, connection::TransportSpec, protocol::RequestContext, url::PathPattern};
+use crate::{
+    alias::PRwLock, connection::TransportSpec, protocol::RequestContext, url::PathPattern,
+};
 
 use super::{PartialState, UrlNode};
 
@@ -20,7 +22,10 @@ pub struct Children<C: RequestContext, TS: TransportSpec = crate::connection::tc
 /// 2. regex scan
 /// 3. single-segment wildcard
 /// 4. catch-all wildcard
-pub struct ChildrenInner<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct ChildrenInner<
+    C: RequestContext,
+    TS: TransportSpec = crate::connection::tcp::TcpTransport,
+> {
     /// Exact-match children keyed by literal segment.
     literals: LiteralChild<C, TS>,
     /// Regex children evaluated after exact literal lookup.
@@ -33,7 +38,8 @@ pub struct ChildrenInner<C: RequestContext, TS: TransportSpec = crate::connectio
 }
 
 /// Exact-match child cache for literal path segments.
-pub struct LiteralChild<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct LiteralChild<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport>
+{
     inner: HashMap<String, Arc<UrlNode<C, TS>>>,
     _ts: PhantomData<TS>,
 }
@@ -119,6 +125,11 @@ impl<C: RequestContext, TS: TransportSpec> Children<C, TS> {
     }
 
     /// Matches one step and returns the next candidate plus resume state.
+    ///
+    /// `Any` accepts any single segment, including the empty string `""`.
+    /// The effective priority is `Literal > Regex > Any > AnyPath`, so an
+    /// explicit literal empty-segment route (for example `"/"`) always wins
+    /// over a wildcard route such as `"/<slug>"`.
     pub fn match_step(
         &self,
         segment: &str,
@@ -258,7 +269,7 @@ impl<C: RequestContext, TS: TransportSpec> ChildrenInner<C, TS> {
             .or_else(|| self.match_regex(segment))
             .or_else(|| self.match_any())
     }
-    
+
     /// Matches one step and returns the next candidate plus resume state.
     pub fn match_step(
         &self,
@@ -481,7 +492,9 @@ mod tests {
             chain: binding.compile(),
             binding: Arc::new(binding),
             params: ParamsClone::default(),
-            names: StepName { inner: HashMap::new() },
+            names: StepName {
+                inner: HashMap::new(),
+            },
         })
     }
 
@@ -593,9 +606,15 @@ mod tests {
         let mut children = Children::<TestContext, TcpTransport>::new();
         let node = test_node(PathPattern::Literal("home".into()));
         children.insert(node.clone());
-        let removed = children.remove(&PathPattern::Literal("home".into())).unwrap();
+        let removed = children
+            .remove(&PathPattern::Literal("home".into()))
+            .unwrap();
         assert!(Arc::ptr_eq(&removed, &node));
-        assert!(children.find(&PathPattern::Literal("home".into())).is_none());
+        assert!(
+            children
+                .find(&PathPattern::Literal("home".into()))
+                .is_none()
+        );
     }
 
     #[test]
@@ -607,15 +626,21 @@ mod tests {
             .remove(&PathPattern::Regex("^user[0-9]+$".into()))
             .unwrap();
         assert!(Arc::ptr_eq(&removed, &node));
-        assert!(children
-            .find(&PathPattern::Regex("^user[0-9]+$".into()))
-            .is_none());
+        assert!(
+            children
+                .find(&PathPattern::Regex("^user[0-9]+$".into()))
+                .is_none()
+        );
     }
 
     #[test]
     fn children_remove_missing_returns_none() {
         let mut children = Children::<TestContext, TcpTransport>::new();
-        assert!(children.remove(&PathPattern::Literal("missing".into())).is_none());
+        assert!(
+            children
+                .remove(&PathPattern::Literal("missing".into()))
+                .is_none()
+        );
     }
 
     #[test]

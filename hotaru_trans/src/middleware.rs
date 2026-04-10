@@ -59,7 +59,7 @@ impl MWFunc {
         struct_decl.extend(self.attrs.reform());
 
         // #[allow(non_camel_case_types)]
-        let mut inner = TokenStream::new(); 
+        let mut inner = TokenStream::new();
         inner.extend(vec![
             TokenTree::Ident(Ident::new("allow", Span::call_site())),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, {

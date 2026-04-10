@@ -23,8 +23,12 @@ pub struct FlexMeta {
 }
 
 impl ConnMeta for FlexMeta {
-    fn local_addr(&self) -> Option<SocketAddr> { self.local }
-    fn remote_addr(&self) -> Option<SocketAddr> { self.remote }
+    fn local_addr(&self) -> Option<SocketAddr> {
+        self.local
+    }
+    fn remote_addr(&self) -> Option<SocketAddr> {
+        self.remote
+    }
 }
 
 /// A connection that is either plain TCP or client-side TLS.
@@ -94,7 +98,11 @@ impl AsyncRead for TcpOrTlsStream {
 }
 
 impl AsyncWrite for TcpOrTlsStream {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
         match self.get_mut() {
             TcpOrTlsStream::Tcp(s) => Pin::new(s).poll_write(cx, buf),
             TcpOrTlsStream::Tls(s) => Pin::new(s).poll_write(cx, buf),
@@ -161,11 +169,19 @@ impl TcpReader {
         local_addr: Option<SocketAddr>,
         remote_addr: Option<SocketAddr>,
     ) -> Self {
-        Self { inner, local_addr, remote_addr }
+        Self {
+            inner,
+            local_addr,
+            remote_addr,
+        }
     }
 
-    pub fn local_addr(&self) -> Option<SocketAddr> { self.local_addr }
-    pub fn remote_addr(&self) -> Option<SocketAddr> { self.remote_addr }
+    pub fn local_addr(&self) -> Option<SocketAddr> {
+        self.local_addr
+    }
+    pub fn remote_addr(&self) -> Option<SocketAddr> {
+        self.remote_addr
+    }
 
     pub async fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
         tokio::io::AsyncBufReadExt::fill_buf(&mut self.inner).await
@@ -206,7 +222,11 @@ pub fn split_connection(conn: TcpOrTlsStream) -> (TcpReader, TcpWriter) {
 }
 
 impl AsyncRead for TcpReader {
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
@@ -222,7 +242,11 @@ impl AsyncBufRead for TcpReader {
 }
 
 impl AsyncWrite for TcpWriter {
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
         Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 

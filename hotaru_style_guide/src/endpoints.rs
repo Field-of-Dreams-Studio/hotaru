@@ -2,12 +2,12 @@
 // Endpoint Examples
 // ============================================================================
 
-use hotaru::prelude::*;
 use hotaru::http::*;
+use hotaru::prelude::*;
 use serde_json::json;
 
+use crate::middleware::{AuthCheck, LogRequest, SetUserContext};
 use crate::APP;
-use crate::middleware::{LogRequest, AuthCheck, SetUserContext};
 
 // ============================================================================
 // Endpoint with Middleware
@@ -16,7 +16,7 @@ use crate::middleware::{LogRequest, AuthCheck, SetUserContext};
 endpoint! {
     APP.url("/logged"),
     middleware = [LogRequest],
-    
+
     /// Endpoint with logging middleware
     pub logged_endpoint <HTTP> {
         text_response("This request was logged")
@@ -26,7 +26,7 @@ endpoint! {
 endpoint! {
     APP.url("/protected"),
     middleware = [AuthCheck, LogRequest],
-    
+
     /// Protected endpoint requiring authentication
     pub protected_endpoint <HTTP> {
         json_response(object!({
@@ -44,7 +44,7 @@ endpoint! {
 endpoint! {
     APP.url("/api/readonly"),
     config = [HttpSafety::new().with_allowed_method(GET)],
-    
+
     /// GET-only endpoint
     pub readonly_api <HTTP> {
         json_response(object!({
@@ -57,7 +57,7 @@ endpoint! {
 endpoint! {
     APP.url("/api/write"),
     config = [HttpSafety::new().with_allowed_methods(vec![POST, PUT])],
-    
+
     /// Write-only endpoint (POST/PUT)
     pub write_api <HTTP> {
         let method = req.method().to_string();
@@ -76,13 +76,13 @@ endpoint! {
     APP.url("/api/complex/<int:id>"),
     middleware = [SetUserContext, LogRequest],
     config = [HttpSafety::new().with_allowed_methods(vec![GET, POST])],
-    
+
     /// # Request
-    /// 
+    ///
     /// `GET/POST /api/complex/{id}`
-    /// 
+    ///
     /// # Response
-    /// 
+    ///
     /// ```json
     /// {
     ///   "status": "success",
@@ -94,10 +94,10 @@ endpoint! {
     pub complex_endpoint <HTTP> {
         let id: String = req.pattern("id").unwrap_or("0".to_string());
         let method = req.method().to_string();
-        
+
         // Access middleware-set values
         let user_id = req.locals.get::<u64>("user_id").unwrap_or(&0);
-        
+
         json_response(object!({
             status: "success",
             id: id,

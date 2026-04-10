@@ -3,19 +3,19 @@
 //! This module provides the GrpcProtocol that integrates tonic's gRPC implementation
 //! with Hotaru's protocol system.
 
-use std::sync::Arc;
-use std::error::Error;
 use async_trait::async_trait;
-use tokio::io::{BufReader, BufWriter, ReadHalf, WriteHalf};
 use http::HeaderMap;
+use std::error::Error;
+use std::sync::Arc;
+use tokio::io::{BufReader, BufWriter, ReadHalf, WriteHalf};
 
 use hotaru_core::{
     app::application::App,
     connection::{Protocol, ProtocolRole, TcpConnectionStream},
 };
 
-use h2per::HyperHttp2;
 use crate::context::GrpcContext;
+use h2per::HyperHttp2;
 
 /// gRPC protocol implementation that wraps tonic functionality
 #[derive(Clone)]
@@ -32,7 +32,7 @@ impl GrpcProtocol {
             role,
         }
     }
-    
+
     /// Checks if the request headers indicate gRPC
     fn is_grpc_request(headers: &HeaderMap) -> bool {
         headers
@@ -49,22 +49,22 @@ impl Protocol for GrpcProtocol {
     type Stream = ();
     type Message = crate::transport::GrpcMessage;
     type Context = GrpcContext;
-    
+
     fn detect(initial_bytes: &[u8]) -> bool {
         // First check if this looks like HTTP/2
         if !HyperHttp2::detect(initial_bytes) {
             return false;
         }
-        
+
         // We'll do final gRPC detection based on headers in the service layer
         // since we need the full HTTP/2 request to check content-type
         true
     }
-    
+
     fn role(&self) -> ProtocolRole {
         self.role
     }
-    
+
     async fn handle(
         &mut self,
         reader: BufReader<ReadHalf<TcpConnectionStream>>,
