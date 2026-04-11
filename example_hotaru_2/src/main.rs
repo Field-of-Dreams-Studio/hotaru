@@ -76,8 +76,8 @@ endpoint! {
     config: ["ConfigString"],
 
     /// Example endpoint using new syntax
-    pub fn new_syntax_endpoint(context: HTTP) {
-        let args = context.pattern("arg");
+    pub new_syntax_endpoint<HTTP> {
+        let args = req.pattern("arg");
         text_response(format!("New syntax endpoint called with arg: {}", args.unwrap_or_default()))
     }
 }

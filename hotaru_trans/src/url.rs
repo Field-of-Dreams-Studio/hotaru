@@ -37,7 +37,47 @@ impl UrlArgs {
         reg_func.extend(vec![TokenTree::Ident(Ident::new(
             &format!("__wrapper_{}", &self.op.fn_name),
             Span::call_site(),
-        ))]);
+        ))]); 
+
+        let mut cont = TokenStream::new(); 
+
+        // Generate empty configs (Params) 
+        // let mut params = hotaru::akari::extensions::ParamsClone::default(); 
+        cont.extend(vec![
+            TokenTree::Ident(Ident::new("let", Span::call_site())),
+            TokenTree::Ident(Ident::new("mut", Span::call_site())),
+            TokenTree::Ident(Ident::new("params", Span::call_site())),
+            TokenTree::Punct(Punct::new('=', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("hotaru", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("akari", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("extensions", Span::call_site())), 
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)), 
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)), 
+            TokenTree::Ident(Ident::new("ParamsClone", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("default", Span::call_site())),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
+            TokenTree::Punct(Punct::new(';', Spacing::Alone)), 
+        ]); 
+
+        // Inserting configs 
+        // params.set(value) 
+        if let Some(configs) = self.config.clone() {
+            for expr in configs {
+                cont.extend(vec![
+                    TokenTree::Ident(Ident::new("params", Span::call_site())),
+                    TokenTree::Punct(Punct::new('.', Spacing::Alone)),
+                    TokenTree::Ident(Ident::new("set", Span::call_site())),
+                    TokenTree::Group(Group::new(Delimiter::Parenthesis, expr)),
+                    TokenTree::Punct(Punct::new(';', Spacing::Alone)),
+                ])
+            }
+        } 
 
         // std::sync::Arc::new(__wrapper_xxx)
         let mut arc_func = TokenStream::new();
@@ -55,39 +95,31 @@ impl UrlArgs {
             TokenTree::Group(Group::new(Delimiter::Parenthesis, reg_func)),
         ]);
 
-        // let mut endpoint = { <url-expr> };
-        // endpoint.set_method(std::sync::Arc::new(__wrapper_xxx));
-
-        // Modify url_expr to inject the protocol type parameter
-        let modified_url_expr = self.url_expr.expand(self.op.protocol.clone());
-
-        let mut cont = TokenStream::new();
+        // let mut binding = hotaru::hotaru_core::executable::ExecutableBinding::new().with_handler(std::sync::Arc::new(__wrapper_xxx)); 
         cont.extend(vec![
             TokenTree::Ident(Ident::new("let", Span::call_site())),
             TokenTree::Ident(Ident::new("mut", Span::call_site())),
-            TokenTree::Ident(Ident::new("endpoint", Span::call_site())),
+            TokenTree::Ident(Ident::new("binding", Span::call_site())),
             TokenTree::Punct(Punct::new('=', Spacing::Alone)),
-            TokenTree::Group(Group::new(Delimiter::Brace, modified_url_expr)),
-            TokenTree::Punct(Punct::new(';', Spacing::Alone)),
-            TokenTree::Ident(Ident::new("endpoint", Span::call_site())),
+            TokenTree::Ident(Ident::new("hotaru", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("hotaru_core", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("executable", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("ExecutableBinding", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("new", Span::call_site())),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
             TokenTree::Punct(Punct::new('.', Spacing::Alone)),
-            TokenTree::Ident(Ident::new("set_method", Span::call_site())),
+            TokenTree::Ident(Ident::new("with_handler", Span::call_site())),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, arc_func)),
             TokenTree::Punct(Punct::new(';', Spacing::Alone)),
-        ]);
-
-        // Inserting configs
-        if let Some(configs) = self.config.clone() {
-            for expr in configs {
-                cont.extend(vec![
-                    TokenTree::Ident(Ident::new("endpoint", Span::call_site())),
-                    TokenTree::Punct(Punct::new('.', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("set_params", Span::call_site())),
-                    TokenTree::Group(Group::new(Delimiter::Parenthesis, expr)),
-                    TokenTree::Punct(Punct::new(';', Spacing::Alone)),
-                ])
-            }
-        }
+        ]); 
 
         if let Some(mws) = self.middlewares.clone() {
             // Middleware inheritance implementation
@@ -112,15 +144,6 @@ impl UrlArgs {
                 TokenTree::Punct(Punct::new('<', Spacing::Alone)),
                 TokenTree::Ident(Ident::new("dyn", Span::call_site())),
                 TokenTree::Ident(Ident::new("hotaru", Span::call_site())),
-                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("hotaru_core", Span::call_site())),
-                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("app", Span::call_site())),
-                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("middleware", Span::call_site())),
                 TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                 TokenTree::Punct(Punct::new(':', Spacing::Alone)),
                 TokenTree::Ident(Ident::new("AsyncMiddleware", Span::call_site())),
@@ -253,9 +276,9 @@ impl UrlArgs {
                 }
             }
 
-            // endpoint.set_middlewares(middlewares);
+            // binding.set_middlewares(middlewares);
             cont.extend(vec![
-                TokenTree::Ident(Ident::new("endpoint", Span::call_site())),
+                TokenTree::Ident(Ident::new("binding", Span::call_site())),
                 TokenTree::Punct(Punct::new('.', Spacing::Alone)),
                 TokenTree::Ident(Ident::new("set_middlewares", Span::call_site())),
                 TokenTree::Group(Group::new(Delimiter::Parenthesis, {
@@ -268,8 +291,18 @@ impl UrlArgs {
                 })),
                 TokenTree::Punct(Punct::new(';', Spacing::Alone)),
             ]);
-        }
+        } 
+        
+        // Modify url_expr to inject the protocol type parameter
+        let modified_url_expr = self.url_expr.expand(
+            self.op.protocol.clone(), 
+            Ident::new("binding", Span::call_site()),
+            Ident::new("params", Span::call_site())
+        ); 
 
+        cont.extend(modified_url_expr);
+        cont.extend(std::iter::once(TokenTree::Punct(Punct::new(';', Spacing::Alone)))); 
+        
         let mut tokens = TokenStream::new();
         tokens.extend(ctor_attrs);
         tokens.extend(vec![
@@ -550,7 +583,9 @@ impl UrlExpr {
             .map(|_| ())
     }
 
-    pub fn expand(&self, protocol: Ident) -> TokenStream {
+    pub fn expand(&self, protocol: Ident, binding: Ident, config: Ident) -> TokenStream {
+        // APP.url::<HTTP, _>("/path", binding, params)
+        //  .expect("failed to register endpoint");
         let mut tokens = TokenStream::new();
         tokens.extend(vec![
             TokenTree::Ident(self.app.clone()),
@@ -565,9 +600,24 @@ impl UrlExpr {
             TokenTree::Punct(Punct::new('>', Spacing::Alone)),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, {
                 let mut g = TokenStream::new();
-                g.extend(vec![TokenTree::Literal(self.literal.clone())]);
+                g.extend(vec![
+                    TokenTree::Literal(self.literal.clone()), 
+                    TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+                    TokenTree::Ident(binding),
+                    TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+                    TokenTree::Ident(config) 
+                ]);
                 g
             })),
+            TokenTree::Punct(Punct::new('.', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("expect", Span::call_site())), 
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, {
+                let mut g = TokenStream::new();
+                g.extend(vec![
+                    TokenTree::Literal(Literal::string("failed to register endpoint")),
+                ]); 
+                g 
+            })), 
         ]);
         tokens
     }
@@ -596,7 +646,7 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
                 let random_name = format!("auto_generated_{}", random_alpha_string(8));
                 Ident::new(&random_name, Span::call_site())
             }
-            false => expect_any_ident(tokens, "Expected function name")?,
+            false => expect_any_ident(tokens, "Expected function name, or anonymous function annotation '_'")?,
         };
         let _ = expect_punct_consume(tokens, "<", "Expected '<' after function name")?;
         let protocol = expect_any_ident(tokens, "Expected protocol identifier after '<'")?;
@@ -633,7 +683,9 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
             &mut tokens,
             "Expected an array for middleware",
         )?);
-    }
+    } 
+
+    match_punct_consume(&mut tokens, ","); // Optional separator for better readability between middleware and config 
 
     if match_ident_consume(&mut tokens, "config") {
         tokens.next(); // Consume the `=`  
@@ -642,6 +694,8 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
             "Expected an array for config",
         )?);
     }
+
+    match_punct_consume(&mut tokens, ","); // Optional separator for better readability between middleware and config 
 
     return Ok(UrlArgs::new(
         UrlExpr::from_tokens(url_expr)?,
@@ -700,7 +754,7 @@ pub fn parse_semi_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
             let random_name = format!("auto_generated_{}", random_alpha_string(8));
             Ident::new(&random_name, Span::call_site())
         }
-        false => expect_any_ident(&mut tokens, "Expected function name")?,
+        false => expect_any_ident(&mut tokens, "Expected function name, or anonymous function annotation '_'")?,
     };
     let _ = expect_punct_consume(&mut tokens, "<", "Expected '<' after function name")?;
     let protocol = expect_any_ident(&mut tokens, "Expected protocol identifier after '<'")?;
@@ -780,7 +834,7 @@ pub fn parse_attr(attr: TokenStream, args: TokenStream) -> Result<UrlArgs, Token
             let random_name = format!("auto_generated_{}", random_alpha_string(8));
             Ident::new(&random_name, Span::call_site())
         }
-        false => expect_any_ident(&mut tokens, "Expected function name")?,
+        false => expect_any_ident(&mut tokens, "Expected function name, or anonymous function annotation '_'")?,
     };
     let _ = expect_punct_consume(&mut tokens, "<", "Expected '<' after function name")?;
     let protocol = expect_any_ident(&mut tokens, "Expected protocol identifier after '<'")?;
