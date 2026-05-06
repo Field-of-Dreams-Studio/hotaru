@@ -1,30 +1,23 @@
-use super::{Accepter, ConnStream, Connector};
+use super::{ConnStream, Inbound, Outbound};
 
-/// Static transport policy for one application/runtime.
-///
-/// `TransportSpec` ties together the wire stream type and the concrete
-/// inbound/outbound transport implementations used to create that stream.
+/// Static transport policy for one runtime.
 pub trait TransportSpec: Send + Sync + 'static {
-    /// Wire-level stream used by protocols in this runtime.
+    /// Wire stream used by protocols.
     type Wire: ConnStream;
 
-    /// Inbound upgrader (server side).
-    type Accepter: Accepter<Stream = Self::Wire>;
+    /// App-facing inbound runtime.
+    type Inbound: Inbound<Wire = Self::Wire>;
 
-    /// Outbound connector (client side).
-    type Connector: Connector<Stream = Self::Wire>;
+    /// App-facing outbound runtime.
+    type Outbound: Outbound<Wire = Self::Wire>;
 
-    /// Optional default inbound upgrader for this transport.
-    ///
-    /// Return `None` when the transport requires explicit runtime config.
-    fn default_accepter() -> Option<Self::Accepter> {
+    /// Default inbound bind target, if no config is needed.
+    fn default_inbound() -> Option<<Self::Inbound as Inbound>::BindTarget> {
         None
     }
 
-    /// Optional default outbound connector for this transport.
-    ///
-    /// Return `None` when the transport requires explicit runtime config.
-    fn default_connector() -> Option<Self::Connector> {
+    /// Default outbound connect target, if one is appropriate.
+    fn default_outbound() -> Option<<Self::Outbound as Outbound>::ConnectTarget> {
         None
     }
 }

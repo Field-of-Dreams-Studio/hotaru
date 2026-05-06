@@ -27,7 +27,6 @@ impl TimeoutSetting {
 
 /// Shared operational settings used by both server and client runtimes.
 pub struct OperationalConfig {
-    binding_address: String,
     worker: usize,
     max_connection_time: TimeoutSetting,
     max_frame_process_time: usize,
@@ -38,7 +37,6 @@ pub struct OperationalConfig {
 impl Default for OperationalConfig {
     fn default() -> Self {
         Self {
-            binding_address: String::from("127.0.0.1:3003"),
             worker: 1,
             max_connection_time: TimeoutSetting::Seconds(30),
             max_frame_process_time: 5,
@@ -56,7 +54,6 @@ impl OperationalConfig {
 
     /// Creates a config from fully specified server and client settings.
     pub fn from_parts(
-        binding_address: String,
         worker: usize,
         max_connection_time: TimeoutSetting,
         max_frame_process_time: usize,
@@ -64,7 +61,6 @@ impl OperationalConfig {
         request_timeout: TimeoutSetting,
     ) -> Self {
         Self {
-            binding_address,
             worker,
             max_connection_time,
             max_frame_process_time,
@@ -75,13 +71,11 @@ impl OperationalConfig {
 
     /// Creates a config while overriding only the server-facing settings.
     pub fn from_server_parts(
-        binding_address: String,
         worker: usize,
         max_connection_time: TimeoutSetting,
         max_frame_process_time: usize,
     ) -> Self {
         Self {
-            binding_address,
             worker,
             max_connection_time,
             max_frame_process_time,
@@ -90,7 +84,10 @@ impl OperationalConfig {
     }
 
     /// Creates a config while overriding only the client-facing settings.
-    pub fn from_client_parts(connect_timeout: TimeoutSetting, request_timeout: TimeoutSetting) -> Self {
+    pub fn from_client_parts(
+        connect_timeout: TimeoutSetting,
+        request_timeout: TimeoutSetting,
+    ) -> Self {
         Self {
             connect_timeout,
             request_timeout,
@@ -99,20 +96,14 @@ impl OperationalConfig {
     }
 
     /// Consumes the config and returns all stored parts.
-    pub fn into_parts(self) -> (String, usize, TimeoutSetting, usize, TimeoutSetting, TimeoutSetting) {
+    pub fn into_parts(self) -> (usize, TimeoutSetting, usize, TimeoutSetting, TimeoutSetting) {
         (
-            self.binding_address,
             self.worker,
             self.max_connection_time,
             self.max_frame_process_time,
             self.connect_timeout,
             self.request_timeout,
         )
-    }
-
-    /// Returns the binding address.
-    pub fn binding_address(&self) -> &str {
-        &self.binding_address
     }
 
     /// Returns the worker thread count.
@@ -138,11 +129,6 @@ impl OperationalConfig {
     /// Returns the per-request timeout setting.
     pub fn request_timeout(&self) -> TimeoutSetting {
         self.request_timeout
-    }
-
-    /// Replaces the binding address.
-    pub fn set_binding<T: Into<String>>(&mut self, binding_address: T) {
-        self.binding_address = binding_address.into();
     }
 
     /// Replaces the worker thread count.

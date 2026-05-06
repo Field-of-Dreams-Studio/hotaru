@@ -1,7 +1,6 @@
 use akari::extensions::ParamsClone;
 use core::panic;
 use std::any::TypeId;
-use tokio::net::{TcpListener, TcpStream};
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,7 +8,7 @@ use std::time::Duration;
 use crate::executable::ExecutableBinding;
 use crate::{debug_error, debug_log, debug_warn};
 
-use crate::connection::{Accepter, Protocol, TransportSpec};
+use crate::connection::{Inbound, Protocol, TransportSpec};
 use crate::url::UrlError;
 
 pub mod registry;
@@ -24,12 +23,12 @@ use super::common::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
 
 // type Job = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
-/// Server struct modified to store binding address instead of TcpListener
+/// Server runtime for inbound protocol traffic.
 pub struct Server<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
-    pub handler: ProtocolRegistryKind<TS>, // Changed from listener to binding_address
-    pub accepter: TS::Accepter,
+    pub registry: ProtocolRegistryKind<TS>,
+    pub binding: <TS::Inbound as Inbound>::BindTarget,
     pub runtime: Arc<RuntimeConfig>,
-    pub server: OperationalConfig,
+    pub config: OperationalConfig,
 }
 
 impl<TS: TransportSpec> Server<TS> {
@@ -48,19 +47,19 @@ impl<TS: TransportSpec> Server<TS> {
     }
 
     pub fn set_max_connection_time(&mut self, max_connection_time: TimeoutSetting) {
-        self.server.set_max_connection_time(max_connection_time);
+        self.config.set_max_connection_time(max_connection_time);
     }
 
     pub fn get_max_connection_time(self: &Arc<Self>) -> TimeoutSetting {
-        self.server.max_connection_time()
+        self.config.max_connection_time()
     }
 
     pub fn get_max_frame_process_time(self: &Arc<Self>) -> usize {
-        self.server.max_frame_process_time()
+        self.config.max_frame_process_time()
     }
 
     pub fn set_max_frame_process_time(&mut self, max_frame_process_time: usize) {
-        self.server
+        self.config
             .set_max_frame_process_time(max_frame_process_time);
     }
 
@@ -97,7 +96,7 @@ impl<TS: TransportSpec> Server<TS> {
     /// TODO: What happen when empty - Should not return ()'s Type ID!
     pub fn default_protocol_type(self: &Arc<Self>) -> TypeId {
         // Return the first protocol's TypeId from registry
-        self.handler
+        self.registry
             .first_protocol_type_id()
             .unwrap_or_else(|| TypeId::of::<()>())
     }
@@ -113,9 +112,9 @@ impl<TS: TransportSpec> Server<TS> {
     ) -> Result<(), UrlError> {
         // If no middleware is configured for this executable, set the protocol-level middlewares as default.
         if executable.has_no_middlewares() {
-            executable.set_middlewares(self.handler.get_protocol_middlewares::<P>());
+            executable.set_middlewares(self.registry.get_protocol_middlewares::<P>());
         }
-        self.handler.lit_url::<P, _>(url, executable, config)?;
+        self.registry.lit_url::<P, _>(url, executable, config)?;
         Ok(())
     }
 
@@ -128,15 +127,15 @@ impl<TS: TransportSpec> Server<TS> {
     ) -> Result<(), UrlError> {
         // If no middleware is configured for this executable, set the protocol-level middlewares as default.
         if executable.has_no_middlewares() {
-            executable.set_middlewares(self.handler.get_protocol_middlewares::<P>());
+            executable.set_middlewares(self.registry.get_protocol_middlewares::<P>());
         }
-        self.handler.sub_url::<P, _>(url, executable, config)?;
+        self.registry.sub_url::<P, _>(url, executable, config)?;
         Ok(())
     }
 
     // TODO: Implement register_from on Url or remove this method
     // pub fn reg_from<P: Protocol + 'static>(self: &Arc<Self>, segments: &[PathPattern]) -> Arc<Url<P::Context>> {
-    //     match self.handler.reg_from::<P>(segments) {
+    //     match self.registry.reg_from::<P>(segments) {
     //         Ok(url) => url,
     //         Err(e) => {
     //             eprintln!("{}", e);
@@ -145,32 +144,27 @@ impl<TS: TransportSpec> Server<TS> {
     //     }
     // }
 
-    /// Handle a single connection
-    pub fn handle_connection(self: Arc<Self>, stream: TcpStream) {
+    /// Handle one accepted wire stream.
+    pub fn handle_wire(self: Arc<Self>, conn: TS::Wire) {
         // Resolve Inherit to the protocol's own default before spawning.
-        let timeout = match self.server.max_connection_time() {
-            TimeoutSetting::Inherit => self.handler.default_connection_timeout(),
+        let timeout = match self.config.max_connection_time() {
+            TimeoutSetting::Inherit => self.registry.default_connection_timeout(),
             TimeoutSetting::Disabled => None,
             TimeoutSetting::Fixed(d) => Some(d),
         };
         let app = self.clone();
         tokio::spawn(async move {
-            match self.accepter.upgrade(stream).await {
-                Ok(conn) => match timeout {
-                    None => {
-                        self.handler.run(app.runtime.clone(), conn).await;
-                    }
-                    Some(duration) => {
-                        tokio::select! {
-                            _ = self.handler.run(app.runtime.clone(), conn) => {},
-                            _ = tokio::time::sleep(duration) => {
-                                debug_warn!("⚠️ Connection timed out after {:?}", duration);
-                            }
+            match timeout {
+                None => {
+                    self.registry.run(app.runtime.clone(), conn).await;
+                }
+                Some(duration) => {
+                    tokio::select! {
+                        _ = self.registry.run(app.runtime.clone(), conn) => {},
+                        _ = tokio::time::sleep(duration) => {
+                            debug_warn!("⚠️ Connection timed out after {:?}", duration);
                         }
                     }
-                },
-                Err(e) => {
-                    debug_error!("Failed to upgrade accepted TCP connection: {e}");
                 }
             }
         });
@@ -199,13 +193,10 @@ impl<TS: TransportSpec> Server<TS> {
     /// }
     /// ```
     pub async fn run(self: Arc<Self>) {
-        let worker_count = self.server.worker();
+        let worker_count = self.config.worker();
         let app = self.clone();
 
-        println!(
-            "Starting Hotaru server on {}",
-            self.server.binding_address()
-        );
+        println!("Starting Hotaru server");
 
         // Spawn a blocking task to create and run the runtime
         // This allows the runtime to be created from within an async context
@@ -226,20 +217,11 @@ impl<TS: TransportSpec> Server<TS> {
 
     /// Internal application loop - listens for and handles connections
     async fn run_app_loop(self: Arc<Self>) {
-        // Create TcpListener only when run() is called, within the tokio runtime
-        // This function should directly panic because this is during the stage where APP is getting initialized
-        // This error is unwindable
-        let listener = TcpListener::bind(self.server.binding_address())
+        let inbound = TS::Inbound::bind(self.binding.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to bind to address"));
+            .unwrap_or_else(|_| panic!("Failed to bind inbound transport"));
 
-        debug_log!(
-            "Connection established on {}",
-            match listener.local_addr() {
-                Ok(addr) => addr.to_string(),
-                Err(e) => "error".to_string() + &e.to_string(),
-            }
-        );
+        debug_log!("Inbound transport bound");
 
         // Create a signal handler for clean shutdown
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
@@ -254,15 +236,15 @@ impl<TS: TransportSpec> Server<TS> {
 
         loop {
             tokio::select! {
-                accept_result = listener.accept() => {
+                accept_result = inbound.accept() => {
                     match accept_result {
-                        Ok((stream, addr)) => {
-                            debug_log!("Accepted connection from {addr}");
-                            Arc::clone(&self).handle_connection(stream);
+                        Ok(conn) => {
+                            debug_log!("Accepted inbound wire");
+                            Arc::clone(&self).handle_wire(conn);
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             if self.get_mode() == RunMode::Build{
-                                debug_error!("Failed to accept connection: {e}");
+                                debug_error!("Failed to accept connection: {_e}");
                             }
                         }
                     }

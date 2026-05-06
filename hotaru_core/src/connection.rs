@@ -1,17 +1,19 @@
-pub mod accepter;
 pub mod connection;
-pub mod connector;
 pub mod error;
+pub mod primitive;
+pub mod runtime;
 pub mod stream;
 pub mod tcp;
 pub mod test;
 pub mod transport_spec;
 
-pub use self::accepter::Accepter;
-pub use self::connector::Connector;
 pub use self::error::Result;
+pub use self::primitive::{Accepter, Connector};
+pub use self::runtime::{Inbound, Outbound};
 pub use self::stream::{ConnMeta, ConnStream};
-pub use self::tcp::{TcpAccepter, TcpConnector, TcpConnectorAddr, TcpMeta, TcpTransport};
+pub use self::tcp::{
+    TcpAccepter, TcpConnector, TcpConnectorAddr, TcpInbound, TcpMeta, TcpOutbound, TcpTransport,
+};
 pub use self::transport_spec::TransportSpec;
 
 // New protocol traits

@@ -9,7 +9,10 @@ pub enum UrlError {
     ChildNotFound(PathPattern),
     InvalidPath(String),
     ParseError(String),
-    DepthLimitExceeded { max: u32, actual: usize },
+    DepthLimitExceeded {
+        max: u32,
+        actual: usize,
+    },
     NotImplemented(&'static str),
     /// No protocol of the requested type is registered in this registry.
     ProtocolNotFound,

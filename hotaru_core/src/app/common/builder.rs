@@ -5,7 +5,7 @@ use crate::{
         client::{Client, ProtocolRegistryKind as ClientProtocolRegistryKind},
         server::{ProtocolRegistryKind as ServerProtocolRegistryKind, Server},
     },
-    connection::{Protocol, TransportSpec},
+    connection::{Inbound, Outbound, Protocol, TransportSpec},
     executable::{ProtocolEntryBuilder, ProtocolRegistryBuilder, registry::ProtocolEntryRegistry},
     extensions::{Locals, Params},
 };
@@ -21,10 +21,9 @@ pub struct ClientRole;
 /// `AppBuilder<ServerRole, TS>` builds a [`Server`], while
 /// `AppBuilder<ClientRole, TS>` builds a [`Client`].
 pub struct AppBuilder<R, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
-    binding_address: Option<String>,
     registry: Option<ProtocolEntryRegistry<TS>>,
-    accepter: Option<TS::Accepter>,
-    connector: Option<TS::Connector>,
+    binding: Option<<TS::Inbound as Inbound>::BindTarget>,
+    target: Option<<TS::Outbound as Outbound>::ConnectTarget>,
     mode: Option<RunMode>,
     worker: Option<usize>,
     max_connection_time: Option<TimeoutSetting>,
@@ -37,10 +36,9 @@ pub struct AppBuilder<R, TS: TransportSpec = crate::connection::tcp::TcpTranspor
 impl<R, TS: TransportSpec> AppBuilder<R, TS> {
     pub fn new() -> Self {
         Self {
-            binding_address: None,
             registry: None,
-            accepter: None,
-            connector: None,
+            binding: None,
+            target: None,
             mode: None,
             worker: None,
             max_connection_time: None,
@@ -51,9 +49,11 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
         }
     }
 
-    pub fn binding<T: Into<String>>(mut self, binding: T) -> Self {
-        self.binding_address = Some(binding.into());
-        self
+    pub fn binding<T: Into<String>>(self, binding: T) -> Self
+    where
+        <TS::Inbound as Inbound>::BindTarget: From<String>,
+    {
+        self.with_binding(binding.into().into())
     }
 
     pub fn registry(mut self, protocol: ProtocolEntryRegistry<TS>) -> Self {
@@ -61,13 +61,13 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
         self
     }
 
-    pub fn accepter(mut self, accepter: TS::Accepter) -> Self {
-        self.accepter = Some(accepter);
+    pub fn with_binding(mut self, binding: <TS::Inbound as Inbound>::BindTarget) -> Self {
+        self.binding = Some(binding);
         self
     }
 
-    pub fn connector(mut self, connector: TS::Connector) -> Self {
-        self.connector = Some(connector);
+    pub fn target(mut self, target: <TS::Outbound as Outbound>::ConnectTarget) -> Self {
+        self.target = Some(target);
         self
     }
 
@@ -136,27 +136,21 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
 impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
     /// Builds a server runtime from the configured server-side builder state.
     pub fn build(self) -> Arc<super::super::server::Server<TS>> {
-        let handler = self
+        let registry = self
             .registry
             .map(ServerProtocolRegistryKind::from)
             .expect("AppBuilder::registry(...) must be set for App<TS>");
-        let accepter = self
-            .accepter
-            .or_else(TS::default_accepter)
-            .expect("AppBuilder::accepter(...) must be set for Server<TS>");
+        let binding = self
+            .binding
+            .or_else(TS::default_inbound)
+            .expect("AppBuilder::binding(...) must be set for Server<TS>");
 
-        let binding_address = self
-            .binding_address
-            .unwrap_or_else(|| String::from("127.0.0.1:3003"));
         let mode = self.mode.unwrap_or(RunMode::Development);
         let worker = self.worker.unwrap_or_else(num_cpus);
-        let max_connection_time = self
-            .max_connection_time
-            .unwrap_or(TimeoutSetting::Inherit);
+        let max_connection_time = self.max_connection_time.unwrap_or(TimeoutSetting::Inherit);
         let max_frame_process_time = self.max_frame_process_time.unwrap_or(5);
         let runtime = RuntimeConfig::from_parts(mode, self.config, self.statics);
-        let server = OperationalConfig::from_server_parts(
-            binding_address,
+        let config = OperationalConfig::from_server_parts(
             worker,
             max_connection_time,
             max_frame_process_time,
@@ -164,10 +158,10 @@ impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
         let runtime = Arc::new(runtime);
 
         let app = Arc::new(Server {
-            handler,
-            accepter,
+            registry,
+            binding,
             runtime,
-            server,
+            config,
         });
 
         app
@@ -177,14 +171,14 @@ impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
 impl<TS: TransportSpec> AppBuilder<ClientRole, TS> {
     /// Builds a client runtime from the configured client-side builder state.
     pub fn build(self) -> Arc<Client<TS>> {
-        let session = self
+        let registry = self
             .registry
             .map(ClientProtocolRegistryKind::from)
             .expect("AppBuilder::registry(...) must be set for Client<TS>");
-        let connector = self
-            .connector
-            .or_else(TS::default_connector)
-            .expect("AppBuilder::connector(...) must be set for Client<TS>");
+        let target = self
+            .target
+            .or_else(TS::default_outbound)
+            .expect("AppBuilder::target(...) must be set for Client<TS>");
 
         let mode = self.mode.unwrap_or(RunMode::Development);
         let connect_timeout = self
@@ -195,13 +189,13 @@ impl<TS: TransportSpec> AppBuilder<ClientRole, TS> {
             .map(|n| TimeoutSetting::Seconds(n))
             .unwrap_or(TimeoutSetting::Seconds(30));
         let runtime = Arc::new(RuntimeConfig::from_parts(mode, self.config, self.statics));
-        let client = OperationalConfig::from_client_parts(connect_timeout, request_timeout);
+        let config = OperationalConfig::from_client_parts(connect_timeout, request_timeout);
 
         Arc::new(Client {
-            session,
-            connector,
+            registry,
+            target,
             runtime,
-            client,
+            config,
         })
     }
 }

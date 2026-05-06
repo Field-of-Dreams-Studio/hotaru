@@ -460,7 +460,13 @@ mod tests {
         let tokens = tokenize("/");
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         // "/" is a separator between two empty segments
-        assert_eq!(pats, vec![PathPattern::Literal("".into()), PathPattern::Literal("".into())]);
+        assert_eq!(
+            pats,
+            vec![
+                PathPattern::Literal("".into()),
+                PathPattern::Literal("".into())
+            ]
+        );
         assert_eq!(names, vec![None, None]);
     }
 
@@ -502,7 +508,10 @@ mod tests {
     fn ok_name_only_any() {
         let tokens = tokenize("/<slug>");
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
-        assert_eq!(pats, vec![PathPattern::Literal("".into()), PathPattern::Any]);
+        assert_eq!(
+            pats,
+            vec![PathPattern::Literal("".into()), PathPattern::Any]
+        );
         assert_eq!(names, vec![None, Some("slug".into())]);
     }
 
@@ -512,7 +521,10 @@ mod tests {
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
-            vec![PathPattern::Literal("".into()), PathPattern::Regex("[^/]+".into())]
+            vec![
+                PathPattern::Literal("".into()),
+                PathPattern::Regex("[^/]+".into())
+            ]
         );
         assert_eq!(names, vec![None, None]);
     }
@@ -545,7 +557,10 @@ mod tests {
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
-            vec![PathPattern::Literal("".into()), PathPattern::Literal("files<**path>".into())]
+            vec![
+                PathPattern::Literal("".into()),
+                PathPattern::Literal("files<**path>".into())
+            ]
         );
         assert_eq!(names, vec![None, None]);
     }

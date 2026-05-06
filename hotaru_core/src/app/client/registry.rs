@@ -97,7 +97,10 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         config: ParamsClone,
     ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
         let url = url.into();
-        match self.url::<P>().map(|root| root.literal_url(&url, executable, config)) {
+        match self
+            .url::<P>()
+            .map(|root| root.literal_url(&url, executable, config))
+        {
             Some(result) => result,
             None => Err(UrlError::ProtocolNotFound),
         }
@@ -110,7 +113,10 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         config: ParamsClone,
     ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
         let pattern = pattern.into();
-        match self.url::<P>().map(|root| root.sub_url(&pattern, executable, config)) {
+        match self
+            .url::<P>()
+            .map(|root| root.sub_url(&pattern, executable, config))
+        {
             Some(result) => result,
             None => Err(UrlError::ProtocolNotFound),
         }

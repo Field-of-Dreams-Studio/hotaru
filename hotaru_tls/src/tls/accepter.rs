@@ -64,11 +64,12 @@ impl TlsAccepter {
 
 #[async_trait]
 impl Accepter for TlsAccepter {
+    type Raw = TcpStream;
     type Stream = TlsStream;
 
-    async fn upgrade(&self, tcp: TcpStream) -> std::io::Result<Self::Stream> {
+    async fn upgrade(&self, raw: Self::Raw) -> std::io::Result<Self::Stream> {
         self.acceptor
-            .accept(tcp)
+            .accept(raw)
             .await
             .map(TlsStream::Server)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))

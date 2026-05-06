@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use crate::{
-    app::common::{AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole},
-    connection::{Protocol, TransportSpec},
+    app::common::{
+        AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
+    },
+    connection::{Outbound, Protocol, TransportSpec},
     url::{UrlError, UrlNode, UrlRoot},
 };
 
@@ -15,10 +17,10 @@ pub mod registry;
 /// `worker` in the shared operational config is interpreted as connection-pool
 /// size on the client side, rather than Tokio worker-thread count.
 pub struct Client<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
-    pub session: ProtocolRegistryKind<TS>,
-    pub connector: TS::Connector,
+    pub registry: ProtocolRegistryKind<TS>,
+    pub target: <TS::Outbound as Outbound>::ConnectTarget,
     pub runtime: Arc<RuntimeConfig>,
-    pub client: OperationalConfig,
+    pub config: OperationalConfig,
 }
 
 impl<TS: TransportSpec> Client<TS> {
@@ -31,7 +33,7 @@ impl<TS: TransportSpec> Client<TS> {
     pub fn root<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
         &self,
     ) -> Option<Arc<UrlRoot<P::Context, TS>>> {
-        self.session.url::<P>()
+        self.registry.url::<P>()
     }
 
     /// Returns the shared runtime mode.
@@ -76,17 +78,27 @@ impl<TS: TransportSpec> Client<TS> {
 
     /// Returns the configured outbound connection-pool size.
     pub fn get_worker(self: &Arc<Self>) -> usize {
-        self.client.worker()
+        self.config.worker()
     }
 
     /// Returns the configured maximum connection lifetime setting.
     pub fn get_max_connection_time(self: &Arc<Self>) -> TimeoutSetting {
-        self.client.max_connection_time()
+        self.config.max_connection_time()
     }
 
     /// Returns the configured maximum request processing time in seconds.
     pub fn get_max_frame_process_time(self: &Arc<Self>) -> usize {
-        self.client.max_frame_process_time()
+        self.config.max_frame_process_time()
+    }
+
+    /// Opens one outbound wire to this client's configured target.
+    pub async fn connect(self: &Arc<Self>) -> std::io::Result<TS::Wire> {
+        TS::Outbound::connect(self.target.clone()).await
+    }
+
+    /// Runs protocol-side client handling on an existing wire.
+    pub async fn run_wire(self: &Arc<Self>, wire: TS::Wire) {
+        self.registry.run(self.runtime.clone(), wire).await;
     }
 
     /// Resolves an outbound path into a concrete endpoint node.
