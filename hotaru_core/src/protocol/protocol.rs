@@ -2,17 +2,21 @@ use async_trait::async_trait;
 use std::{error::Error, sync::Arc, time::Duration};
 use tokio::io::BufReader;
 
-use crate::app::common::RuntimeConfig;
+use crate::{app::common::RuntimeConfig, protocol::ProtocolFlow};
 use crate::connection::TransportSpec;
 use crate::connection::stream::ConnStream;
 use crate::protocol::ProtocolRole;
-use crate::url::UrlRoot;
+use crate::url::{UrlNode, UrlRoot};
 
-use super::{Message, RequestContext, Stream as ProtocolStream, Transport};
+use super::{Message, RequestContext, Stream as ProtocolStream, Channel};
 
 // ----------------------------------------------------------------------------
 // Protocol Trait
 // ----------------------------------------------------------------------------
+
+/// Convenience alias: the error type produced by `P`'s context.
+/// Protocol's Error is stored in Context because it's often needed for request handling and middleware, so this alias makes it easier to refer to. 
+pub type CtxError<P> = <<P as Protocol>::Context as RequestContext>::Error;
 
 /// User-defined protocol handler.
 ///
@@ -27,10 +31,10 @@ pub trait Protocol: Clone + Send + Sync + 'static {
     type Wire: ConnStream;
 
     /// The transport spec used by this protocol runtime.
-    type Spec: TransportSpec<Wire = Self::Wire>;
+    type TS: TransportSpec<Wire = Self::Wire>;
 
     /// The protocol's connection-level abstraction.
-    type Transport: Transport;
+    type Channel: Channel;
 
     /// The protocol's stream abstraction (use () if no streams).
     type Stream: ProtocolStream;
@@ -39,7 +43,7 @@ pub trait Protocol: Clone + Send + Sync + 'static {
     type Message: Message;
 
     /// The protocol's request context type.
-    type Context: RequestContext;
+    type Context: RequestContext; 
 
     /// Returns the name of this protocol (for logging and diagnostics).
     fn name(&self) -> &'static str;
@@ -61,33 +65,35 @@ pub trait Protocol: Clone + Send + Sync + 'static {
     where
         Self: Sized;
 
+    /// Construct a channel handle from a freshly split wire.
+    fn open_channel(
+        self,
+        reader: BufReader<<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf>,
+        writer: <<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf,
+        meta: <<Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
+    ) -> Self::Channel;
+
     /// Handles a connection with this protocol.
     ///
     /// This is where all protocol logic lives. The implementation should
     /// check `self.role()` to determine whether to act as client or server.
+    /// 
+    /// The framework calls this in a loop while `channel.is_open()`.
     ///
-    /// Why this signature is concrete:
-    /// - `BufReader<Wire::ReadHalf>`: protocol detection and protocol parsing can
-    ///   share one buffered read state without replay/adapters.
-    /// - `Wire::WriteHalf` (not buffered here): write buffering policy stays inside
-    ///   each protocol implementation (flush behavior is protocol-dependent).
-    /// - Concrete wire split types (no generic R/W): each protocol handles exactly
-    ///   its wire kind; stream-specific logic remains in the protocol layer.
+    /// - Reader and Writer wrapped in Channel 
+    /// - Runtime 
+    /// - Root URL 
     async fn handle(
-        &mut self,
-        reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
-        writer: <Self::Wire as ConnStream>::WriteHalf,
-        config: <Self::Wire as ConnStream>::Meta,
+        channel: &Self::Channel,
         runtime: Arc<RuntimeConfig>,
-        root: Arc<UrlRoot<Self::Context, Self::Spec>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>;
+        root: Arc<UrlRoot<Self::Context, Self::TS>>,
+    ) -> Result<ProtocolFlow, CtxError<Self>>; 
 
-    async fn request(
-        &mut self,
-        reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
-        writer: <Self::Wire as ConnStream>::WriteHalf,
-        config: <Self::Wire as ConnStream>::Meta,
-        runtime: Arc<RuntimeConfig>,
-        root: Arc<UrlRoot<Self::Context, Self::Spec>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>>;
+    /// Client-side: send the request currently in `ctx` and read the response.
+    /// Invoked by the generated outpoint final handler.
+    async fn send(
+        channel: &Self::Channel,
+        ctx: &mut Self::Context,
+        outpoint: &Arc<UrlNode<Self::Context, Self::TS>>,
+    ) -> Result<ProtocolFlow, CtxError<Self>>;
 }
