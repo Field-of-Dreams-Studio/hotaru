@@ -3,9 +3,7 @@ use std::sync::Arc;
 use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
-    },
-    connection::{Outbound, Protocol, TransportSpec},
-    url::{UrlError, UrlNode, UrlRoot},
+    }, connection::{Outbound, Protocol, TransportSpec}, protocol::RequestContext, url::{UrlError, UrlNode, UrlRoot}
 };
 
 pub use registry::ProtocolRegistryKind;
@@ -135,9 +133,9 @@ impl<TS: TransportSpec> Client<TS> {
         self: &Arc<Self>,
         path: &str,
         ctx: P::Context,
-    ) -> Result<P::Context, UrlError> {
+    ) -> Result<Result<P::Context, <P::Context as RequestContext>::Error>, UrlError> {
         let endpoint = self.resolve::<P>(path).await?;
-        Ok(endpoint.run(ctx).await)
+        Ok(endpoint.run(ctx).await) 
     }
 
     /// Executes one outbound route by path with an explicit depth limit.
@@ -146,7 +144,7 @@ impl<TS: TransportSpec> Client<TS> {
         path: &str,
         max_depth: u32,
         ctx: P::Context,
-    ) -> Result<P::Context, UrlError> {
+    ) -> Result<Result<P::Context, <P::Context as RequestContext>::Error>, UrlError> {
         let endpoint = self.resolve_with_limit::<P>(path, max_depth).await?;
         Ok(endpoint.run(ctx).await)
     }

@@ -493,6 +493,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
 impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
     type Request = HttpRequest;
     type Response = HttpResponse;
+    type Error = std::io::Error; // Placeholder error type, can be customized 
 
     fn handle_error(&mut self) {
         match &self.executable {

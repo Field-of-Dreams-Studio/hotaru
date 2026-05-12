@@ -249,16 +249,10 @@ impl MWFunc {
                     '<',
                     Spacing::Alone,
                 ))));
-                // dyn std::future::Future<Output = Protocol> + Send
-                let mut dyn_future = TokenStream::new();
-                dyn_future.extend(vec![TokenTree::Ident(Ident::new("dyn", Span::call_site()))]);
-                dyn_future.extend(path(&["std", "future", "Future"]));
-                // <Output = <Protocol as Protocol>::Context>
-                dyn_future.extend(vec![
-                    TokenTree::Punct(Punct::new('<', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("Output", Span::call_site())),
-                    TokenTree::Punct(Punct::new('=', Spacing::Alone)),
-                    // <Protocol as Protocol>::Context
+
+                // <Protocol as Protocol>::Context
+                let mut context = TokenStream::new(); 
+                context.extend(vec![
                     TokenTree::Punct(Punct::new('<', Spacing::Alone)),
                     TokenTree::Ident(self.protocol.clone()),
                     TokenTree::Ident(Ident::new("as", Span::call_site())),
@@ -267,13 +261,49 @@ impl MWFunc {
                     TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                     TokenTree::Punct(Punct::new(':', Spacing::Alone)),
                     TokenTree::Ident(Ident::new("Context", Span::call_site())),
-                    TokenTree::Punct(Punct::new('>', Spacing::Alone)),
-                ]);
-                // + Send
+                ]); 
+
+                // dyn std::future::Future<Output = Protocol> + Send
+                let mut dyn_future = TokenStream::new();
+                dyn_future.extend(vec![TokenTree::Ident(Ident::new("dyn", Span::call_site()))]);
+                dyn_future.extend(path(&["std", "future", "Future"]));
+                // <Output = Result<context, <context as RequestContext>::Error>> + Send + 'static>
+                
+                // <Output = Result< 
                 dyn_future.extend(vec![
+                    TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+                    TokenTree::Ident(Ident::new("Output", Span::call_site())),
+                    TokenTree::Punct(Punct::new('=', Spacing::Alone)),
+                    TokenTree::Ident(Ident::new("Result", Span::call_site())), 
+                ]); 
+
+                // <Protocol as Protocol>::Context, <<Protocol as Protocol>::Context as RequestContext>::Error> 
+                dyn_future.extend(context); // <Protocol as Protocol>::Context
+                dyn_future.extend(vec![
+                    TokenTree.Punct(Punct::new(',', Spacing::Alone)),
+                    TokenTree.Punct(Punct::new('<', Spacing::Alone)),
+                ]); 
+                dyn_future.extend(context); // <Protocol as Protocol>::Context 
+                dyn_future.extend(vec![
+                    TokenTree::Ident(Ident::new("as", Span::call_site())),
+                    TokenTree::Ident(Ident::new("RequestContext", Span::call_site())),
+                    TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+                    TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                    TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                    TokenTree::Ident(Ident::new("Error", Span::call_site())),
+                    TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+                ]); 
+
+                // > + Send + 'static> 
+                dyn_future.extend(vec![
+                    TokenTree::Punct(Punct::new('>', Spacing::Alone)), 
                     TokenTree::Punct(Punct::new('+', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("Send", Span::call_site())),
+                    TokenTree::Ident(Ident::new("Send", Span::call_site())), 
+                    TokenTree::Punct(Punct::new('+', Spacing::Alone)), 
+                    TokenTree::Punct(Punct::new('\'', Spacing::Joint)), 
+                    TokenTree::Ident(Ident::new("static", Span::call_site())), 
                 ]);
+                
                 inner.extend(std::iter::once(TokenTree::Group(Group::new(
                     Delimiter::Parenthesis,
                     dyn_future,
