@@ -18,7 +18,8 @@ pub use self::transport_spec::TransportSpec;
 
 // New protocol traits
 pub use crate::protocol::{
-    IoProtocolError, Message, Protocol, ProtocolError, ProtocolErrorBox, ProtocolErrorKind,
-    ProtocolIndex, ProtocolResult, ProtocolRole, RequestContext, StaticProtocolError, Stream,
-    Transport,
+    Message, Protocol,
+    ProtocolIndex, ProtocolRole, RequestContext, Stream,
+    Transport, 
+    ProtocolError, BoxProtocolError, DefaultProtocolError, 
 };

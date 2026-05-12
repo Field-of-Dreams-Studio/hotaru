@@ -297,12 +297,12 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
         }
     }
 
-    pub async fn run(&self, mut ctx: C) -> C {
+    pub async fn run(&self, mut ctx: C) -> Result<C, <C as RequestContext>::Error> {
         if let Some(chain) = &self.chain {
             chain.run(ctx).await
         } else {
             ctx.handle_error();
-            ctx
-        }
+            Ok(ctx)
+        } 
     }
 }

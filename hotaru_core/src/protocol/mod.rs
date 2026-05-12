@@ -7,10 +7,7 @@ pub mod transport;
 pub mod types;
 
 pub use context::RequestContext;
-pub use error::{
-    IoProtocolError, ProtocolError, ProtocolErrorBox, ProtocolErrorKind, ProtocolResult,
-    StaticProtocolError,
-};
+pub use error::{ProtocolError, BoxProtocolError, DefaultProtocolError}; 
 pub use message::Message;
 pub use protocol::Protocol;
 pub use stream::Stream;

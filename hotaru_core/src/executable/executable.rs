@@ -126,11 +126,15 @@ impl<C: RequestContext> ExecutableBinding<C> {
 }
 
 /// The execution-chain builder and executor.
-pub struct ExecutionChain<C> {
+pub struct ExecutionChain<C> 
+where 
+    C: RequestContext + Send + 'static {
     inner: Arc<dyn Fn(C) -> BoxFuture<C> + Send + Sync + 'static>,
 }
 
-impl<C> Clone for ExecutionChain<C> {
+impl<C> Clone for ExecutionChain<C> 
+where 
+    C: RequestContext + Send + 'static { 
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -162,9 +166,9 @@ where
     }
 
     /// Drive the chain to completion, returning the final context.
-    pub async fn run(&self, ctx: C) -> C {
+    pub async fn run(&self, ctx: C) -> Result<C, <C as RequestContext>::Error> {
         (self.inner)(ctx).await
-    }
+    } 
 }
 
 impl<C> TryFrom<ExecutableBinding<C>> for ExecutionChain<C>
@@ -186,7 +190,7 @@ pub async fn run_chain<C: RequestContext + 'static>(
     middlewares: AsyncMiddlewareChain<C>,
     final_handler: Arc<dyn AsyncFinalHandler<C>>,
     ctx: C,
-) -> C {
+) -> Result<C, <C as RequestContext>::Error> {
     let chain = ExecutionChain::new(middlewares, final_handler);
     chain.run(ctx).await
-}
+} 

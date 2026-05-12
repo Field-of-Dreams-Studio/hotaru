@@ -318,6 +318,7 @@ mod tests {
     impl RequestContext for TestContext {
         type Request = ();
         type Response = ();
+        type Error = std::io::Error; 
 
         fn handle_error(&mut self) {}
 
@@ -328,7 +329,7 @@ mod tests {
 
     fn binding_with_handler() -> ExecutableBinding<TestContext> {
         let handler: Arc<dyn AsyncFinalHandler<TestContext>> =
-            Arc::new(|ctx: TestContext| async move { ctx });
+            Arc::new(|ctx: TestContext| async move { Ok(ctx) });
         ExecutableBinding::new().with_handler(handler)
     }
 

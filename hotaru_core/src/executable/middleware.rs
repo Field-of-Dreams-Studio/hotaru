@@ -8,7 +8,9 @@ use crate::connection::RequestContext;
 use std::any::Any;
 
 /// A boxed future returning `C`.
-pub type BoxFuture<C> = Pin<Box<dyn Future<Output = C> + Send + 'static>>;
+pub type BoxFuture<C> = Pin<Box<
+    dyn Future<Output = Result<C, <C as RequestContext>::Error>> + Send + 'static 
+>>;
 
 pub type AsyncMiddlewareChain<C> = Vec<Arc<dyn AsyncMiddleware<C>>>;
 
@@ -23,12 +25,18 @@ pub trait AsyncMiddleware<C: RequestContext>: Send + Sync + 'static {
     fn handle<'a>(
         &self,
         rc: C,
-        next: Box<dyn Fn(C) -> Pin<Box<dyn Future<Output = C> + Send>> + Send + Sync + 'static>,
-    ) -> Pin<Box<dyn Future<Output = C> + Send + 'static>>;
+        next: Box<
+            dyn Fn(C) -> Pin<Box<
+                dyn Future<Output = Result<C, <C as RequestContext>::Error>> + Send
+            >> + Send + Sync + 'static,
+        >,
+    ) -> Pin<Box<
+        dyn Future<Output = Result<C, <C as RequestContext>::Error>> + Send + 'static
+    >>; 
 }
 
 /// The “final handler” trait that sits at the end of a middleware chain.
-pub trait AsyncFinalHandler<C>: Send + Sync + 'static {
+pub trait AsyncFinalHandler<C: RequestContext>: Send + Sync + 'static {
     /// Consume the request‐context and return a future yielding the (possibly modified) context.
     fn handle(&self, ctx: C) -> BoxFuture<C>;
 }
@@ -36,13 +44,14 @@ pub trait AsyncFinalHandler<C>: Send + Sync + 'static {
 /// Blanket impl: any async fn or closure `Fn(R) -> impl Future<Output=R>` becomes an AsyncFinalHandler<R>.
 impl<F, Fut, C> AsyncFinalHandler<C> for F
 where
+    C: RequestContext,
     F: Fn(C) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = C> + Send + 'static,
+    Fut: Future<Output = Result<C, <C as RequestContext>::Error>> + Send + 'static,
 {
     fn handle(&self, ctx: C) -> BoxFuture<C> {
         Box::pin((self)(ctx))
     }
-}
+} 
 
 // HTTP Implementation example (to be moved to hotaru_http crate later)
 // pub struct LoggingMiddleware;

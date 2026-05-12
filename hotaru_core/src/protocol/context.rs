@@ -1,4 +1,4 @@
-use crate::protocol::ProtocolRole;
+use crate::protocol::{ProtocolError, ProtocolRole};
 
 // ----------------------------------------------------------------------------
 // RequestContext Trait
@@ -17,6 +17,10 @@ pub trait RequestContext: Send + 'static {
 
     /// The response type for this context
     type Response;
+
+    /// The error type produced by middleware, handlers, and the protocol
+    /// that owns this context.
+    type Error: ProtocolError;
 
     /// Handle protocol errors (bad request for server, bad response for client)
     fn handle_error(&mut self);

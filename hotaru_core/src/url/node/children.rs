@@ -476,6 +476,7 @@ mod tests {
     impl RequestContext for TestContext {
         type Request = ();
         type Response = ();
+        type Error = std::io::Error; 
 
         fn handle_error(&mut self) {}
 

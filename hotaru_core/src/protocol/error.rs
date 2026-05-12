@@ -1,98 +1,40 @@
-use std::{any::Any, fmt};
+// ----------------------------------------------------------------------------
+// Protocol error trait — minimal, protocol-defined.
+// ----------------------------------------------------------------------------
 
-// ============================================================================
-// Error System (keeping the existing error traits)
-// ============================================================================
+pub type BoxProtocolError = Box<dyn ProtocolError>;
 
-/// High-level, transport-agnostic error classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProtocolErrorKind {
-    Io,
-    Timeout,
-    Frame,
-    FlowControl,
-    Config,
-    Upgrade,
-    Closed,
-    Unsupported,
-    Other,
-}
-
-/// Object-safe protocol error trait retained for extensibility.
-pub trait ProtocolError: fmt::Debug + fmt::Display + Send + Sync + 'static {
-    fn kind(&self) -> ProtocolErrorKind {
-        ProtocolErrorKind::Other
-    }
-    fn is_retryable(&self) -> bool {
+/// Protocol-defined error. Each protocol owns its own concrete error type.
+///
+/// `can_continue` is the policy hook: when a chain returns `Err(boxed)`, the
+/// protocol's `handle`/`send` decides whether the channel survives. The
+/// framework never interprets this flag itself.
+pub trait ProtocolError: std::error::Error + Send + Sync + 'static {
+    fn can_continue(&self) -> bool {
         false
     }
-    fn as_any(&self) -> &dyn Any
+
+    fn boxed(self) -> BoxProtocolError
     where
         Self: Sized,
     {
-        self
+        Box::new(self)
     }
 }
 
-/// Thin boxed error wrapper used as the canonical error type.
-#[derive(Debug)]
-pub struct ProtocolErrorBox(pub Box<dyn ProtocolError>);
-
-impl ProtocolErrorBox {
-    pub fn new<E: ProtocolError>(e: E) -> Self {
-        Self(Box::new(e))
-    }
-    pub fn kind(&self) -> ProtocolErrorKind {
-        self.0.kind()
-    }
-    pub fn is_retryable(&self) -> bool {
-        self.0.is_retryable()
-    }
-    // Note: as_any() cannot be called on trait objects due to Sized bound
+// Blanket helper so plain `std::error::Error` types can be wrapped trivially
+// when a protocol does not need richer behaviour.
+impl<T> ProtocolError for T where
+    T: std::error::Error + Send + Sync + 'static + DefaultProtocolError
+{
 }
 
-impl fmt::Display for ProtocolErrorBox {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&*self.0, f)
-    }
-}
-impl std::error::Error for ProtocolErrorBox {}
+/// Marker so the blanket impl above does not conflict with hand-written impls
+/// that want custom `can_continue` behaviour. Implement this on types that
+/// should get the default `can_continue() = false`. 
+/// 
+/// Implement this trait on your error type if you want to use the blanket 
+/// `ProtocolError` impl and don't need custom `can_continue` logic. 
+pub trait DefaultProtocolError {}
 
-impl From<std::io::Error> for ProtocolErrorBox {
-    fn from(e: std::io::Error) -> Self {
-        ProtocolErrorBox::new(IoProtocolError(e))
-    }
-}
-
-/// Canonical IO error wrapper implementing `ProtocolError`.
-#[derive(Debug)]
-pub struct IoProtocolError(pub std::io::Error);
-impl fmt::Display for IoProtocolError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "IO error: {}", self.0)
-    }
-}
-impl ProtocolError for IoProtocolError {
-    fn kind(&self) -> ProtocolErrorKind {
-        ProtocolErrorKind::Io
-    }
-}
-
-/// Simple static error helper.
-#[derive(Debug)]
-pub struct StaticProtocolError {
-    pub kind: ProtocolErrorKind,
-    pub msg: &'static str,
-}
-impl fmt::Display for StaticProtocolError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.msg)
-    }
-}
-impl ProtocolError for StaticProtocolError {
-    fn kind(&self) -> ProtocolErrorKind {
-        self.kind
-    }
-}
-
-pub type ProtocolResult<T> = Result<T, ProtocolErrorBox>;
+impl DefaultProtocolError for std::io::Error {} 
