@@ -5,9 +5,11 @@ use crate::{
         client::{Client, ProtocolRegistryKind as ClientProtocolRegistryKind},
         server::{ProtocolRegistryKind as ServerProtocolRegistryKind, Server},
     },
-    connection::{Inbound, Outbound, Protocol, TransportSpec},
+    connection::{Inbound, Outbound, TransportSpec},
     executable::{ProtocolEntryBuilder, ProtocolRegistryBuilder, registry::ProtocolEntryRegistry},
     extensions::{Locals, Params},
+        protocol::Protocol,
+        
 };
 
 use super::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};

@@ -11,7 +11,8 @@ use tokio::io::BufReader;
 
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, Protocol, TransportSpec},
+    connection::{ConnStream, TransportSpec},
+    protocol::Protocol,
     executable::middleware::AsyncMiddlewareChain,
     url::UrlRoot,
 };

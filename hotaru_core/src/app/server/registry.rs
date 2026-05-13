@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, Protocol, TransportSpec},
+    connection::{ConnStream,TransportSpec},
     executable::{
         ExecutableBinding,
         entry::{ProtocolEntry, ProtocolEntryTrait},
@@ -10,6 +10,7 @@ use crate::{
         registry::ProtocolEntryRegistry,
     },
     extensions::ParamsClone,
+    protocol::Protocol,
     url::{UrlError, UrlRegistration, UrlRoot},
 };
 use std::{any::TypeId, sync::Arc};

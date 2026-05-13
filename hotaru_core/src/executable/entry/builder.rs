@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    connection::{Protocol, TransportSpec},
+    connection::TransportSpec,
+    protocol::Protocol,
     executable::entry::{ProtocolEntry, ProtocolEntryTrait},
     executable::middleware::AsyncMiddleware,
     url::UrlRoot,

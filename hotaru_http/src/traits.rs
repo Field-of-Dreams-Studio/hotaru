@@ -18,6 +18,7 @@ use std::task::{Context, Poll};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::executor::block_on;
+use hotaru_core::protocol::ProtocolFlow;
 use tokio::io::{AsyncBufRead, AsyncWriteExt, BufReader, ReadBuf};
 use tokio::sync::Mutex;
 use tokio::net::TcpStream;
@@ -153,84 +154,69 @@ impl HttpTransport {
     }
 }
 
-impl Transport for HttpTransport {
-    type Id = i128;
-
-    fn id(&self) -> i128 {
-        self.id
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
 
 // ============================================================================
 // HttpMessage - Message wrapper for HTTP
 // ============================================================================
 
-/// HTTP message wrapper.
-///
-/// Wraps the existing HttpRequest and HttpResponse types
-/// to implement the Message trait.
-#[derive(Debug)]
-pub enum HttpMessage {
-    /// HTTP request (client -> server)
-    Request(HttpRequest),
+// /// HTTP message wrapper.
+// ///
+// /// Wraps the existing HttpRequest and HttpResponse types
+// /// to implement the Message trait.
+// #[derive(Debug)]
+// pub enum HttpMessage {
+//     /// HTTP request (client -> server)
+//     Request(HttpRequest),
 
-    /// HTTP response (server -> client)
-    Response(HttpResponse),
-}
+//     /// HTTP response (server -> client)
+//     Response(HttpResponse),
+// }
 
-impl Message for HttpMessage {
-    fn encode(&self, buf: &mut BytesMut) -> Result<(), Box<dyn Error + Send + Sync>> {
-        match self {
-            HttpMessage::Request(req) => {
-                // Clone to get ownership
-                let mut meta = req.meta.clone();
-                let body = req.body.clone();
+// impl Message for HttpMessage {
+//     fn encode(&self, buf: &mut BytesMut) -> Result<(), Box<dyn Error + Send + Sync>> {
+//         match self {
+//             HttpMessage::Request(req) => {
+//                 // Clone to get ownership
+//                 let mut meta = req.meta.clone();
+//                 let body = req.body.clone();
 
-                // Use into_static to properly set headers and get body bytes
-                let body_bytes = block_on(body.into_static(&mut meta));
+//                 // Use into_static to properly set headers and get body bytes
+//                 let body_bytes = block_on(body.into_static(&mut meta));
 
-                // Use represent() to format headers
-                let headers = meta.represent();
-                buf.extend_from_slice(headers.as_bytes());
+//                 // Use represent() to format headers
+//                 let headers = meta.represent();
+//                 buf.extend_from_slice(headers.as_bytes());
 
-                // Add body
-                buf.extend_from_slice(&body_bytes);
-                Ok(())
-            }
-            HttpMessage::Response(res) => {
-                // Clone to get ownership
-                let mut meta = res.meta.clone();
-                let body = res.body.clone();
+//                 // Add body
+//                 buf.extend_from_slice(&body_bytes);
+//                 Ok(())
+//             }
+//             HttpMessage::Response(res) => {
+//                 // Clone to get ownership
+//                 let mut meta = res.meta.clone();
+//                 let body = res.body.clone();
 
-                // Use into_static to properly set headers and get body bytes
-                let body_bytes = block_on(body.into_static(&mut meta));
+//                 // Use into_static to properly set headers and get body bytes
+//                 let body_bytes = block_on(body.into_static(&mut meta));
 
-                // Use represent() to format headers
-                let headers = meta.represent();
-                buf.extend_from_slice(headers.as_bytes());
+//                 // Use represent() to format headers
+//                 let headers = meta.represent();
+//                 buf.extend_from_slice(headers.as_bytes());
 
-                // Add body
-                buf.extend_from_slice(&body_bytes);
+//                 // Add body
+//                 buf.extend_from_slice(&body_bytes);
 
-                Ok(())
-            }
-        }
-    }
+//                 Ok(())
+//             }
+//         }
+//     }
 
-    fn decode(_buf: &mut BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>> {
-        // For now, we'll use the existing parsing logic in handle methods
-        // Full implementation would use HttpRequest::parse_lazy here
-        Ok(None)
-    }
-}
+//     fn decode(_buf: &mut BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>> {
+//         // For now, we'll use the existing parsing logic in handle methods
+//         // Full implementation would use HttpRequest::parse_lazy here
+//         Ok(None)
+//     }
+// }
 
 // ============================================================================
 // Wire wrappers (signature migration only)
@@ -431,7 +417,12 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
             Some(local_addr),
         );
 
-        let (response, _status) = ctx.run().await?;
+        let (response, _status) = ctx.run().await.map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("HTTP/1.1 request handling error: {}", e),
+            )
+        })?;
 
         let mut writer_guard = channel.writer.lock().await;
         response.send(&mut *writer_guard).await?;
@@ -462,7 +453,7 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
     type TS = TS;
     type Channel = Http1Channel<W>;
     type Stream = ();
-    type Message = HttpMessage;
+    type Message = ();
     type Context = HttpContext<TS>;
 
     fn name(&self) -> &'static str {

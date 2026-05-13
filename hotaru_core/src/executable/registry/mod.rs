@@ -4,7 +4,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, Protocol, TransportSpec},
+    connection::{ConnStream, TransportSpec},
     debug_log,
     executable::{
         ExecutableBinding,
@@ -12,6 +12,7 @@ use crate::{
         middleware::{AsyncMiddleware, AsyncMiddlewareChain},
     },
     extensions::ParamsClone,
+    protocol::Protocol,
     url::{UrlError, UrlRegistration, UrlRoot},
 };
 

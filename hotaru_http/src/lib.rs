@@ -1,4 +1,4 @@
-pub use hotaru_core::{TemplateManager, Value, app, connection, debug, extensions, object, url};
+pub use hotaru_core::{TemplateManager, Value, app, connection, debug, executable, extensions, object, protocol, url};
 pub use hotaru_core::{debug_error, debug_log, debug_trace, debug_value, debug_warn};
 
 pub mod body;
@@ -39,7 +39,7 @@ pub mod http {
 
 pub use error::HttpError;
 pub use traits::{
-    DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol, HttpMessage, HttpTransport,
+    DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol, HttpTransport,
 };
 #[cfg(feature = "tls")]
 pub use traits::{HTTPS, Http1TlsProtocol};

@@ -8,7 +8,8 @@ use std::time::Duration;
 use crate::executable::ExecutableBinding;
 use crate::{debug_error, debug_log, debug_warn};
 
-use crate::connection::{Inbound, Protocol, TransportSpec};
+use crate::connection::{Inbound, TransportSpec};
+use crate::protocol::Protocol;
 use crate::url::UrlError;
 
 pub mod registry;

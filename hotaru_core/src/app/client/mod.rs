@@ -3,7 +3,9 @@ use std::sync::Arc;
 use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
-    }, connection::{Outbound, Protocol, TransportSpec}, protocol::RequestContext, url::{UrlError, UrlNode, UrlRoot}
+    },
+    connection::{Outbound,TransportSpec}, protocol::RequestContext, url::{UrlError, UrlNode, UrlRoot},
+    protocol::Protocol,
 };
 
 pub use registry::ProtocolRegistryKind;

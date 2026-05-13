@@ -1,7 +1,7 @@
 use crate::app::common::{RunMode, RuntimeConfig};
 use crate::connection::connection::ConnectionStatus;
 use crate::connection::error::ConnectionError;
-use crate::connection::{ConnStream, Outbound, ProtocolRole, RequestContext, TransportSpec};
+use crate::connection::{ConnStream, Outbound, TransportSpec};
 use crate::debug_log;
 use crate::extensions::{Locals, Params};
 use crate::http::cookie::{Cookie, CookieMap};
@@ -16,6 +16,7 @@ use crate::http::{
 };
 use crate::url::UrlNode;
 use akari::Value;
+use hotaru_core::protocol::{ProtocolRole, RequestContext};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
