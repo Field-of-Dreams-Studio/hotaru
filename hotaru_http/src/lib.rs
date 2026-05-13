@@ -14,6 +14,7 @@ pub mod response;
 pub mod safety;
 pub mod start_line;
 pub mod traits; // Protocol trait implementations for HTTP/1.1
+pub mod error;
 
 #[cfg(test)]
 pub mod test; // Security tests for HTTP parsing
@@ -36,6 +37,7 @@ pub mod http {
     pub use crate::traits;
 }
 
+pub use error::HttpError;
 pub use traits::{
     DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol, HttpMessage, HttpTransport,
 };
