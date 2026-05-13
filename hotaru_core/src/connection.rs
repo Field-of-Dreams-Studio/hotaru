@@ -16,10 +16,3 @@ pub use self::tcp::{
 };
 pub use self::transport_spec::TransportSpec;
 
-// New protocol traits
-pub use crate::protocol::{
-    Message, Protocol,
-    ProtocolIndex, ProtocolRole, RequestContext, Stream,
-    transport::Transport,
-    ProtocolError, BoxProtocolError, DefaultProtocolError,
-};

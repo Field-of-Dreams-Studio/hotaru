@@ -24,7 +24,8 @@ use tokio::net::TcpStream;
 
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnMeta, ConnStream, Channel, Message, Outbound, Protocol, ProtocolRole, Transport, TransportSpec, RequestContext},
+    connection::{ConnMeta, ConnStream, Outbound, TransportSpec},
+    protocol::{Channel,Message, Protocol, ProtocolRole, RequestContext},
     http::{
         context::HttpContext, request::HttpRequest, response::HttpResponse, safety::HttpSafety,
     },
@@ -486,9 +487,9 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
 
     fn open_channel(
         self,
-        reader: BufReader<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf,
-        writer: <Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf,
-        meta: <Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
+        reader: BufReader<<Self::TS as TransportSpec>::Wire>::ReadHalf,
+        writer: <Self::TS as TransportSpec>::Wire::WriteHalf,
+        meta: <Self::TS as TransportSpec>::Wire::Meta,
     ) -> Self::Channel {
         let mut transport = self.transport.clone();
         transport.set_addresses(meta.local_addr(), meta.remote_addr());
