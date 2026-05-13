@@ -20,6 +20,6 @@ pub use self::transport_spec::TransportSpec;
 pub use crate::protocol::{
     Message, Protocol,
     ProtocolIndex, ProtocolRole, RequestContext, Stream,
-    Transport, 
-    ProtocolError, BoxProtocolError, DefaultProtocolError, 
+    transport::Transport,
+    ProtocolError, BoxProtocolError, DefaultProtocolError,
 };

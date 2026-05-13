@@ -104,7 +104,7 @@ impl<TS: TransportSpec> Server<TS> {
     /// This function add a new url to the app. It will be added to the root url
     /// # Arguments
     /// * `url` - The url to add. It should be a string.
-    pub fn lit_url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
+    pub fn lit_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         self: &Arc<Self>,
         url: T,
         mut executable: ExecutableBinding<P::Context>,
@@ -119,7 +119,7 @@ impl<TS: TransportSpec> Server<TS> {
     }
 
     /// Regiter a URL by using Hotaru Pattern
-    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
+    pub fn url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         self: &Arc<Self>,
         url: T,
         mut executable: ExecutableBinding<P::Context>,

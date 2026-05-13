@@ -11,6 +11,7 @@ use std::error::Error;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
@@ -18,15 +19,16 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::executor::block_on;
 use tokio::io::{AsyncBufRead, AsyncWriteExt, BufReader, ReadBuf};
+use tokio::sync::Mutex;
 use tokio::net::TcpStream;
 
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnMeta, ConnStream, Message, Protocol, ProtocolRole, Transport, TransportSpec},
+    connection::{ConnMeta, ConnStream, Channel, Message, Outbound, Protocol, ProtocolRole, Transport, TransportSpec, RequestContext},
     http::{
         context::HttpContext, request::HttpRequest, response::HttpResponse, safety::HttpSafety,
     },
-    url::UrlRoot,
+    url::{UrlNode, UrlRoot},
 };
 
 // ============================================================================
@@ -309,6 +311,39 @@ impl<W: tokio::io::AsyncWrite + Unpin> tokio::io::AsyncWrite for HttpWireWriter<
     }
 }
 
+/// HTTP/1 channel shim for the new Protocol trait.
+///
+/// Keeps the existing one-connection, one-transport semantics while
+/// exposing a shared I/O handle that can be used by the protocol-level
+/// `handle` implementation.
+pub struct Http1Channel<W: ConnStream> {
+    reader: Arc<Mutex<BufReader<W::ReadHalf>>>,
+    writer: Arc<Mutex<W::WriteHalf>>,
+    transport: Arc<Mutex<HttpTransport>>,
+    open: Arc<AtomicBool>,
+}
+
+impl<W: ConnStream> Clone for Http1Channel<W> {
+    fn clone(&self) -> Self {
+        Self {
+            reader: self.reader.clone(),
+            writer: self.writer.clone(),
+            transport: self.transport.clone(),
+            open: self.open.clone(),
+        }
+    }
+}
+
+impl<W: ConnStream> Channel for Http1Channel<W> {
+    fn is_open(&self) -> bool {
+        self.open.load(Ordering::Acquire)
+    }
+
+    fn close(&self) {
+        self.open.store(false, Ordering::Release);
+    }
+}
+
 // ============================================================================
 // Http1Protocol - Main protocol handler
 // ============================================================================
@@ -360,77 +395,71 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
         }
     }
 
-    /// Handles server-side HTTP/1.1 connections.
-    async fn handle_server(
-        &mut self,
-        mut reader: HttpWireReader<BufReader<W::ReadHalf>>,
-        mut writer: HttpWireWriter<W::WriteHalf>,
+    async fn handle_server_once(
+        channel: &Http1Channel<W>,
         runtime: Arc<RuntimeConfig>,
         root: Arc<UrlRoot<HttpContext<TS>, TS>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        loop {
-            // Parse request using existing logic
-            let request = HttpRequest::parse_lazy(&mut reader, &self.transport.safety, false).await;
+    ) -> Result<ProtocolFlow, std::io::Error> {
+        let mut reader_guard = channel.reader.lock().await;
+        let request = HttpRequest::parse_lazy(&mut *reader_guard, &channel.transport.lock().await.safety, false).await;
 
-            // Check if request is empty/default (parsing failed)
-            if request.meta.path().is_empty() && request.meta.header.is_empty() {
-                break;
-            }
-
-            // Update keep-alive status
-            self.transport.update_keep_alive(&request);
-            self.transport.increment_requests();
-
-            // Walk the URL tree to find the matching endpoint
-            let path = request.meta.path();
-            let endpoint = root
-                .walk_str(&path)
-                .await
-                .ok_or("No HTTP/1.1 endpoint matched the request path")?;
-
-            // Create the context with the found endpoint
-            let ctx = HttpContext::new_server(
-                runtime.clone(),
-                endpoint,
-                request,
-                reader.remote_addr(),
-                reader.local_addr(),
-            );
-
-            // Run the handler and get response
-            let (response, _status) = ctx.run().await?;
-
-            // Send response
-            response.send(&mut writer).await?;
-            writer.flush().await?;
-
-            // Check if we should close the connection
-            if !self.transport.should_keep_alive() {
-                break;
-            }
+        if request.meta.path().is_empty() && request.meta.header.is_empty() {
+            return Ok(ProtocolFlow::Close);
         }
 
-        Ok(())
+        let mut transport_guard = channel.transport.lock().await;
+        transport_guard.update_keep_alive(&request);
+        transport_guard.increment_requests();
+
+        let local_addr = transport_guard.local_addr;
+        let remote_addr = transport_guard.remote_addr;
+        let keep_alive = transport_guard.should_keep_alive();
+        drop(transport_guard);
+
+        let path = request.meta.path();
+        let endpoint = root
+            .walk_str(&path)
+            .await
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "No HTTP/1.1 endpoint matched the request path"))?;
+
+        let ctx = HttpContext::new_server(
+            runtime.clone(),
+            endpoint,
+            request,
+            Some(remote_addr),
+            Some(local_addr),
+        );
+
+        let (response, _status) = ctx.run().await?;
+
+        let mut writer_guard = channel.writer.lock().await;
+        response.send(&mut *writer_guard).await?;
+        writer_guard.flush().await?;
+
+        if keep_alive {
+            Ok(ProtocolFlow::Continue)
+        } else {
+            Ok(ProtocolFlow::Close)
+        }
     }
 
-    /// Handles client-side HTTP/1.1 connections.
-    async fn handle_client(
-        &mut self,
-        _reader: HttpWireReader<BufReader<W::ReadHalf>>,
-        _writer: HttpWireWriter<W::WriteHalf>,
+    async fn handle_client_once(
+        _channel: &Http1Channel<W>,
         _runtime: Arc<RuntimeConfig>,
         _root: Arc<UrlRoot<HttpContext<TS>, TS>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        // Client implementation will be added when we create the Client App
-        Err("HTTP/1.1 client not yet implemented".into())
+    ) -> Result<ProtocolFlow, std::io::Error> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "HTTP/1.1 client not yet implemented",
+        ))
     }
 }
 
 #[async_trait]
 impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, TS> {
     type Wire = W;
-    type Spec = TS;
-    type Transport = HttpTransport;
+    type TS = TS;
+    type Channel = Http1Channel<W>;
     type Stream = ();
     type Message = HttpMessage;
     type Context = HttpContext<TS>;
@@ -455,41 +484,47 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
             || initial_bytes.starts_with(b"TRACE ")
     }
 
-    async fn handle(
-        &mut self,
-        reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
-        writer: <Self::Wire as ConnStream>::WriteHalf,
-        meta: <Self::Wire as ConnStream>::Meta,
-        runtime: Arc<RuntimeConfig>,
-        root: Arc<UrlRoot<Self::Context, Self::Spec>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        self.transport
-            .set_addresses(meta.local_addr(), meta.remote_addr());
+    fn open_channel(
+        self,
+        reader: BufReader<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf,
+        writer: <Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf,
+        meta: <Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
+    ) -> Self::Channel {
+        let mut transport = self.transport.clone();
+        transport.set_addresses(meta.local_addr(), meta.remote_addr());
 
-        let reader = HttpWireReader::new(reader, meta.local_addr(), meta.remote_addr());
-        let writer = HttpWireWriter::new(writer);
-
-        match self.role() {
-            ProtocolRole::Server => self.handle_server(reader, writer, runtime, root).await,
-            ProtocolRole::Client => self.handle_client(reader, writer, runtime, root).await,
+        Http1Channel {
+            reader: Arc::new(Mutex::new(BufReader::new(reader))),
+            writer: Arc::new(Mutex::new(writer)),
+            transport: Arc::new(Mutex::new(transport)),
+            open: Arc::new(AtomicBool::new(true)),
         }
     }
 
-    async fn request(
-        &mut self,
-        reader: BufReader<<Self::Wire as ConnStream>::ReadHalf>,
-        writer: <Self::Wire as ConnStream>::WriteHalf,
-        meta: <Self::Wire as ConnStream>::Meta,
+    async fn handle(
+        channel: &Self::Channel,
         runtime: Arc<RuntimeConfig>,
-        root: Arc<UrlRoot<Self::Context, Self::Spec>>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        self.transport
-            .set_addresses(meta.local_addr(), meta.remote_addr());
+        root: Arc<UrlRoot<Self::Context, Self::TS>>,
+    ) -> Result<ProtocolFlow, <Self::Context as RequestContext>::Error> {
+        let transport_guard = channel.transport.lock().await;
+        let role = transport_guard.role;
+        drop(transport_guard);
 
-        let reader = HttpWireReader::new(reader, meta.local_addr(), meta.remote_addr());
-        let writer = HttpWireWriter::new(writer);
+        match role {
+            ProtocolRole::Server => Self::handle_server_once(channel, runtime, root).await,
+            ProtocolRole::Client => Self::handle_client_once(channel, runtime, root).await,
+        }
+    }
 
-        self.handle_client(reader, writer, runtime, root).await
+    async fn send(
+        _channel: &Self::Channel,
+        _ctx: &mut Self::Context,
+        _outpoint: &Arc<UrlNode<Self::Context, Self::TS>>,
+    ) -> Result<ProtocolFlow, <Self::Context as RequestContext>::Error> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "P::send is implemented in Stage 5",
+        ))
     }
 }
 

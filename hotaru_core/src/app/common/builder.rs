@@ -76,7 +76,7 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
         self
     }
 
-    pub fn single_protocol<P: Protocol<Wire = TS::Wire, Spec = TS>>(
+    pub fn single_protocol<P: Protocol<Wire = TS::Wire, TS = TS>>(
         mut self,
         builder: ProtocolEntryBuilder<P, TS>,
     ) -> Self {

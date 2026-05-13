@@ -1,7 +1,7 @@
 use crate::app::common::{RunMode, RuntimeConfig};
 use crate::connection::connection::ConnectionStatus;
 use crate::connection::error::ConnectionError;
-use crate::connection::{ConnStream, Connector, ProtocolRole, RequestContext, TransportSpec};
+use crate::connection::{ConnStream, Outbound, ProtocolRole, RequestContext, TransportSpec};
 use crate::debug_log;
 use crate::extensions::{Locals, Params};
 use crate::http::cookie::{Cookie, CookieMap};
@@ -548,12 +548,11 @@ impl<TS: TransportSpec> HttpContext<TS> {
         safety_config: HttpSafety,
     ) -> Result<HttpResponse, ConnectionError>
     where
-        TTarget: Into<<TS::Connector as Connector>::Target>,
-        TS::Connector: From<TConnectorConfig>,
+        TTarget: Into<<TS::Outbound as Outbound>::ConnectTarget>,
+        TS::Outbound: From<TConnectorConfig>,
     {
-        let connector = TS::Connector::from(connector_config);
-        let wire = connector
-            .connect(target.into())
+        let _outbound = TS::Outbound::from(connector_config);
+        let wire = <TS::Outbound as Outbound>::connect(target.into())
             .await
             .map_err(ConnectionError::IoError)?;
         let (read, write, _meta) = wire.split();
@@ -611,7 +610,7 @@ impl HttpContext<crate::connection::tcp::TcpTransport> {
         safety_config: HttpSafety,
     ) -> Result<HttpResponse, ConnectionError>
     where
-        <crate::connection::tcp::TcpTransport as TransportSpec>::Connector: From<TConnectorConfig>,
+        <crate::connection::tcp::TcpTransport as TransportSpec>::Outbound: From<TConnectorConfig>,
     {
         let host_str = host.into();
         let (is_https, without_scheme) = if host_str.starts_with("https://") {
