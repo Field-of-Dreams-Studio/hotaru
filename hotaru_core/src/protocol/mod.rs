@@ -13,5 +13,5 @@ pub use message::Message;
 pub use protocol::Protocol;
 pub use stream::Stream;
 pub use channel::{Channel, ProtocolFlow}; 
-// pub use transport::Transport;
+pub use transport::Transport;
 pub use types::{ProtocolIndex, ProtocolRole};

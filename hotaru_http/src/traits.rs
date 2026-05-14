@@ -26,6 +26,7 @@ use tokio::net::TcpStream;
 use crate::{
     app::common::RuntimeConfig,
     connection::{ConnMeta, ConnStream, Outbound, TransportSpec},
+    error::HttpError,
     protocol::{Channel,Message, Protocol, ProtocolRole, RequestContext},
     http::{
         context::HttpContext, request::HttpRequest, response::HttpResponse, safety::HttpSafety,
@@ -159,64 +160,66 @@ impl HttpTransport {
 // HttpMessage - Message wrapper for HTTP
 // ============================================================================
 
-// /// HTTP message wrapper.
-// ///
-// /// Wraps the existing HttpRequest and HttpResponse types
-// /// to implement the Message trait.
-// #[derive(Debug)]
-// pub enum HttpMessage {
-//     /// HTTP request (client -> server)
-//     Request(HttpRequest),
+/// HTTP message wrapper.
+///
+/// Wraps the existing HttpRequest and HttpResponse types
+/// to implement the Message trait.
+#[derive(Debug)]
+pub enum HttpMessage {
+    /// HTTP request (client -> server)
+    Request(HttpRequest),
 
-//     /// HTTP response (server -> client)
-//     Response(HttpResponse),
-// }
+    /// HTTP response (server -> client)
+    Response(HttpResponse),
+}
 
-// impl Message for HttpMessage {
-//     fn encode(&self, buf: &mut BytesMut) -> Result<(), Box<dyn Error + Send + Sync>> {
-//         match self {
-//             HttpMessage::Request(req) => {
-//                 // Clone to get ownership
-//                 let mut meta = req.meta.clone();
-//                 let body = req.body.clone();
+impl Message for HttpMessage {
+    type BytesMut = BytesMut;
 
-//                 // Use into_static to properly set headers and get body bytes
-//                 let body_bytes = block_on(body.into_static(&mut meta));
+    fn encode(&self, buf: &mut Self::BytesMut) -> Result<(), Box<dyn Error + Send + Sync>> {
+        match self {
+            HttpMessage::Request(req) => {
+                // Clone to get ownership
+                let mut meta = req.meta.clone();
+                let body = req.body.clone();
 
-//                 // Use represent() to format headers
-//                 let headers = meta.represent();
-//                 buf.extend_from_slice(headers.as_bytes());
+                // Use into_static to properly set headers and get body bytes
+                let body_bytes = block_on(body.into_static(&mut meta));
 
-//                 // Add body
-//                 buf.extend_from_slice(&body_bytes);
-//                 Ok(())
-//             }
-//             HttpMessage::Response(res) => {
-//                 // Clone to get ownership
-//                 let mut meta = res.meta.clone();
-//                 let body = res.body.clone();
+                // Use represent() to format headers
+                let headers = meta.represent();
+                buf.extend_from_slice(headers.as_bytes());
 
-//                 // Use into_static to properly set headers and get body bytes
-//                 let body_bytes = block_on(body.into_static(&mut meta));
+                // Add body
+                buf.extend_from_slice(&body_bytes);
+                Ok(())
+            }
+            HttpMessage::Response(res) => {
+                // Clone to get ownership
+                let mut meta = res.meta.clone();
+                let body = res.body.clone();
 
-//                 // Use represent() to format headers
-//                 let headers = meta.represent();
-//                 buf.extend_from_slice(headers.as_bytes());
+                // Use into_static to properly set headers and get body bytes
+                let body_bytes = block_on(body.into_static(&mut meta));
 
-//                 // Add body
-//                 buf.extend_from_slice(&body_bytes);
+                // Use represent() to format headers
+                let headers = meta.represent();
+                buf.extend_from_slice(headers.as_bytes());
 
-//                 Ok(())
-//             }
-//         }
-//     }
+                // Add body
+                buf.extend_from_slice(&body_bytes);
 
-//     fn decode(_buf: &mut BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>> {
-//         // For now, we'll use the existing parsing logic in handle methods
-//         // Full implementation would use HttpRequest::parse_lazy here
-//         Ok(None)
-//     }
-// }
+                Ok(())
+            }
+        }
+    }
+
+    fn decode(_buf: &mut Self::BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>> {
+        // For now, we'll use the existing parsing logic in handle methods
+        // Full implementation would use HttpRequest::parse_lazy here
+        Ok(None)
+    }
+}
 
 // ============================================================================
 // Wire wrappers (signature migration only)
@@ -478,15 +481,15 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
 
     fn open_channel(
         self,
-        reader: BufReader<<Self::TS as TransportSpec>::Wire>::ReadHalf,
-        writer: <Self::TS as TransportSpec>::Wire::WriteHalf,
-        meta: <Self::TS as TransportSpec>::Wire::Meta,
+        reader: BufReader<<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf>,
+        writer: <<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf,
+        meta: <<Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
     ) -> Self::Channel {
         let mut transport = self.transport.clone();
         transport.set_addresses(meta.local_addr(), meta.remote_addr());
 
         Http1Channel {
-            reader: Arc::new(Mutex::new(BufReader::new(reader))),
+            reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
             transport: Arc::new(Mutex::new(transport)),
             open: Arc::new(AtomicBool::new(true)),
@@ -503,8 +506,16 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         drop(transport_guard);
 
         match role {
-            ProtocolRole::Server => Self::handle_server_once(channel, runtime, root).await,
-            ProtocolRole::Client => Self::handle_client_once(channel, runtime, root).await,
+            ProtocolRole::Server => {
+                Self::handle_server_once(channel, runtime, root)
+                    .await
+                    .map_err(HttpError::from)
+            }
+            ProtocolRole::Client => {
+                Self::handle_client_once(channel, runtime, root)
+                    .await
+                    .map_err(HttpError::from)
+            }
         }
     }
 
@@ -513,10 +524,10 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         _ctx: &mut Self::Context,
         _outpoint: &Arc<UrlNode<Self::Context, Self::TS>>,
     ) -> Result<ProtocolFlow, <Self::Context as RequestContext>::Error> {
-        Err(std::io::Error::new(
+        Err(HttpError::Io(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "P::send is implemented in Stage 5",
-        ))
+        )))
     }
 }
 

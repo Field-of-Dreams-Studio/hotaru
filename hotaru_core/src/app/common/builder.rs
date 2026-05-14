@@ -8,8 +8,7 @@ use crate::{
     connection::{Inbound, Outbound, TransportSpec},
     executable::{ProtocolEntryBuilder, ProtocolRegistryBuilder, registry::ProtocolEntryRegistry},
     extensions::{Locals, Params},
-        protocol::Protocol,
-        
+    protocol::Protocol,
 };
 
 use super::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};

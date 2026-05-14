@@ -21,7 +21,7 @@ pub use hotaru_core::object;
 
 pub use hotaru_core::connection::ConnStream;
 pub use hotaru_core::connection::error::{ConnectionError, Result};
-pub use hotaru_core::connection::{
+pub use hotaru_core::protocol::{
     Message, Protocol, ProtocolRole, RequestContext, Stream, Transport,
 };
 pub use hotaru_core::connection::{
