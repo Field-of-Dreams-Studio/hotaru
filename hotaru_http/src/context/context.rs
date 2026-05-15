@@ -1,5 +1,4 @@
 use hotaru_core::app::common::{RunMode, RuntimeConfig};
-use hotaru_core::connection::connection::ConnectionStatus;
 use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::connection::{ConnStream, Outbound, TransportSpec};
 use hotaru_core::debug_log;
@@ -217,33 +216,32 @@ impl<TS: TransportSpec> HttpContext<TS> {
         let _ = response.send(writer).await;
     }
 
-    /// Runs the endpoint and sending the response.
+    /// Runs the endpoint and returns the response.
     ///
     /// # Return
     ///
-    /// Returns the response and a boolean indicating whether the connection should be closed.
-    /// Response is the response of the endpoint, and the boolean indicates whether the connection should be closed.
-    pub async fn run(mut self) -> Result<(HttpResponse, ConnectionStatus), ConnectionError> {
+    /// Returns the response. Keep-alive is now managed by `Http1Channel.open`.
+    pub async fn run(mut self) -> Result<HttpResponse, crate::protocol::HttpError> {
         if let Some(endpoint) = self.endpoint() {
             debug_log!("HTTP Context: Found endpoint, checking request");
             if let Err(s) = self.request_check(&endpoint) {
                 debug_log!("HTTP Context: Request check failed with status: {:?}", s);
-                return Ok((
-                    response_templates::return_status(s),
-                    ConnectionStatus::Stopped,
-                ));
+                return Ok(response_templates::return_status(s));
             };
             debug_log!("HTTP Context: Running endpoint handler");
             let result = endpoint.run(self).await;
             debug_log!("HTTP Context: Handler completed");
             let ctx = result.map_err(|e| {
-                ConnectionError::Other(format!("Endpoint execution error: {}", e))
+                crate::protocol::HttpError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Endpoint execution error: {}", e),
+                ))
             })?;
-            Ok((ctx.response, ConnectionStatus::Stopped))
+            Ok(ctx.response)
         } else {
             debug_log!("HTTP Context: No endpoint available (client context)");
             // No endpoint available (client context)
-            Ok((self.response, ConnectionStatus::Stopped))
+            Ok(self.response)
         }
     }
 

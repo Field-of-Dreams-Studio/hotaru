@@ -1,6 +1,6 @@
 ﻿use std::collections::HashMap;
 
-use crate::http::meta::HeaderValue;
+use crate::message::meta::HeaderValue;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CookieMap(pub HashMap<String, Cookie>);

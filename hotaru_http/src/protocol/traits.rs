@@ -422,7 +422,7 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
             Some(local_addr),
         );
 
-        let (response, _status) = ctx.run().await.map_err(|e| {
+        let response = ctx.run().await.map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("HTTP/1.1 request handling error: {}", e),

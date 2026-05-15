@@ -32,12 +32,57 @@ pub use protocol::{HTTPS, Http1TlsProtocol};
 
 pub use protocol::HttpError;
 
-/// Compatibility namespace so legacy `crate::http::...` imports keep working
-/// after moving HTTP into this standalone crate.
-pub mod http {
-    pub use crate::context;
-    pub use crate::message::{body, http_value, meta, request, response, start_line};
-    pub use crate::protocol;
-    pub use crate::security;
-    pub use crate::util::{cookie, encoding, form};
+// ============================================================================
+// Backward-compatible re-exports for external crates (e.g. hotaru, htmstd, h2per)
+// These allow old `hotaru_http::body`, `hotaru_http::cookie`, etc. paths to work.
+// ============================================================================
+
+pub mod body {
+    //! Re-exported from `message::body`
+    pub use crate::message::body::*;
+}
+
+pub mod cookie {
+    //! Re-exported from `util::cookie`
+    pub use crate::util::cookie::*;
+}
+
+pub mod encoding {
+    //! Re-exported from `util::encoding`
+    pub use crate::util::encoding::*;
+}
+
+pub mod form {
+    //! Re-exported from `util::form`
+    pub use crate::util::form::*;
+}
+
+pub mod http_value {
+    //! Re-exported from `message::http_value`
+    pub use crate::message::http_value::*;
+}
+
+pub mod meta {
+    //! Re-exported from `message::meta`
+    pub use crate::message::meta::*;
+}
+
+pub mod request {
+    //! Re-exported from `message::request`
+    pub use crate::message::request::*;
+}
+
+pub mod response {
+    //! Re-exported from `message::response`
+    pub use crate::message::response::*;
+}
+
+pub mod safety {
+    //! Re-exported from `security::safety`
+    pub use crate::security::safety::*;
+}
+
+pub mod traits {
+    //! Re-exported from `protocol::traits`
+    pub use crate::protocol::traits::*;
 }
