@@ -18,21 +18,22 @@ use std::task::{Context, Poll};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::executor::block_on;
-use crate::protocol::ProtocolFlow;
+use hotaru_core::protocol::ProtocolFlow;
 use tokio::io::{AsyncBufRead, AsyncWriteExt, BufReader, ReadBuf};
 use tokio::sync::Mutex;
 use tokio::net::TcpStream;
 
-use crate::{
+use hotaru_core::{
     app::common::RuntimeConfig,
     connection::{ConnMeta, ConnStream, Outbound, TransportSpec},
-    context::HttpContext,
-    error::HttpError,
-    protocol::{Channel,Message, Protocol, ProtocolRole, RequestContext},
-    request::HttpRequest,
-    response::HttpResponse,
-    safety::HttpSafety,
+    protocol::{Channel, Message, Protocol, ProtocolRole, RequestContext},
     url::{UrlNode, UrlRoot},
+};
+use crate::{
+    context::HttpContext,
+    message::{request::HttpRequest, response::HttpResponse},
+    protocol::HttpError,
+    security::safety::HttpSafety,
 };
 
 // ============================================================================
@@ -40,7 +41,7 @@ use crate::{
 // ============================================================================
 
 /// Default transport spec used by HTTP when callers don't specify one.
-pub type DefaultHttpTransport = crate::connection::tcp::TcpTransport;
+pub type DefaultHttpTransport = hotaru_core::connection::tcp::TcpTransport;
 
 /// Default HTTP protocol (currently HTTP/1.1)
 /// This provides a simpler name for user-facing code while maintaining
@@ -568,7 +569,7 @@ mod tests {
     /// Run with: cargo test --lib -- --ignored test_message_encoding
     #[ignore = "requires HttpRequest::default() to include start line"]
     fn test_message_encoding() {
-        use crate::meta::HttpMeta;
+        use crate::message::meta::HttpMeta;
 
         // Test request encoding
         let mut request = HttpRequest::default();

@@ -1,8 +1,8 @@
-use hotaru_lib::url_encoding::{decode_url_owned, encode_url_owned};
+﻿use hotaru_lib::url_encoding::{decode_url_owned, encode_url_owned};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
-use super::http_value::ContentDisposition;
+use crate::http::http_value::ContentDisposition;
 
 #[derive(Debug, Clone)]
 pub struct UrlEncodedForm {
@@ -123,7 +123,7 @@ impl MultiForm {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::form::MultiForm;
+    /// use crate::form::MultiForm;
     /// let boundary = "boundary123";
     /// let body = concat!(
     ///     "--boundary123\r\n",

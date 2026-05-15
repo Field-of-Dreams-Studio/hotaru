@@ -1,10 +1,11 @@
-use super::cookie::Cookie;
-use super::safety::HttpSafety;
+use crate::util::cookie::Cookie;
+use crate::security::safety::HttpSafety;
 
-use super::body::HttpBody;
-use super::meta::HttpMeta;
-use super::start_line::HttpStartLine;
-use super::{http_value::*, net};
+use crate::message::body::HttpBody;
+use crate::message::meta::HttpMeta;
+use crate::message::start_line::HttpStartLine;
+use crate::message::http_value::*;
+use crate::context::io;
 use std::collections::HashMap;
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
@@ -35,7 +36,7 @@ impl HttpRequest {
         config: &HttpSafety,
         print_raw: bool,
     ) -> Self {
-        match net::parse_lazy(stream, config, true, print_raw).await {
+        match io::parse_lazy(stream, config, true, print_raw).await {
             Ok((meta, body)) => Self::new(meta, body),
             Err(_) => Self::default(),
         }
@@ -72,7 +73,7 @@ impl HttpRequest {
     }
 
     pub async fn send<W: AsyncWrite + Unpin>(self, writer: &mut W) -> std::io::Result<()> {
-        net::send(self.meta, self.body, writer).await
+        io::send(self.meta, self.body, writer).await
     }
 }
 
@@ -93,11 +94,11 @@ pub mod request_templates {
 
     use akari::Value;
 
-    use crate::body::HttpBody;
-    use crate::form::UrlEncodedForm;
-    use crate::http_value::{HttpContentType, HttpMethod, HttpVersion};
-    use crate::meta::HttpMeta;
-    use crate::start_line::HttpStartLine;
+    use crate::message::body::HttpBody;
+    use crate::util::form::UrlEncodedForm;
+    use crate::message::http_value::{HttpContentType, HttpMethod, HttpVersion};
+    use crate::message::meta::HttpMeta;
+    use crate::message::start_line::HttpStartLine;
 
     use super::HttpRequest;
 

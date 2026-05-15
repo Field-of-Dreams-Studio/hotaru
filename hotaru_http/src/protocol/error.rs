@@ -1,9 +1,9 @@
 use std::fmt;
 
-use crate::connection::error::ConnectionError;
-use crate::protocol::ProtocolError;
+use hotaru_core::connection::error::ConnectionError;
+use hotaru_core::protocol::ProtocolError;
 
-use super::http_value::StatusCode;
+use crate::message::http_value::StatusCode;
 
 #[derive(Debug)]
 pub enum HttpError {

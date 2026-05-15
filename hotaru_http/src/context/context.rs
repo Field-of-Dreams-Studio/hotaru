@@ -1,20 +1,10 @@
-use crate::app::common::{RunMode, RuntimeConfig};
-use crate::connection::connection::ConnectionStatus;
-use crate::connection::error::ConnectionError;
-use crate::connection::{ConnStream, Outbound, TransportSpec};
-use crate::debug_log;
-use crate::extensions::{Locals, Params};
-use crate::http::cookie::{Cookie, CookieMap};
-use crate::http::request::HttpRequest;
-use crate::http::safety::HttpSafety;
-use crate::http::{
-    body::HttpBody,
-    form::{MultiForm, UrlEncodedForm},
-    http_value::HttpMethod,
-    meta::HttpMeta,
-    response::HttpResponse,
-};
-use crate::url::UrlNode;
+use hotaru_core::app::common::{RunMode, RuntimeConfig};
+use hotaru_core::connection::connection::ConnectionStatus;
+use hotaru_core::connection::error::ConnectionError;
+use hotaru_core::connection::{ConnStream, Outbound, TransportSpec};
+use hotaru_core::debug_log;
+use hotaru_core::extensions::{Locals, Params};
+use hotaru_core::url::UrlNode;
 use akari::Value;
 use hotaru_core::protocol::{ProtocolRole, RequestContext};
 use once_cell::sync::Lazy;
@@ -23,8 +13,14 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::io::{AsyncBufRead, AsyncWrite, BufReader, BufWriter};
 
-use super::http_value::StatusCode;
-use super::response::response_templates;
+use crate::message::body::HttpBody;
+use crate::message::http_value::{HttpMethod, StatusCode};
+use crate::message::meta::HttpMeta;
+use crate::message::request::HttpRequest;
+use crate::message::response::{HttpResponse, response_templates};
+use crate::security::safety::HttpSafety;
+use crate::util::cookie::{Cookie, CookieMap};
+use crate::util::form::{MultiForm, UrlEncodedForm};
 
 /// Executable context - determines what's available for execution
 pub enum Executable<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
@@ -428,12 +424,12 @@ impl<TS: TransportSpec> HttpContext<TS> {
 
     /// Convenience method to get request headers directly.
     /// Avoids the long chain: req.request.meta.header
-    pub fn headers(&self) -> &HashMap<String, super::meta::HeaderValue> {
+    pub fn headers(&self) -> &HashMap<String, crate::message::meta::HeaderValue> {
         &self.request.meta.header
     }
 
     /// Convenience method to get a specific header value.
-    pub fn header(&self, key: &str) -> Option<&super::meta::HeaderValue> {
+    pub fn header(&self, key: &str) -> Option<&crate::message::meta::HeaderValue> {
         self.request.meta.header.get(key)
     }
 
@@ -441,8 +437,8 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// Returns the first value if multiple values exist.
     pub fn header_str(&self, key: &str) -> Option<&str> {
         self.request.meta.header.get(key).and_then(|hv| match hv {
-            super::meta::HeaderValue::Single(s) => Some(s.as_str()),
-            super::meta::HeaderValue::Multiple(v) => v.first().map(|s| s.as_str()),
+            crate::message::meta::HeaderValue::Single(s) => Some(s.as_str()),
+            crate::message::meta::HeaderValue::Multiple(v) => v.first().map(|s| s.as_str()),
         })
     }
 
@@ -497,7 +493,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
 impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
     type Request = HttpRequest;
     type Response = HttpResponse;
-    type Error = crate::error::HttpError;
+    type Error = crate::protocol::HttpError;
 
     fn handle_error(&mut self) {
         match &self.executable {

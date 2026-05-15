@@ -1,9 +1,9 @@
-use super::encoding::ContentCodings;
-use super::safety::HttpSafety;
+﻿use crate::util::encoding::ContentCodings;
+use crate::security::safety::HttpSafety;
 
-use super::form::*;
-use super::http_value::*;
-use super::meta::HttpMeta;
+use crate::util::form::*;
+use crate::message::http_value::*;
+use crate::message::meta::HttpMeta;
 use akari::Value;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt};
 
@@ -131,14 +131,14 @@ impl HttpBody {
         /// 4. **Simplicity**: Clear, maintainable code with focused security checks
         ///
         /// ## What We Check (Critical)
-        /// - ✅ Cumulative size limits (prevents DoS)
-        /// - ✅ Invalid hex chunk sizes (prevents crashes)
-        /// - ✅ CRLF terminators (prevents protocol confusion)
+        /// - 鉁?Cumulative size limits (prevents DoS)
+        /// - 鉁?Invalid hex chunk sizes (prevents crashes)
+        /// - 鉁?CRLF terminators (prevents protocol confusion)
         ///
         /// ## What We Don't Check (Non-Critical)
-        /// - ❌ Chunk extension validity (doesn't affect security if size is validated)
-        /// - ❌ Duplicate zero chunks (harmless, just ends parsing)
-        /// - ❌ Chunk data content validation (application layer concern)
+        /// - 鉂?Chunk extension validity (doesn't affect security if size is validated)
+        /// - 鉂?Duplicate zero chunks (harmless, just ends parsing)
+        /// - 鉂?Chunk data content validation (application layer concern)
         ///
         /// **Rationale**: If data doesn't overflow the upper size limit, it's safe to process.
         /// Malformed but size-compliant data will be caught at the application layer or cause

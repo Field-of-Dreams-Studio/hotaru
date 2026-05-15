@@ -7,13 +7,11 @@
 
 #[cfg(test)]
 mod security_tests {
-    use crate::http::{
-        body::HttpBody,
-        http_value::{HttpMethod, HttpVersion},
-        meta::HttpMeta,
-        safety::HttpSafety,
-        start_line::RequestStartLine,
-    };
+    use crate::body::HttpBody;
+    use crate::http_value::{HttpMethod, HttpVersion};
+    use crate::meta::HttpMeta;
+    use crate::safety::HttpSafety;
+    use crate::start_line::RequestStartLine;
     use std::io::Cursor;
     use tokio::io::BufReader;
 
@@ -183,10 +181,10 @@ mod security_tests {
         // Verify null byte is in the header value
         if let Some(host) = meta.header.get("Host") {
             match host {
-                crate::http::meta::HeaderValue::Single(s) => {
+                crate::meta::HeaderValue::Single(s) => {
                     assert!(s.contains('\0'), "Header contains null byte");
                 }
-                crate::http::meta::HeaderValue::Multiple(v) => {
+                crate::meta::HeaderValue::Multiple(v) => {
                     assert!(
                         v.iter().any(|s| s.contains('\0')),
                         "Header contains null byte"
