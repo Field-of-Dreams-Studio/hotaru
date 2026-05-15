@@ -262,7 +262,7 @@ pub mod response_templates {
     ///
     /// ```rust
     /// use crate::response::response_templates;
-    /// use crate::http_value::StatusCode;
+    /// use crate::message::http_value::StatusCode;
     ///
     /// let response = response_templates::normal_response(StatusCode::CREATED, "Resource created");
     /// ```
@@ -361,7 +361,7 @@ pub mod response_templates {
     ///
     /// ```rust
     /// use crate::response::response_templates;
-    /// use crate::http_value::StatusCode;
+    /// use crate::message::http_value::StatusCode;
     ///
     /// // Return a 404 Not Found response
     /// let response = response_templates::return_status(StatusCode::NOT_FOUND);

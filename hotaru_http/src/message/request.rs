@@ -48,7 +48,7 @@ impl HttpRequest {
         self.body = body.parse_buffer(safety_setting);
     }
 
-    /// Add a cookie into the response metadata.
+    /// Add a cookie into the request metadata.
     pub fn add_cookie<T: Into<String>>(mut self, key: T, cookie: Cookie) -> Self {
         self.meta.add_cookie(key, cookie);
         self

@@ -445,7 +445,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
         self.request.meta.header.contains_key(key)
     }
 
-    /// Get teh full cookie map
+    /// Get the full cookie map
     pub fn get_cookies(&mut self) -> &CookieMap {
         self.request.meta.get_cookies()
     }
