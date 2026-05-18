@@ -35,8 +35,9 @@ pub use hotaru_http::context::{Executable, HttpContext};
 pub use hotaru_http::request::HttpRequest;
 pub use hotaru_http::response::HttpResponse;
 pub use hotaru_http::traits::{
-    DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol, HttpMessage, HttpTransport,
+    DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol, HttpTransport,
 };
+
 
 pub use hotaru_http::body::*;
 pub use hotaru_http::cookie::*;

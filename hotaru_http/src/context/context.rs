@@ -5,7 +5,8 @@ use hotaru_core::debug_log;
 use hotaru_core::extensions::{Locals, Params};
 use hotaru_core::url::UrlNode;
 use akari::Value;
-use hotaru_core::protocol::{ProtocolRole, RequestContext};
+use hotaru_core::protocol::{BoxProtocolError, ProtocolError, ProtocolRole, RequestContext};
+
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
@@ -18,6 +19,7 @@ use crate::message::meta::HttpMeta;
 use crate::message::request::HttpRequest;
 use crate::message::response::{HttpResponse, response_templates};
 use crate::security::safety::HttpSafety;
+
 use crate::util::cookie::{Cookie, CookieMap};
 use crate::util::form::{MultiForm, UrlEncodedForm};
 
@@ -216,34 +218,32 @@ impl<TS: TransportSpec> HttpContext<TS> {
         let _ = response.send(writer).await;
     }
 
-    /// Runs the endpoint and returns the response.
+    /// Runs the endpoint and returns the context with the response set.
     ///
     /// # Return
     ///
-    /// Returns the response. Keep-alive is now managed by `Http1Channel.open`.
-    pub async fn run(mut self) -> Result<HttpResponse, crate::protocol::HttpError> {
+    /// Returns `Ok(HttpContext)` with the response populated, or `Err(BoxProtocolError)`
+    /// if the endpoint chain fails. Keep-alive is managed by `Http1Channel.open`.
+    pub async fn run(mut self) -> Result<HttpContext<TS>, BoxProtocolError> {
         if let Some(endpoint) = self.endpoint() {
             debug_log!("HTTP Context: Found endpoint, checking request");
             if let Err(s) = self.request_check(&endpoint) {
                 debug_log!("HTTP Context: Request check failed with status: {:?}", s);
-                return Ok(response_templates::return_status(s));
+                self.response = response_templates::return_status(s);
+                return Ok(self);
             };
             debug_log!("HTTP Context: Running endpoint handler");
-            let result = endpoint.run(self).await;
+            let result = endpoint.run(self).await.map_err(|e| e.boxed());
             debug_log!("HTTP Context: Handler completed");
-            let ctx = result.map_err(|e| {
-                crate::protocol::HttpError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Endpoint execution error: {}", e),
-                ))
-            })?;
-            Ok(ctx.response)
+            result
+
         } else {
             debug_log!("HTTP Context: No endpoint available (client context)");
             // No endpoint available (client context)
-            Ok(self.response)
+            Ok(self)
         }
     }
+
 
     /// Checks whether the request fulfills the endpoint's security requirements.
     pub fn request_check(
