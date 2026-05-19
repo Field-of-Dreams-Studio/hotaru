@@ -15,6 +15,7 @@ use tokio::io::{AsyncBufRead, AsyncWrite, BufReader, BufWriter};
 
 use crate::message::body::HttpBody;
 use crate::message::http_value::{HttpMethod, StatusCode};
+use crate::protocol::HttpError;
 use crate::message::meta::HttpMeta;
 use crate::message::request::HttpRequest;
 use crate::message::response::{HttpResponse, response_templates};
@@ -227,9 +228,10 @@ impl<TS: TransportSpec> HttpContext<TS> {
     pub async fn run(mut self) -> Result<HttpContext<TS>, BoxProtocolError> {
         if let Some(endpoint) = self.endpoint() {
             debug_log!("HTTP Context: Found endpoint, checking request");
-            if let Err(s) = self.request_check(&endpoint) {
-                debug_log!("HTTP Context: Request check failed with status: {:?}", s);
-                self.response = response_templates::return_status(s);
+            if let Err(err) = self.request_check(&endpoint) {
+                debug_log!("HTTP Context: Request check failed: {:?}", err);
+                let status: StatusCode = (&err).into();
+                self.response = response_templates::return_status(status);
                 return Ok(self);
             };
             debug_log!("HTTP Context: Running endpoint handler");
@@ -246,22 +248,25 @@ impl<TS: TransportSpec> HttpContext<TS> {
 
 
     /// Checks whether the request fulfills the endpoint's security requirements.
+    ///
+    /// Returns `Ok(())` if the request passes all checks, or `Err(HttpError)` with
+    /// the appropriate error variant if a check fails.
     pub fn request_check(
         &mut self,
         endpoint: &Arc<UrlNode<HttpContext<TS>, TS>>,
-    ) -> Result<(), StatusCode> {
+    ) -> Result<(), HttpError> {
         let config = endpoint.get_params::<HttpSafety>().unwrap_or_default();
         // println!(
         //     "Checking request: {:?} {}{} ",config,self.request.meta.method(),config.check_method(&self.request.meta.method())
         // );
         if !config.check_body_size(self.request.meta.get_content_length().unwrap_or(0)) {
-            return Err(StatusCode::PAYLOAD_TOO_LARGE);
+            return Err(HttpError::PayloadTooLarge);
         }
         if !config.check_method(&self.request.meta.method()) {
-            return Err(StatusCode::METHOD_NOT_ALLOWED);
+            return Err(HttpError::MethodNotAllowed);
         }
         if !config.check_content_type(&self.request.meta.get_content_type().unwrap_or_default()) {
-            return Err(StatusCode::UNSUPPORTED_MEDIA_TYPE);
+            return Err(HttpError::UnsupportedMediaType);
         }
         return Ok(());
     }
@@ -496,11 +501,13 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
     fn handle_error(&mut self) {
         match &self.executable {
             Executable::Request { .. } => {
-                // Server: return 404
+                // Server: return a generic error response.
+                // The specific status code is determined by the error type
+                // in the protocol-level handle loop via error_response_from().
                 self.response = response_templates::html_response(
-                    "<h1>404 Not Found</h1><br><p>This route is not found</p>",
+                    "<h1>500 Internal Server Error</h1><br><p>An unexpected error occurred</p>",
                 )
-                .status(404);
+                .status(500);
             }
             Executable::<TS>::Response => {
                 // Client: set default error response
