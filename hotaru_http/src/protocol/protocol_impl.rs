@@ -10,7 +10,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use hotaru_core::{
     app::common::RuntimeConfig,
-    connection::{ConnMeta, ConnStream, TransportSpec},
+    connection::{ConnStream, TransportSpec},
     protocol::{Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext},
     url::{UrlNode, UrlRoot},
 };
@@ -18,13 +18,11 @@ use tokio::io::BufReader;
 use tokio::net::TcpStream;
 
 use crate::{
+    channel::{Http1Channel, HttpChannel},
     context::HttpContext,
     protocol::{
-        channel::Http1Channel,
         error::HttpError,
         helpers::{error_response_from, is_keep_alive, not_found_response},
-        http_channel::HttpChannel,
-        transport::HttpTransport,
     },
     security::safety::HttpSafety,
 };
@@ -69,9 +67,7 @@ pub struct Http1Protocol<
     W: ConnStream = TcpStream,
     TS: TransportSpec<Wire = W> = DefaultHttpTransport,
 > {
-    /// Transport state for this connection
-    transport: HttpTransport,
-    /// Application reference is passed to handle methods and not stored here.
+    role: ProtocolRole,
     _wire: PhantomData<fn() -> W>,
     _ts: PhantomData<fn() -> TS>,
 }
@@ -79,7 +75,7 @@ pub struct Http1Protocol<
 impl<W: ConnStream, TS: TransportSpec<Wire = W>> Clone for Http1Protocol<W, TS> {
     fn clone(&self) -> Self {
         Self {
-            transport: self.transport.clone(),
+            role: self.role,
             _wire: PhantomData,
             _ts: PhantomData,
         }
@@ -88,18 +84,23 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Clone for Http1Protocol<W, TS> 
 
 impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
     /// Creates a new HTTP/1.1 protocol handler for server role.
-    pub fn server(safety: HttpSafety) -> Self {
+    ///
+    /// The `_safety` parameter is accepted for API compatibility; the live
+    /// `HttpSafety` used per request comes from `RuntimeConfig`.
+    pub fn server(_safety: HttpSafety) -> Self {
         Self {
-            transport: HttpTransport::new_unbound(ProtocolRole::Server, safety),
+            role: ProtocolRole::Server,
             _wire: PhantomData,
             _ts: PhantomData,
         }
     }
 
     /// Creates a new HTTP/1.1 protocol handler for client role.
-    pub fn client(safety: HttpSafety) -> Self {
+    ///
+    /// See [`server`](Self::server) regarding `_safety`.
+    pub fn client(_safety: HttpSafety) -> Self {
         Self {
-            transport: HttpTransport::new_unbound(ProtocolRole::Client, safety),
+            role: ProtocolRole::Client,
             _wire: PhantomData,
             _ts: PhantomData,
         }
@@ -124,7 +125,7 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
     }
 
     fn role(&self) -> ProtocolRole {
-        self.transport.role
+        self.role
     }
 
     fn detect(initial_bytes: &[u8]) -> bool {
@@ -145,10 +146,7 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         writer: <<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf,
         meta: <<Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
     ) -> Self::Channel {
-        let mut transport = self.transport.clone();
-        transport.set_addresses(meta.local_addr(), meta.remote_addr());
-
-        Http1Channel::new(reader, writer, transport)
+        Http1Channel::new(reader, writer, meta)
     }
 
     async fn handle(
@@ -173,13 +171,13 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
             }
         };
 
-        // 3. Build context, run chain.
+        // 3. Build context, run chain. Addresses come from the channel's meta.
         let ctx = HttpContext::new_server(
             runtime.clone(),
             endpoint.clone(),
             request,
-            None, // remote_addr — fill from meta if you carry it through channel
-            None, // local_addr
+            channel.remote_addr(),
+            channel.local_addr(),
         );
 
         match endpoint.run(ctx).await {
@@ -188,7 +186,7 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
                 Ok(if keep_alive { ProtocolFlow::Continue } else { ProtocolFlow::Close })
             }
             Err(err) if err.can_continue() => {
-                // Recoverable: 500-style response, keep going.
+                // Recoverable: map error to a response and keep going.
                 channel.send_response(error_response_from(&err)).await?;
                 Ok(if keep_alive { ProtocolFlow::Continue } else { ProtocolFlow::Close })
             }
@@ -226,15 +224,6 @@ mod tests {
         assert!(HTTP::detect(b"PUT /resource HTTP/1.1\r\n"));
         assert!(!HTTP::detect(b"INVALID REQUEST\r\n"));
         assert!(!HTTP::detect(b""));
-    }
-
-    #[test]
-    fn test_transport_keep_alive() {
-        let mut transport = HttpTransport::new_unbound(ProtocolRole::Server, HttpSafety::default());
-        assert!(transport.keep_alive);
-
-        transport.keep_alive = false;
-        assert!(!transport.should_keep_alive());
     }
 
     #[test]

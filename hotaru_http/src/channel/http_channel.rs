@@ -5,6 +5,8 @@
 //! version (HTTP/1.1, HTTP/2, HTTP/3) implements this trait so that the
 //! protocol-level `handle` / `send` logic can be written generically.
 
+use std::net::SocketAddr;
+
 use hotaru_core::protocol::Channel;
 
 use crate::message::request::HttpRequest;
@@ -15,13 +17,14 @@ use crate::security::safety::HttpSafety;
 /// HTTP-level channel — the I/O surface every HTTP version must provide.
 ///
 /// This trait sits between the framework [`Channel`] trait (which only knows
-/// about open/close) and the concrete HTTP version implementations. It
-/// defines the four fundamental HTTP I/O operations:
+/// about open/close) and the concrete HTTP version implementations. It defines:
 ///
-/// - Parse an incoming request from the wire
-/// - Send a response on the wire
-/// - Send a request on the wire (client-side)
-/// - Parse an incoming response from the wire (client-side)
+/// - The four fundamental HTTP I/O operations (parse/send request and response).
+/// - The connection's local/remote addresses, when available.
+///
+/// Addresses are returned as `Option<SocketAddr>` because non-TCP backings
+/// (in-process channels, Unix sockets, QUIC during address migration) may
+/// not have a meaningful `SocketAddr`.
 pub trait HttpChannel: Channel {
     /// Parse one HTTP request from the channel's reader.
     ///
@@ -37,4 +40,10 @@ pub trait HttpChannel: Channel {
 
     /// Parse one HTTP response from the channel's reader (client-side).
     async fn parse_response(&self, safety: &HttpSafety) -> Result<HttpResponse, HttpError>;
+
+    /// Local socket address of the underlying connection, if any.
+    fn local_addr(&self) -> Option<SocketAddr>;
+
+    /// Remote socket address of the underlying connection, if any.
+    fn remote_addr(&self) -> Option<SocketAddr>;
 }

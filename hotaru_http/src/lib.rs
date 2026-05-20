@@ -5,8 +5,11 @@ pub use hotaru_core::{debug_error, debug_log, debug_trace, debug_value, debug_wa
 // Module structure organized by functional area
 // ============================================================================
 
-/// [Protocol Integration] Http1Protocol, Http1Channel, HttpTransport, HttpError
+/// [Protocol Integration] Http1Protocol, HttpError
 pub mod protocol;
+
+/// [Channel] HttpChannel trait + Http1Channel impl (parallel to context)
+pub mod channel;
 
 /// [Runtime Context] HttpContext, parse_lazy(), send()
 pub mod context;
@@ -24,9 +27,7 @@ pub mod util;
 // Re-exports for backward compatibility
 // ============================================================================
 
-pub use protocol::{
-    DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol, HttpTransport,
-};
+pub use protocol::{DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol};
 #[cfg(feature = "tls")]
 pub use protocol::{HTTPS, Http1TlsProtocol};
 

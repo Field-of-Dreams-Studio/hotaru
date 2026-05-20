@@ -22,7 +22,7 @@ pub use hotaru_core::object;
 pub use hotaru_core::connection::ConnStream;
 pub use hotaru_core::connection::error::{ConnectionError, Result};
 pub use hotaru_core::protocol::{
-    Message, Protocol, ProtocolRole, RequestContext, Stream, Transport,
+    Message, Protocol, ProtocolRole, RequestContext, Stream,
 };
 pub use hotaru_core::connection::{
     TcpAccepter, TcpConnector, TcpConnectorAddr, TcpMeta, TcpTransport,
@@ -35,7 +35,7 @@ pub use hotaru_http::context::{Executable, HttpContext};
 pub use hotaru_http::request::HttpRequest;
 pub use hotaru_http::response::HttpResponse;
 pub use hotaru_http::traits::{
-    DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol, HttpTransport,
+    DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol,
 };
 
 
