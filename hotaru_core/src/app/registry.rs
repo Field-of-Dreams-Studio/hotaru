@@ -1,8 +1,32 @@
+//! Shared protocol-registry wrapper used by both `Server` and `Client`.
+//!
+//! This file replaces the two near-duplicate `app/server/registry.rs` and
+//! `app/client/registry.rs` files. The wrapper is a small "is this one
+//! protocol or many" optimization layered on top of
+//! [`ProtocolEntryRegistry`]. Both `Server` and `Client` use it identically,
+//! diverging only in their dispatch verb:
+//!
+//! - `Server` calls [`ProtocolRegistryKind::serve`] from its inbound loop.
+//! - `Client` calls [`ProtocolRegistryKind::request`] from its outbound path.
+//!
+//! `default_connection_timeout` is exposed for server-side `TimeoutSetting::Inherit`
+//! resolution; client code does not call it.
+//!
+//! TODO: Most helper methods here just delegate to the inner
+//! [`ProtocolEntryRegistry`]. Once the Stage-4 registration funnel lands, the
+//! helpers (`url`, `lit_url`, `sub_url`, `get_protocol_middlewares`, …) should
+//! migrate down into `executable::registry::ProtocolEntryRegistry` and this
+//! wrapper should shrink to just the enum + `from`/`into` + the two
+//! dispatchers + `default_connection_timeout`.
+
 use std::time::Duration;
+use std::{any::TypeId, sync::Arc};
+
+use tokio::io::BufReader;
 
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream,TransportSpec},
+    connection::{ConnStream, TransportSpec},
     executable::{
         ExecutableBinding,
         entry::{ProtocolEntry, ProtocolEntryTrait},
@@ -13,10 +37,11 @@ use crate::{
     protocol::Protocol,
     url::{UrlError, UrlRegistration, UrlRoot},
 };
-use std::{any::TypeId, sync::Arc};
-use tokio::io::BufReader;
 
-/// Optimization for single-protocol servers, which are common in practice.
+/// Optimization for single-protocol apps, which are common in practice.
+///
+/// `Single` skips the protocol-detection loop when only one protocol is
+/// registered; `Multi` falls back to the full registry.
 pub enum ProtocolRegistryKind<TS: TransportSpec> {
     Single(Arc<dyn ProtocolEntryTrait<TS>>),
     Multi(ProtocolEntryRegistry<TS>),
@@ -42,9 +67,6 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
-    // TODO: Most helper methods below are duplicated in app/client/registry.rs.
-    // Once client/server wrappers settle, keep only serve-side dispatch here and
-    // move shared helper methods down into executable::registry::ProtocolEntryRegistry.
     pub fn single<P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static>(
         protocol: P,
         root_handler: Arc<UrlRoot<P::Context, TS>>,
@@ -61,7 +83,14 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         Self::Multi(registry)
     }
 
-    pub async fn run(&self, runtime: Arc<RuntimeConfig>, conn: TS::Wire) {
+    // ------------------------------------------------------------------
+    // Dispatch — Server-side
+    // ------------------------------------------------------------------
+
+    /// Server-side dispatch: detect the protocol on an inbound wire and
+    /// hand it to the matching entry's `serve` method. Called from
+    /// `Server::handle_wire`.
+    pub async fn serve(&self, runtime: Arc<RuntimeConfig>, conn: TS::Wire) {
         match self {
             Self::Single(handler) => {
                 let (reader, writer, meta) = conn.split();
@@ -73,6 +102,31 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
             }
         }
     }
+
+    // ------------------------------------------------------------------
+    // Dispatch — Client-side
+    // ------------------------------------------------------------------
+
+    /// Client-side dispatch: detect the protocol on an outbound wire and
+    /// hand it to the matching entry's `request` method. Called from
+    /// `Client::run_wire`.
+    pub async fn request(&self, runtime: Arc<RuntimeConfig>, conn: TS::Wire) {
+        match self {
+            Self::Single(handler) => {
+                let (reader, writer, meta) = conn.split();
+                let reader = BufReader::new(reader);
+                handler.request(runtime, reader, writer, meta).await;
+            }
+            Self::Multi(registry) => {
+                registry.request(runtime, conn).await;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // URL registration helpers (currently duplicated with inner registry —
+    // see file-level TODO)
+    // ------------------------------------------------------------------
 
     pub fn url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
@@ -125,18 +179,29 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Server-only: timeout resolution
+    // ------------------------------------------------------------------
+
     /// Returns the default connection-timeout to use when [`TimeoutSetting::Inherit`]
     /// is configured.
     ///
     /// For `Single`, delegates directly to the protocol.
     ///
-    /// For `Multi`, returns the **longest** default across all registered protocols
-    /// so no protocol's connections are prematurely cut off. `None` (no timeout)
-    /// beats any finite duration; among finite durations the maximum wins.
+    /// For `Multi`, returns the **longest** default across all registered
+    /// protocols so no protocol's connections are prematurely cut off. `None`
+    /// (no timeout) beats any finite duration; among finite durations the
+    /// maximum wins.
     ///
-    /// TODO: This is an interim heuristic. The correct fix is to resolve `Inherit`
-    /// *after* protocol detection so each connection uses the matched protocol's
-    /// own default. That requires moving timeout application inside the serve path.
+    /// Client code does not call this — the client side uses
+    /// `OperationalConfig.connect_timeout` and `request_timeout` instead of
+    /// `max_connection_time`. The method lives on the shared wrapper for
+    /// convenience; it's harmless on the client.
+    ///
+    /// TODO: This is an interim heuristic. The correct fix is to resolve
+    /// `Inherit` *after* protocol detection so each connection uses the
+    /// matched protocol's own default. That requires moving timeout
+    /// application inside the serve path.
     pub fn default_connection_timeout(&self) -> Option<Duration> {
         match self {
             Self::Single(handler) => handler.default_connection_timeout(),
@@ -162,6 +227,10 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
             }
         }
     }
+
+    // ------------------------------------------------------------------
+    // Introspection helpers
+    // ------------------------------------------------------------------
 
     pub fn first_protocol_type_id(&self) -> Option<TypeId> {
         match self {

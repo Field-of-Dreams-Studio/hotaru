@@ -7,6 +7,7 @@
 
 use std::net::SocketAddr;
 
+use async_trait::async_trait;
 use hotaru_core::protocol::Channel;
 
 use crate::message::request::HttpRequest;
@@ -25,6 +26,12 @@ use crate::security::safety::HttpSafety;
 /// Addresses are returned as `Option<SocketAddr>` because non-TCP backings
 /// (in-process channels, Unix sockets, QUIC during address migration) may
 /// not have a meaningful `SocketAddr`.
+///
+/// The trait is decorated with `#[async_trait]` for consistency with
+/// [`hotaru_core::protocol::Protocol`] and so that generic code over
+/// `H: HttpChannel` can use the returned futures in `Send`-required async
+/// contexts (e.g. `tokio::spawn`) without extra associated-type-bound syntax.
+#[async_trait]
 pub trait HttpChannel: Channel {
     /// Parse one HTTP request from the channel's reader.
     ///

@@ -8,9 +8,7 @@ use crate::{
     protocol::Protocol,
 };
 
-pub use registry::ProtocolRegistryKind;
-
-pub mod registry;
+pub use crate::app::registry::ProtocolRegistryKind;
 
 /// Outbound runtime for protocol-routed requests.
 ///
@@ -98,7 +96,7 @@ impl<TS: TransportSpec> Client<TS> {
 
     /// Runs protocol-side client handling on an existing wire.
     pub async fn run_wire(self: &Arc<Self>, wire: TS::Wire) {
-        self.registry.run(self.runtime.clone(), wire).await;
+        self.registry.request(self.runtime.clone(), wire).await;
     }
 
     /// Resolves an outbound path into a concrete endpoint node.

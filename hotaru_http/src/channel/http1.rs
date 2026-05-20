@@ -12,6 +12,7 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use hotaru_core::connection::{ConnMeta, ConnStream};
 use hotaru_core::protocol::Channel;
 use tokio::io::{AsyncWriteExt, BufReader};
@@ -59,6 +60,7 @@ impl<W: ConnStream> Channel for Http1Channel<W> {
     }
 }
 
+#[async_trait]
 impl<W: ConnStream> HttpChannel for Http1Channel<W> {
     async fn parse_request(&self, safety: &HttpSafety) -> Result<HttpRequest, HttpError> {
         let mut reader = self.reader.lock().await;

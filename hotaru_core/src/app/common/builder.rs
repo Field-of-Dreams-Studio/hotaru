@@ -2,8 +2,9 @@ use std::{marker::PhantomData, sync::Arc};
 
 use crate::{
     app::{
-        client::{Client, ProtocolRegistryKind as ClientProtocolRegistryKind},
-        server::{ProtocolRegistryKind as ServerProtocolRegistryKind, Server},
+        client::Client,
+        registry::ProtocolRegistryKind,
+        server::Server,
     },
     connection::{Inbound, Outbound, TransportSpec},
     executable::{ProtocolEntryBuilder, ProtocolRegistryBuilder, registry::ProtocolEntryRegistry},
@@ -139,7 +140,7 @@ impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
     pub fn build(self) -> Arc<super::super::server::Server<TS>> {
         let registry = self
             .registry
-            .map(ServerProtocolRegistryKind::from)
+            .map(ProtocolRegistryKind::from)
             .expect("AppBuilder::registry(...) must be set for App<TS>");
         let binding = self
             .binding
@@ -174,7 +175,7 @@ impl<TS: TransportSpec> AppBuilder<ClientRole, TS> {
     pub fn build(self) -> Arc<Client<TS>> {
         let registry = self
             .registry
-            .map(ClientProtocolRegistryKind::from)
+            .map(ProtocolRegistryKind::from)
             .expect("AppBuilder::registry(...) must be set for Client<TS>");
         let target = self
             .target

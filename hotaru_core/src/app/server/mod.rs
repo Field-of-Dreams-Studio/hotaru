@@ -12,10 +12,8 @@ use crate::connection::{Inbound, TransportSpec};
 use crate::protocol::Protocol;
 use crate::url::UrlError;
 
-pub mod registry;
-
 pub use crate::executable::ProtocolRegistryBuilder;
-pub use registry::ProtocolRegistryKind;
+pub use crate::app::registry::ProtocolRegistryKind;
 
 // use super::middleware::AsyncMiddleware;
 pub use super::common::builder::AppBuilder;
@@ -157,11 +155,11 @@ impl<TS: TransportSpec> Server<TS> {
         tokio::spawn(async move {
             match timeout {
                 None => {
-                    self.registry.run(app.runtime.clone(), conn).await;
+                    self.registry.serve(app.runtime.clone(), conn).await;
                 }
                 Some(duration) => {
                     tokio::select! {
-                        _ = self.registry.run(app.runtime.clone(), conn) => {},
+                        _ = self.registry.serve(app.runtime.clone(), conn) => {},
                         _ = tokio::time::sleep(duration) => {
                             debug_warn!("⚠️ Connection timed out after {:?}", duration);
                         }
