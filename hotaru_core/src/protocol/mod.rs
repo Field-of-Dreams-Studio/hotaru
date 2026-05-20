@@ -10,7 +10,7 @@ pub mod types;
 pub use context::RequestContext;
 pub use error::{ProtocolError, BoxProtocolError, DefaultProtocolError}; 
 pub use message::Message;
-pub use protocol::Protocol;
+pub use protocol::{Protocol, CtxError}; 
 pub use stream::Stream;
 pub use channel::{Channel, ProtocolFlow}; 
 // pub use transport::Transport;
