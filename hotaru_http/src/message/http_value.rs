@@ -1,4 +1,4 @@
-#![allow(non_snake_case)]
+﻿#![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
 use hotaru_lib::url_encoding::*;
@@ -221,7 +221,7 @@ impl StatusCode {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::http_value::StatusCode;
+    /// use crate::http_value::StatusCode;
     /// let code = StatusCode::OK;
     /// assert_eq!(code.as_u16(), 200);
     /// ```
@@ -238,7 +238,7 @@ impl StatusCode {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::http_value::StatusCode;
+    /// use crate::http_value::StatusCode;
     /// let code = StatusCode::OK;
     /// assert_eq!(code.to_string(), "200 OK");
     /// ```
@@ -751,7 +751,7 @@ impl HttpContentType {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::http_value::HttpContentType;
+    /// use crate::http_value::HttpContentType;
     /// let content_type = HttpContentType::from_str("text/html; charset=UTF-8");
     /// assert_eq!(content_type, HttpContentType::Text { subtype: "html".to_string(), charset: Some("UTF-8".to_string()) });
     /// ```
@@ -812,7 +812,7 @@ impl HttpContentType {
     /// Find value from Vec<(String, String)>
     /// # Examples
     /// ```rust
-    /// use hotaru_core::http::http_value::HttpContentType;
+    /// use crate::http_value::HttpContentType;
     /// let vec = vec![("key1".to_string(), "value1".to_string()), ("key2".to_string(), "value2".to_string())];
     /// let value = HttpContentType::find_value_from_vec(&vec, "key1");
     /// assert_eq!(value, Some("value1".to_string()));
@@ -875,7 +875,7 @@ impl HttpContentType {
     /// Get content type based on file extension
     /// # Examples
     /// ```
-    /// use hotaru_core::http::http_value::HttpContentType;
+    /// use crate::http_value::HttpContentType;
     ///
     /// let content_type = HttpContentType::from_extension("html");
     /// assert_eq!(content_type, HttpContentType::TextHtml());
@@ -999,7 +999,7 @@ impl HttpContentType {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::http_value::HttpContentType;
+    /// use crate::http_value::HttpContentType;
     ///
     /// let content_type = HttpContentType::from_file_name("index.html");
     /// assert_eq!(content_type, HttpContentType::TextHtml());
@@ -1259,7 +1259,7 @@ impl std::error::Error for ContentDispositionError {}
 /// # Examples
 ///
 /// ```
-/// use hotaru_core::http::http_value::{ContentDisposition, ContentDispositionType};
+/// use crate::http_value::{ContentDisposition, ContentDispositionType};
 ///
 /// // Create an attachment disposition
 /// let disposition = ContentDisposition::attachment("report.pdf");
@@ -1268,7 +1268,7 @@ impl std::error::Error for ContentDispositionError {}
 /// // Parse a Content-Disposition header with extended parameter syntax
 /// let header = "attachment; filename*=UTF-8''%F0%9F%93%96.txt";
 /// let parsed = ContentDisposition::parse(header).unwrap();
-/// assert_eq!(parsed.filename().unwrap(), "📖.txt");
+/// assert_eq!(parsed.filename().unwrap(), "馃摉.txt");
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContentDisposition {
@@ -1524,7 +1524,7 @@ impl ContentDisposition {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::http_value::ContentDisposition;
+    /// use crate::http_value::ContentDisposition;
     ///
     /// // Regular parameter
     /// let header = "attachment; filename=\"example.txt\"";
@@ -1534,7 +1534,7 @@ impl ContentDisposition {
     /// // Extended parameter
     /// let header = "attachment; filename*=UTF-8''%F0%9F%93%96.txt";
     /// let disposition = ContentDisposition::parse(header).unwrap();
-    /// assert_eq!(disposition.filename().unwrap(), "📖.txt");
+    /// assert_eq!(disposition.filename().unwrap(), "馃摉.txt");
     /// ```
     pub fn parse(header: &str) -> Result<Self, ContentDispositionError> {
         let mut parts = header.split(';').map(|s| s.trim());
@@ -1901,7 +1901,7 @@ impl AcceptLang {
     ///
     /// # Example:
     /// ```
-    /// use hotaru_core::http::http_value::AcceptLang;
+    /// use crate::http_value::AcceptLang;
     /// let accept_lang = AcceptLang::from_str("en-US, fr;q=0.7, zh-CN;q=0.5");
     /// assert_eq!(accept_lang.all_languages(), vec!["en-US", "fr", "zh-CN"]);
     /// ```
@@ -1936,7 +1936,7 @@ impl AcceptLang {
     ///
     /// # Example:
     /// ```
-    /// use hotaru_core::http::http_value::AcceptLang;
+    /// use crate::http_value::AcceptLang;
     /// let accept_lang = AcceptLang::from_str("en-US, fr;q=0.7, zh-CN;q=0.5");
     /// let lang = accept_lang.most_preferred();
     /// assert_eq!(lang, "en-US");
@@ -1979,7 +1979,7 @@ impl AcceptLang {
     ///
     /// # Formatting rules:
     /// - Omits q-value for 1.0 weights
-    /// - Trims trailing zeros (0.7 → "0.7", 0.500 → "0.5")
+    /// - Trims trailing zeros (0.7 鈫?"0.7", 0.500 鈫?"0.5")
     /// - Maintains original case
     pub fn to_header_string(&self) -> String {
         self.langs

@@ -44,3 +44,15 @@ pub trait Message: Send + Sync + 'static {
     where
         Self: Sized;
 }
+
+/// A simple impl for protocols that don't need a message type.             
+impl Message for () {
+    type BytesMut = Vec<u8>;
+    fn encode(&self, _buf: &mut Self::BytesMut) -> Result<(), Box<dyn Error + Send + Sync>> {
+        Ok(())
+    }
+
+    fn decode(_buf: &mut Self::BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>> {
+        Ok(Some(()))
+    } 
+}    

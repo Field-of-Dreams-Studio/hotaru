@@ -1,4 +1,4 @@
-use super::http_value::{HttpContentType, HttpMethod};
+﻿use crate::message::http_value::{HttpContentType, HttpMethod};
 
 /// Centralized HTTP safety configuration with explicit state tracking
 ///
@@ -63,7 +63,7 @@ impl HttpSafety {
     ///
     /// # Examples
     /// ```
-    /// # use hotaru_core::http::safety::HttpSafety;
+    /// # use crate::safety::HttpSafety;
     /// let safety = HttpSafety::new();
     /// assert!(safety.max_body_size().is_none());
     /// ```
@@ -153,9 +153,9 @@ impl HttpSafety {
     ///
     /// Method filtering is application-level business logic, not a framework security concern.
     /// Attackers don't need specific HTTP methods to cause damage - they focus on:
-    /// - Sending huge request bodies → Protected by max_body_size
-    /// - Sending huge headers → Protected by max_header_size
-    /// - Slowloris attacks → Handled by connection timeout at APP layer
+    /// - Sending huge request bodies 鈫?Protected by max_body_size
+    /// - Sending huge headers 鈫?Protected by max_header_size
+    /// - Slowloris attacks 鈫?Handled by connection timeout at APP layer
     ///
     /// Applications should explicitly set allowed_methods only when business logic requires
     /// restricting operations (e.g., read-only API allowing only GET), not for security.
@@ -289,7 +289,7 @@ impl HttpSafety {
     ///
     /// # Examples
     /// ```
-    /// # use hotaru_core::http::safety::HttpSafety;
+    /// # use crate::safety::HttpSafety;
     /// let mut base = HttpSafety::new();
     /// base.set_max_body_size(Some(1024));
     ///
@@ -329,8 +329,8 @@ impl HttpSafety {
     ///
     /// # Examples
     /// ```
-    /// # use hotaru_core::http::safety::HttpSafety;
-    /// # use hotaru_core::http::http_value::HttpMethod;
+    /// # use crate::safety::HttpSafety;
+    /// # use crate::http_value::HttpMethod;
     /// let mut global = HttpSafety::new();
     /// global.set_max_body_size(Some(2048));
     /// global.set_allowed_methods(Some(vec![HttpMethod::Get, HttpMethod::Post]));

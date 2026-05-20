@@ -1,4 +1,4 @@
-use super::http_value::*;
+﻿use super::http_value::*;
 
 /// RequestStartLine is the first line of the HTTP request, which contains the method, path, and HTTP version.
 #[derive(Debug, Clone)]
@@ -57,7 +57,7 @@ impl RequestStartLine {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::start_line::RequestStartLine;
+    /// use crate::start_line::RequestStartLine;
     /// let request_line = "GET /index.html HTTP/1.1";
     /// let start_line = RequestStartLine::parse(request_line).unwrap();
     /// println!("{}", start_line);
@@ -165,7 +165,7 @@ impl ResponseStartLine {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::start_line::ResponseStartLine;
+    /// use crate::start_line::ResponseStartLine;
     /// let response_line = "HTTP/1.1 200 OK";
     /// let start_line = ResponseStartLine::parse(response_line).unwrap();
     /// println!("{}", start_line);
@@ -828,7 +828,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// use crate::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     ///
     /// // Setting status on a response
     /// let mut response = HttpStartLine::new_response(HttpVersion::Http11, StatusCode::OK);
@@ -857,7 +857,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// use crate::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     ///
     /// // Setting version on a request
     /// let mut request = HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, "/".into());
@@ -886,7 +886,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// use crate::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     ///
     /// // Setting path on a request
     /// let mut request = HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, "/".into());
@@ -921,7 +921,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// use crate::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     ///
     /// // Setting method on a request
     /// let mut request = HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, "/".into());
@@ -956,7 +956,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// use crate::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     /// let start_line = HttpStartLine::request_post("/submit");
     /// ```
     pub fn request_post<T: Into<String>>(url: T) -> Self {
@@ -980,7 +980,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// use crate::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     /// let start_line = HttpStartLine::request_get("/index.html");
     /// ```
     pub fn request_get<T: Into<String>>(url: T) -> Self {
@@ -1004,7 +1004,7 @@ impl HttpStartLine {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
+    /// use crate::{start_line::HttpStartLine, http_value::{HttpMethod, HttpVersion, StatusCode}};
     /// let start_line = HttpStartLine::response(StatusCode::NotFound);
     /// // or using an integer:
     /// let start_line = HttpStartLine::response(404);

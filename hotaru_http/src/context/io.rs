@@ -2,11 +2,11 @@ use std::fmt::Write;
 
 use tokio::io::{AsyncBufRead, AsyncWrite, AsyncWriteExt};
 
-use crate::connection::error::ConnectionError;
+use hotaru_core::connection::error::ConnectionError;
 
-use super::body::HttpBody;
-use super::meta::HttpMeta;
-use super::safety::HttpSafety;
+use crate::message::body::HttpBody;
+use crate::message::meta::HttpMeta;
+use crate::security::safety::HttpSafety;
 
 pub async fn parse_lazy<R: AsyncBufRead + Unpin>(
     stream: &mut R,

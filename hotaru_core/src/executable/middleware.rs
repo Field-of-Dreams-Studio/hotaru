@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 // use crate::debug_log;
 
-use crate::connection::RequestContext;
+use crate::protocol::RequestContext;
 use std::any::Any;
 
 /// A boxed future returning `C`.
