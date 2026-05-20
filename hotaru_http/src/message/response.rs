@@ -1,12 +1,12 @@
-use crate::http::http_value::{ContentDisposition, StatusCode};
-use crate::http::safety::HttpSafety;
+﻿use crate::message::http_value::{ContentDisposition, StatusCode};
+use crate::security::safety::HttpSafety;
 
-use super::body::HttpBody;
-use super::cookie::Cookie;
-use super::http_value::HttpContentType;
-use super::meta::HttpMeta;
-use super::net;
-use super::start_line::{HttpStartLine, ResponseStartLine};
+use crate::message::body::HttpBody;
+use crate::util::cookie::Cookie;
+use crate::message::http_value::HttpContentType;
+use crate::message::meta::HttpMeta;
+use crate::context::io;
+use crate::message::start_line::{HttpStartLine, ResponseStartLine};
 use std::collections::HashMap;
 use tokio::io::{AsyncBufRead, AsyncWrite};
 
@@ -26,7 +26,7 @@ impl HttpResponse {
         config: &HttpSafety,
         print_raw: bool,
     ) -> Self {
-        match net::parse_lazy(stream, config, false, print_raw).await {
+        match io::parse_lazy(stream, config, false, print_raw).await {
             Ok((meta, body)) => Self::new(meta, body),
             Err(_) => Self::default(),
         }
@@ -78,7 +78,7 @@ impl HttpResponse {
     /// Send the response
     /// When this method is changed, please also check Request::send()
     pub async fn send<W: AsyncWrite + Unpin>(self, writer: &mut W) -> std::io::Result<()> {
-        net::send(self.meta, self.body, writer).await
+        io::send(self.meta, self.body, writer).await
     }
 
     // /// Converts this response into a Future that resolves to itself.
@@ -117,10 +117,10 @@ pub mod response_templates {
     use akari::Value;
 
     use super::HttpResponse;
-    use crate::http::body::HttpBody;
-    use crate::http::http_value::{HttpContentType, HttpVersion, StatusCode};
-    use crate::http::meta::HttpMeta;
-    use crate::http::start_line::HttpStartLine;
+    use crate::message::body::HttpBody;
+    use crate::message::http_value::{HttpContentType, HttpVersion, StatusCode};
+    use crate::message::meta::HttpMeta;
+    use crate::message::start_line::HttpStartLine;
 
     /// Creates a plain text HTTP response with status 200 OK.
     ///
@@ -135,7 +135,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::response::response_templates;
+    /// use crate::response::response_templates;
     ///
     /// let response = response_templates::text_response("Hello, world!");
     /// ```
@@ -159,7 +159,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::response::response_templates;
+    /// use crate::response::response_templates;
     ///
     /// let html = "<html><body><h1>Hello, world!</h1></body></html>";
     /// let response = response_templates::html_response(html);
@@ -184,7 +184,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::response::response_templates;
+    /// use crate::response::response_templates;
     ///
     /// let response = response_templates::redirect_response("/login");
     /// ```
@@ -209,7 +209,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::response::response_templates;
+    /// use crate::response::response_templates;
     ///
     /// let response = response_templates::plain_template_response("index.html");
     /// ```
@@ -261,8 +261,8 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::response::response_templates;
-    /// use hotaru_core::http::http_value::StatusCode;
+    /// use crate::response::response_templates;
+    /// use crate::message::http_value::StatusCode;
     ///
     /// let response = response_templates::normal_response(StatusCode::CREATED, "Resource created");
     /// ```
@@ -291,7 +291,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::response::response_templates;
+    /// use crate::response::response_templates;
     /// use akari::{Value, object};
     ///
     /// let mut data = object!({});
@@ -321,7 +321,7 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::response::response_templates;
+    /// use crate::response::response_templates;
     /// use akari::Object;
     /// use std::collections::HashMap;
     ///
@@ -360,8 +360,8 @@ pub mod response_templates {
     /// # Examples
     ///
     /// ```rust
-    /// use hotaru_core::http::response::response_templates;
-    /// use hotaru_core::http::http_value::StatusCode;
+    /// use crate::response::response_templates;
+    /// use crate::message::http_value::StatusCode;
     ///
     /// // Return a 404 Not Found response
     /// let response = response_templates::return_status(StatusCode::NOT_FOUND);

@@ -43,7 +43,6 @@ middleware! {
 }
 
 // Semi-trans
-
 // #[endpoint]
 // #[url("/")]
 // #[middleware([logger_middleware])]
@@ -102,3 +101,4 @@ middleware! {
 // }
 
 // mod resource;
+

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::connection::RequestContext;
+use crate::protocol::RequestContext;
 
 use super::middleware::{AsyncFinalHandler, AsyncMiddleware, AsyncMiddlewareChain, BoxFuture};
 

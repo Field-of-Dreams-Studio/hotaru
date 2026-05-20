@@ -3,7 +3,9 @@ use std::sync::Arc;
 use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
-    }, connection::{Outbound, Protocol, TransportSpec}, protocol::RequestContext, url::{UrlError, UrlNode, UrlRoot}
+    },
+    connection::{Outbound,TransportSpec}, protocol::RequestContext, url::{UrlError, UrlNode, UrlRoot},
+    protocol::Protocol,
 };
 
 pub use registry::ProtocolRegistryKind;
@@ -28,7 +30,7 @@ impl<TS: TransportSpec> Client<TS> {
     }
 
     /// Returns the registered root URL tree for one protocol.
-    pub fn root<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+    pub fn root<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
     ) -> Option<Arc<UrlRoot<P::Context, TS>>> {
         self.registry.url::<P>()
@@ -100,7 +102,7 @@ impl<TS: TransportSpec> Client<TS> {
     }
 
     /// Resolves an outbound path into a concrete endpoint node.
-    pub async fn resolve<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+    pub async fn resolve<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         self: &Arc<Self>,
         path: &str,
     ) -> Result<Arc<UrlNode<P::Context, TS>>, UrlError> {
@@ -114,7 +116,7 @@ impl<TS: TransportSpec> Client<TS> {
     }
 
     /// Resolves an outbound path with an explicit depth limit.
-    pub async fn resolve_with_limit<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+    pub async fn resolve_with_limit<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         self: &Arc<Self>,
         path: &str,
         max_depth: u32,
@@ -129,7 +131,7 @@ impl<TS: TransportSpec> Client<TS> {
     }
 
     /// Executes one outbound route by path and runs its middleware/final handler chain.
-    pub async fn request<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+    pub async fn request<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         self: &Arc<Self>,
         path: &str,
         ctx: P::Context,
@@ -139,7 +141,7 @@ impl<TS: TransportSpec> Client<TS> {
     }
 
     /// Executes one outbound route by path with an explicit depth limit.
-    pub async fn request_with_limit<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+    pub async fn request_with_limit<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         self: &Arc<Self>,
         path: &str,
         max_depth: u32,

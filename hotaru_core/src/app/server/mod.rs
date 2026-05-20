@@ -8,7 +8,8 @@ use std::time::Duration;
 use crate::executable::ExecutableBinding;
 use crate::{debug_error, debug_log, debug_warn};
 
-use crate::connection::{Inbound, Protocol, TransportSpec};
+use crate::connection::{Inbound, TransportSpec};
+use crate::protocol::Protocol;
 use crate::url::UrlError;
 
 pub mod registry;
@@ -104,7 +105,7 @@ impl<TS: TransportSpec> Server<TS> {
     /// This function add a new url to the app. It will be added to the root url
     /// # Arguments
     /// * `url` - The url to add. It should be a string.
-    pub fn lit_url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
+    pub fn lit_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         self: &Arc<Self>,
         url: T,
         mut executable: ExecutableBinding<P::Context>,
@@ -119,7 +120,7 @@ impl<TS: TransportSpec> Server<TS> {
     }
 
     /// Regiter a URL by using Hotaru Pattern
-    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
+    pub fn url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         self: &Arc<Self>,
         url: T,
         mut executable: ExecutableBinding<P::Context>,

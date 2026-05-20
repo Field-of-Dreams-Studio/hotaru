@@ -1,4 +1,4 @@
-//! # HTTP Encoding
+﻿//! # HTTP Encoding
 //!
 //! This module provides types and functionality for working with HTTP encoding mechanisms,
 //! specifically Transfer-Encoding and Content-Encoding as defined in HTTP standards.
@@ -19,7 +19,7 @@
 //! ## Examples
 //!
 //! ```
-//! use hotaru_core::http::encoding::HttpEncoding;
+//! use crate::encoding::HttpEncoding;
 //!
 //! // Parse from headers
 //! let encoding = HttpEncoding::from_headers(
@@ -68,7 +68,7 @@ impl TransferCoding {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::TransferCoding;
+    /// use crate::encoding::TransferCoding;
     ///
     /// let coding = TransferCoding::from_string("chunked");
     /// assert!(matches!(coding, TransferCoding::Chunked));
@@ -92,7 +92,7 @@ impl TransferCoding {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::TransferCoding;
+    /// use crate::encoding::TransferCoding;
     ///
     /// let coding = TransferCoding::Chunked;
     /// assert_eq!(coding.as_str(), "chunked");
@@ -148,7 +148,7 @@ impl ContentCoding {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::ContentCoding;
+    /// use crate::encoding::ContentCoding;
     ///
     /// let coding = ContentCoding::from_string("gzip");
     /// assert!(matches!(coding, ContentCoding::Gzip));
@@ -176,7 +176,7 @@ impl ContentCoding {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::ContentCoding;
+    /// use crate::encoding::ContentCoding;
     ///
     /// let coding = ContentCoding::Gzip;
     /// assert_eq!(coding.as_str(), "gzip");
@@ -244,7 +244,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::TransferCodings;
+    /// use crate::encoding::TransferCodings;
     ///
     /// let codings = TransferCodings::new();
     /// assert!(codings.is_identity());
@@ -271,7 +271,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::{TransferCodings, TransferCoding};
+    /// use crate::encoding::{TransferCodings, TransferCoding};
     ///
     /// let mut codings = TransferCodings::new();
     ///
@@ -319,7 +319,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::{TransferCodings, TransferCoding};
+    /// use crate::encoding::{TransferCodings, TransferCoding};
     ///
     /// let mut codings = TransferCodings::new();
     /// assert!(!codings.is_chunked());
@@ -342,7 +342,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::{TransferCodings, TransferCoding};
+    /// use crate::encoding::{TransferCodings, TransferCoding};
     ///
     /// let mut codings = TransferCodings::new();
     /// assert!(codings.is_identity());
@@ -363,7 +363,7 @@ impl TransferCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::{TransferCodings, TransferCoding};
+    /// use crate::encoding::{TransferCodings, TransferCoding};
     ///
     /// let mut codings = TransferCodings::new();
     /// codings.push(TransferCoding::Other("gzip".into())).unwrap();
@@ -396,7 +396,7 @@ impl ContentCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::ContentCodings;
+    /// use crate::encoding::ContentCodings;
     ///
     /// let codings = ContentCodings::new();
     /// assert!(codings.is_identity());
@@ -414,7 +414,7 @@ impl ContentCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::{ContentCodings, ContentCoding};
+    /// use crate::encoding::{ContentCodings, ContentCoding};
     ///
     /// let mut codings = ContentCodings::new();
     /// codings.push(ContentCoding::Gzip);
@@ -433,7 +433,7 @@ impl ContentCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::{ContentCodings, ContentCoding};
+    /// use crate::encoding::{ContentCodings, ContentCoding};
     ///
     /// let mut codings = ContentCodings::new();
     /// assert!(codings.is_identity());
@@ -454,7 +454,7 @@ impl ContentCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::{ContentCodings, ContentCoding};
+    /// use crate::encoding::{ContentCodings, ContentCoding};
     ///
     /// let mut codings = ContentCodings::new();
     /// codings.push(ContentCoding::Gzip);
@@ -483,7 +483,7 @@ impl ContentCodings {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::ContentCodings;
+    /// use crate::encoding::ContentCodings;
     /// let codings = ContentCodings::new();
     /// let data = b"hello".to_vec();
     /// let result = codings.decode_compressed(data.clone()).unwrap();
@@ -514,7 +514,7 @@ impl ContentCodings {
     ///
     /// # Examples
     /// ```
-    /// use hotaru_core::http::encoding::ContentCodings;
+    /// use crate::encoding::ContentCodings;
     /// let codings = ContentCodings::new();
     /// let data = b"hello".to_vec();
     /// let result = codings.encode_compressed(data.clone()).unwrap();
@@ -558,7 +558,7 @@ impl HttpEncoding {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::HttpEncoding;
+    /// use crate::encoding::HttpEncoding;
     ///
     /// let encoding = HttpEncoding::from_headers(
     ///     Some("chunked, gzip".to_string()),
@@ -605,7 +605,7 @@ impl HttpEncoding {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::{HttpEncoding, TransferCoding, ContentCoding};
+    /// use crate::encoding::{HttpEncoding, TransferCoding, ContentCoding};
     ///
     /// let mut encoding = HttpEncoding::from_headers(
     ///     Some("chunked".to_string()),
@@ -641,7 +641,7 @@ impl HttpEncoding {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::HttpEncoding;
+    /// use crate::encoding::HttpEncoding;
     ///
     /// let encoding = HttpEncoding::from_headers(
     ///     Some("chunked".to_string()),
@@ -663,7 +663,7 @@ impl HttpEncoding {
     /// # Examples
     ///
     /// ```
-    /// use hotaru_core::http::encoding::HttpEncoding;
+    /// use crate::encoding::HttpEncoding;
     ///
     /// let encoding = HttpEncoding::from_headers(
     ///     None,

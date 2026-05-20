@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, Protocol, TransportSpec},
+    connection::{ConnStream,TransportSpec},
     executable::{
         ExecutableBinding,
         entry::{ProtocolEntry, ProtocolEntryTrait},
@@ -10,6 +10,7 @@ use crate::{
         registry::ProtocolEntryRegistry,
     },
     extensions::ParamsClone,
+    protocol::Protocol,
     url::{UrlError, UrlRegistration, UrlRoot},
 };
 use std::{any::TypeId, sync::Arc};
@@ -44,7 +45,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
     // TODO: Most helper methods below are duplicated in app/client/registry.rs.
     // Once client/server wrappers settle, keep only serve-side dispatch here and
     // move shared helper methods down into executable::registry::ProtocolEntryRegistry.
-    pub fn single<P: Protocol<Wire = TS::Wire, Spec = TS> + Clone + 'static>(
+    pub fn single<P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static>(
         protocol: P,
         root_handler: Arc<UrlRoot<P::Context, TS>>,
         middlewares: AsyncMiddlewareChain<P::Context>,
@@ -73,7 +74,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
-    pub fn url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+    pub fn url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
     ) -> Option<Arc<UrlRoot<P::Context, TS>>> {
         match self {
@@ -92,7 +93,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
-    pub fn lit_url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
+    pub fn lit_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         &self,
         url: T,
         executable: ExecutableBinding<P::Context>,
@@ -108,7 +109,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
-    pub fn sub_url<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static, T: Into<String>>(
+    pub fn sub_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         &self,
         pattern: T,
         executable: ExecutableBinding<P::Context>,
@@ -169,7 +170,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
-    pub fn get_protocol_middlewares<P: Protocol<Wire = TS::Wire, Spec = TS> + 'static>(
+    pub fn get_protocol_middlewares<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
     ) -> Vec<Arc<dyn AsyncMiddleware<P::Context>>> {
         match self {

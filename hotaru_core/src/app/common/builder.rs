@@ -5,9 +5,10 @@ use crate::{
         client::{Client, ProtocolRegistryKind as ClientProtocolRegistryKind},
         server::{ProtocolRegistryKind as ServerProtocolRegistryKind, Server},
     },
-    connection::{Inbound, Outbound, Protocol, TransportSpec},
+    connection::{Inbound, Outbound, TransportSpec},
     executable::{ProtocolEntryBuilder, ProtocolRegistryBuilder, registry::ProtocolEntryRegistry},
     extensions::{Locals, Params},
+    protocol::Protocol,
 };
 
 use super::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
@@ -76,7 +77,7 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
         self
     }
 
-    pub fn single_protocol<P: Protocol<Wire = TS::Wire, Spec = TS>>(
+    pub fn single_protocol<P: Protocol<Wire = TS::Wire, TS = TS>>(
         mut self,
         builder: ProtocolEntryBuilder<P, TS>,
     ) -> Self {

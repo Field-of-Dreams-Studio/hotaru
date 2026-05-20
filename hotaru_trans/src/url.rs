@@ -445,7 +445,12 @@ impl UrlFunc {
             TokenTree::Punct(Punct::new('=', Spacing::Alone)),
             TokenTree::Ident(Ident::new("response", Span::call_site())),
             TokenTree::Punct(Punct::new(';', Spacing::Alone)),
-            TokenTree::Ident(self.req_var_name.clone()),
+            TokenTree::Ident(Ident::new("Ok", Span::call_site())),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, {
+                let mut g = TokenStream::new();
+                g.extend(vec![TokenTree::Ident(self.req_var_name.clone())]);
+                g
+            })),
         ]);
         let mut tokens = TokenStream::new();
         tokens.extend(vec![
@@ -458,6 +463,9 @@ impl UrlFunc {
             TokenTree::Group(Group::new(Delimiter::Parenthesis, arguments)),
             TokenTree::Punct(Punct::new('-', Spacing::Joint)),
             TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            // Result<<Protocol as Protocol>::Context, <<Protocol as Protocol>::Context as RequestContext>::Error>
+            TokenTree::Ident(Ident::new("Result", Span::call_site())),
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
             // <Protocol as Protocol>::Context
             TokenTree::Punct(Punct::new('<', Spacing::Alone)),
             TokenTree::Ident(self.protocol.clone()),
@@ -467,6 +475,24 @@ impl UrlFunc {
             TokenTree::Punct(Punct::new(':', Spacing::Joint)),
             TokenTree::Punct(Punct::new(':', Spacing::Alone)),
             TokenTree::Ident(Ident::new("Context", Span::call_site())),
+            TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+            // <<Protocol as Protocol>::Context as RequestContext>::Error
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+            TokenTree::Ident(self.protocol.clone()),
+            TokenTree::Ident(Ident::new("as", Span::call_site())),
+            TokenTree::Ident(Ident::new("Protocol", Span::call_site())),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("Context", Span::call_site())),
+            TokenTree::Ident(Ident::new("as", Span::call_site())),
+            TokenTree::Ident(Ident::new("RequestContext", Span::call_site())),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("Error", Span::call_site())),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
             TokenTree::Group(Group::new(Delimiter::Brace, cont)),
         ]);
         tokens
