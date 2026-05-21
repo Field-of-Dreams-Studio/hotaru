@@ -296,6 +296,7 @@ impl UrlArgs {
         // Modify url_expr to inject the protocol type parameter
         let modified_url_expr = self.url_expr.expand(
             self.op.protocol.clone(), 
+            self.op.fn_name.clone(), 
             Ident::new("binding", Span::call_site()),
             Ident::new("params", Span::call_site())
         ); 
@@ -502,7 +503,7 @@ impl UrlFunc {
 pub struct UrlExpr {
     app: Ident,
     method: Ident,
-    literal: Literal,
+    literal: Literal 
 }
 
 use hotaru_core::url::parser::parse as parse_check_url;
@@ -609,8 +610,8 @@ impl UrlExpr {
             .map(|_| ())
     }
 
-    pub fn expand(&self, protocol: Ident, binding: Ident, config: Ident) -> TokenStream {
-        // APP.url::<HTTP, _>("/path", binding, params)
+    pub fn expand(&self, protocol: Ident, fn_name: Ident, binding: Ident, config: Ident) -> TokenStream {
+        // APP.url::<HTTP, _, _>("/path", name, binding, params)
         //  .expect("failed to register endpoint");
         let mut tokens = TokenStream::new();
         tokens.extend(vec![
@@ -623,11 +624,15 @@ impl UrlExpr {
             TokenTree::Ident(protocol),
             TokenTree::Punct(Punct::new(',', Spacing::Alone)),
             TokenTree::Ident(Ident::new("_", Span::call_site())),
+            TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("_", Span::call_site())),
             TokenTree::Punct(Punct::new('>', Spacing::Alone)),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, {
                 let mut g = TokenStream::new();
                 g.extend(vec![
                     TokenTree::Literal(self.literal.clone()), 
+                    TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+                    TokenTree::Literal(Literal::string(&fn_name.to_string())),  
                     TokenTree::Punct(Punct::new(',', Spacing::Alone)),
                     TokenTree::Ident(binding),
                     TokenTree::Punct(Punct::new(',', Spacing::Alone)),

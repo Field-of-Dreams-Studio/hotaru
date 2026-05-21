@@ -2,11 +2,11 @@ use std::{
     any::Any, future::Future, pin::Pin, sync::{Arc, RwLock}, time::Duration
 };
 
-use akari::extensions::{Locals, Params};
+use akari::extensions::{Locals, Params, ParamsClone};
 use tokio::io::BufReader;
 
 use crate::{
-    app::common::RuntimeConfig, connection::{ConnStream, TransportSpec}, executable::{access::table::AccessPointTable, entry::ProtocolEntryTrait, middleware::AsyncMiddlewareChain}, protocol::Protocol, url::UrlRoot
+    app::common::RuntimeConfig, connection::{ConnStream, TransportSpec}, executable::{ExecutableBinding, access::{access_point::AccessPoint, table::AccessPointTable}, entry::ProtocolEntryTrait, middleware::AsyncMiddlewareChain}, protocol::Protocol, url::{PathPattern, UrlError, UrlRegistration, UrlRoot, node::StepName}
 };
 use crate::protocol::{Channel, ProtocolFlow};
 
@@ -38,6 +38,37 @@ where
             middlewares,
             access_points: AccessPointTable::new(), 
         }
+    } 
+
+    /// Register a binding at the given pre-parsed path under `name`, and
+    /// refresh any existing access-point entries pointing at that path.
+    ///
+    /// This is the single canonical Layer-1 funnel. Pattern parsing (full
+    /// Hotaru grammar) and literal splitting are both wrapper-level concerns
+    /// — by the time we get here the caller has already chosen the parsing
+    /// strategy and produced the pre-parsed `Vec<PathPattern>` plus
+    /// `step_names` metadata.
+    ///
+    /// `step_names` carries named-capture metadata from pattern parsing
+    /// (e.g. the `id` in `/users/<id>`). Pass `StepName::default()` for
+    /// purely literal paths that have no captures.
+    pub fn register<N: Into<String>>(
+        &self,
+        name: N,
+        path: Vec<PathPattern>,
+        step_names: StepName,
+        binding: ExecutableBinding<P::Context>,
+        config: ParamsClone,
+    ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
+        let reg = self.root_handler.register(path.clone(), binding, config, step_names)?;
+        if let UrlRegistration::Node(arc) = &reg {
+            self.access_points.refresh_path(&path, arc);
+        }
+        self.access_points.insert(
+            name,
+            AccessPoint { path, target: reg.clone() },
+        );
+        Ok(reg)
     }
 }
 
@@ -45,7 +76,7 @@ impl<P, TS> ProtocolEntryTrait<TS> for ProtocolEntry<P, TS>
 where
     P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static,
     TS: TransportSpec,
-{
+{ 
     fn test(&self, buf: &[u8]) -> bool {
         P::detect(buf)
     }
@@ -130,7 +161,7 @@ where
         _locals: RwLock<Locals>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
         self.request(runtime, reader, writer, meta)
-    }
+    } 
 
     fn as_any(&self) -> &dyn Any {
         self

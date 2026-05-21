@@ -10,7 +10,7 @@ use crate::{debug_error, debug_log, debug_warn};
 
 use crate::connection::{Inbound, TransportSpec};
 use crate::protocol::Protocol;
-use crate::url::UrlError;
+use crate::url::{PathPattern, UrlError, node::StepName};
 
 pub use crate::executable::ProtocolRegistryBuilder;
 pub use crate::app::registry::ProtocolRegistryKind;
@@ -100,35 +100,57 @@ impl<TS: TransportSpec> Server<TS> {
             .unwrap_or_else(|| TypeId::of::<()>())
     }
 
-    /// This function add a new url to the app. It will be added to the root url
-    /// # Arguments
-    /// * `url` - The url to add. It should be a string.
-    pub fn lit_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
+    /// Register a literal URL — no pattern grammar; the string is split on
+    /// `/` and each segment becomes a literal `PathPattern`. `name`
+    /// identifies the access point for later lookup (used by `request_fn` /
+    /// `run_fn` / `call_fn` and the trans-macro funnels).
+    pub fn lit_url<P, T, N>(
         self: &Arc<Self>,
         url: T,
+        name: N,
         mut executable: ExecutableBinding<P::Context>,
         config: ParamsClone,
-    ) -> Result<(), UrlError> {
+    ) -> Result<(), UrlError>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        T: AsRef<str>,
+        N: Into<String>,
+    {
         // If no middleware is configured for this executable, set the protocol-level middlewares as default.
         if executable.has_no_middlewares() {
             executable.set_middlewares(self.registry.get_protocol_middlewares::<P>());
         }
-        self.registry.lit_url::<P, _>(url, executable, config)?;
+        let url = url.as_ref();
+        let path: Vec<PathPattern> = if url.is_empty() {
+            Vec::new()
+        } else {
+            url.split('/').map(PathPattern::literal_path).collect()
+        };
+        self.registry.register::<P, _>(name, path, StepName::default(), executable, config)?;
         Ok(())
     }
 
-    /// Regiter a URL by using Hotaru Pattern
-    pub fn url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
+    /// Register a URL using Hotaru pattern syntax (literals, `<name>`,
+    /// `<type:name>`, `<regex>`, `*`, `**path`). `name` identifies the
+    /// access point for later lookup.
+    pub fn url<P, T, N>(
         self: &Arc<Self>,
         url: T,
+        name: N,
         mut executable: ExecutableBinding<P::Context>,
         config: ParamsClone,
-    ) -> Result<(), UrlError> {
+    ) -> Result<(), UrlError>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        T: AsRef<str>,
+        N: Into<String>,
+    {
         // If no middleware is configured for this executable, set the protocol-level middlewares as default.
         if executable.has_no_middlewares() {
             executable.set_middlewares(self.registry.get_protocol_middlewares::<P>());
         }
-        self.registry.sub_url::<P, _>(url, executable, config)?;
+        let (path, step_names) = crate::url::parser::parse(url.as_ref())?;
+        self.registry.register::<P, _>(name, path, step_names.into(), executable, config)?;
         Ok(())
     }
 

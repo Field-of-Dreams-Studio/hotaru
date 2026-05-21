@@ -23,7 +23,7 @@ impl<P, TS> ProtocolEntryBuilder<P, TS>
 where
     P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static,
     TS: TransportSpec,
-{
+{ 
     pub fn new(protocol: P) -> Self {
         Self {
             protocol: Some(protocol),
@@ -32,7 +32,7 @@ where
         }
     }
 
-    pub fn set_url(mut self, url: Arc<UrlRoot<P::Context, TS>>) -> Self {
+    pub fn set_root(mut self, url: Arc<UrlRoot<P::Context, TS>>) -> Self {
         self.url = url;
         self
     }

@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+use akari::extensions::ParamsClone;
+
 use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
     },
-    connection::{Outbound,TransportSpec}, protocol::RequestContext, url::{UrlError, UrlNode, UrlRoot},
+    connection::{Outbound,TransportSpec}, executable::ExecutableBinding, protocol::RequestContext, url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
     protocol::Protocol,
 };
 
@@ -32,6 +34,52 @@ impl<TS: TransportSpec> Client<TS> {
         &self,
     ) -> Option<Arc<UrlRoot<P::Context, TS>>> {
         self.registry.url::<P>()
+    }
+
+    /// Register a literal outpoint URL — no pattern grammar; the string is
+    /// split on `/` and each segment becomes a literal `PathPattern`.
+    /// `name` identifies the outpoint for later lookup (used by
+    /// `request_fn` / `run_fn` / `call_fn`).
+    pub fn lit_url<P, T, N>(
+        self: &Arc<Self>,
+        url: T,
+        name: N,
+        executable: ExecutableBinding<P::Context>,
+        config: ParamsClone,
+    ) -> Result<(), UrlError>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        T: AsRef<str>,
+        N: Into<String>,
+    {
+        let url = url.as_ref();
+        let path: Vec<PathPattern> = if url.is_empty() {
+            Vec::new()
+        } else {
+            url.split('/').map(PathPattern::literal_path).collect()
+        };
+        self.registry.register::<P, _>(name, path, StepName::default(), executable, config)?;
+        Ok(())
+    }
+
+    /// Register an outpoint URL using Hotaru pattern syntax (literals,
+    /// `<name>`, `<type:name>`, `<regex>`, `*`, `**path`). `name` identifies
+    /// the outpoint for later lookup.
+    pub fn url<P, T, N>(
+        self: &Arc<Self>,
+        url: T,
+        name: N,
+        executable: ExecutableBinding<P::Context>,
+        config: ParamsClone,
+    ) -> Result<(), UrlError>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        T: AsRef<str>,
+        N: Into<String>,
+    {
+        let (path, step_names) = crate::url::parser::parse(url.as_ref())?;
+        self.registry.register::<P, _>(name, path, step_names.into(), executable, config)?;
+        Ok(())
     }
 
     /// Returns the shared runtime mode.

@@ -97,7 +97,18 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
             }
         }
         None
-    }
+    } 
+
+    pub fn entry<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
+        &self,
+    ) -> Option<&ProtocolEntry<P, TS>> {
+        for handler in &self.handlers {
+            if let Some(ph) = handler.as_any().downcast_ref::<ProtocolEntry<P, TS>>() {
+                return Some(ph);
+            }
+        }
+        None
+    } 
 
     pub fn lit_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         &self,

@@ -1,7 +1,7 @@
-use crate::url::{PathPattern, parser::parser::PatternError};
+pub use crate::url::{PathPattern, parser::parser::PatternError};
 
 pub(self) mod lexer;
-pub(self) mod parser;
+pub(self) mod parser; 
 
 // # `parse` – Compile a URL pattern string into matchable path patterns and capture names
 
@@ -107,4 +107,4 @@ pub fn parse<T: AsRef<str>>(
     input: T,
 ) -> Result<(Vec<PathPattern>, Vec<Option<String>>), PatternError> {
     parser::tokens_to_patterns(&lexer::tokenize(input.as_ref()))
-}
+} 

@@ -17,12 +17,36 @@ pub fn is_keep_alive(request: &HttpRequest) -> bool {
     }
 }
 
-/// Build a 404 Not Found response.
-pub fn not_found_response() -> HttpResponse {
-    response_templates::return_status(StatusCode::NOT_FOUND)
+/// Build a minimal HTML error page body for the given status code.
+///
+/// Produces a self-contained HTML document with a single `<h1>` showing the
+/// status code and reason phrase (e.g. "404 Not Found").
+fn html_error_body(status: &StatusCode) -> String {
+    let code = status.as_u16();
+    let reason = status.reason_phrase();
+    format!(
+        "<!DOCTYPE html>\n\
+         <html>\n\
+         <head><title>{code} {reason}</title></head>\n\
+         <body><h1>{code} {reason}</h1></body>\n\
+         </html>\n"
+    )
 }
 
-/// Build an error response from a boxed protocol error.
+/// Build a status response with an HTML body whose `<h1>` carries the
+/// status code and reason phrase.
+fn html_status_response(status: StatusCode) -> HttpResponse {
+    let body = html_error_body(&status).into_bytes();
+    response_templates::html_response(body).status(status)
+}
+
+/// Build a 404 Not Found response with an HTML `<h1>` body.
+pub fn not_found_response() -> HttpResponse {
+    html_status_response(StatusCode::NOT_FOUND)
+}
+
+/// Build an error response from a boxed protocol error with an HTML `<h1>`
+/// body carrying the resolved status code and reason phrase.
 ///
 /// Maps each `HttpError` variant to the most appropriate HTTP status code:
 ///
@@ -50,11 +74,13 @@ pub fn error_response_from(err: &dyn ProtocolError) -> HttpResponse {
     // Try to downcast to HttpError for fine-grained status mapping.
     // ProtocolError: std::error::Error + Send + Sync + 'static, so we can
     // downcast through the std::error::Error vtable.
-    if let Some(http_err) = (err as &dyn std::error::Error).downcast_ref::<HttpError>() {
-        let status: StatusCode = http_err.into();
-        response_templates::return_status(status)
+    let status = if let Some(http_err) =
+        (err as &dyn std::error::Error).downcast_ref::<HttpError>()
+    {
+        http_err.into()
     } else {
         // Fallback: generic 500 for non-HttpError protocol errors.
-        response_templates::return_status(StatusCode::INTERNAL_SERVER_ERROR)
-    }
+        StatusCode::INTERNAL_SERVER_ERROR
+    };
+    html_status_response(status)
 }

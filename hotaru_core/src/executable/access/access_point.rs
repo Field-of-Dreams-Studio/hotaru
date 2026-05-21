@@ -1,11 +1,40 @@
-use std::{collections::HashMap, sync::Arc};
-use std::sync::RwLock;
+use std::sync::Arc;
 
-use crate::{connection::TransportSpec, protocol::RequestContext, url::{PathPattern, UrlNode, UrlRegistration}};
+use crate::{
+    connection::TransportSpec,
+    protocol::RequestContext,
+    url::{PathPattern, UrlNode, UrlRegistration},
+};
 
+/// One named access point.
+///
+/// Stores the parsed path the binding was registered at, plus the
+/// [`UrlRegistration`] result that points to the live node. Use
+/// [`AccessPoint::resolve`] to get the current `UrlNode<C, TS>` — that
+/// method transparently follows the root-endpoint slot's indirection for
+/// `Root` variants, so root rebinds are picked up automatically.
 pub struct AccessPoint<C: RequestContext, TS: TransportSpec> {
     pub path: Vec<PathPattern>,
     pub target: UrlRegistration<C, TS>,
+}
+
+impl<C: RequestContext, TS: TransportSpec> AccessPoint<C, TS> {
+    /// Resolve to the current `UrlNode`.
+    ///
+    /// - **`Node` variant** — returns the stored `Arc` directly. The
+    ///   `AccessPointTable::refresh_path` mechanism keeps this `Arc` in
+    ///   sync with rebinds on the same path.
+    /// - **`Root` variant** — reads the live endpoint slot inside the
+    ///   `RootNode` via its `PRwLock`. Self-refreshing: a root-endpoint
+    ///   rebind doesn't need any explicit notification — the next
+    ///   `resolve()` call returns the new endpoint. Returns `None` only if
+    ///   the root endpoint slot is empty (registration was never completed).
+    pub fn resolve(&self) -> Option<Arc<UrlNode<C, TS>>> {
+        match &self.target {
+            UrlRegistration::Root(root) => root.endpoint(),
+            UrlRegistration::Node(node) => Some(node.clone()),
+        }
+    }
 }
 
 impl<C: RequestContext, TS: TransportSpec> Clone for AccessPoint<C, TS> {
@@ -19,62 +48,3 @@ impl<C: RequestContext, TS: TransportSpec> Clone for AccessPoint<C, TS> {
         }
     }
 }
-
-pub struct AccessPoints<C: RequestContext, TS: TransportSpec> {
-    inner: RwLock<HashMap<String, AccessPoint<C, TS>>>,
-}
-
-impl<C: RequestContext, TS: TransportSpec> AccessPoints<C, TS> {
-    pub fn new() -> Self {
-        Self { inner: RwLock::new(HashMap::new()) }
-    }
-
-    pub fn insert<N: Into<String>>(
-        &self,
-        name: N,
-        ap: AccessPoint<C, TS>,
-    ) -> Option<AccessPoint<C, TS>> {
-        self.inner.write().unwrap().insert(name.into(), ap)
-    }
-
-    /// Refresh the node for every **Node-variant** entry whose stored path
-    /// equals `path`. Root-variant entries are skipped — their PRwLock
-    /// indirection makes them self-refreshing. Returns the number of
-    /// entries refreshed.
-    pub fn refresh_path(
-        &self,
-        path: &[PathPattern],
-        node: &Arc<UrlNode<C, TS>>,
-    ) -> usize {
-        let mut guard = self.inner.write().unwrap();
-        let mut count = 0;
-        for ap in guard.values_mut() {
-            if ap.path.as_slice() == path {
-                if let UrlRegistration::Node(slot) = &mut ap.target {
-                    *slot = node.clone();
-                    count += 1;
-                }
-                // Root variants intentionally skipped.
-            }
-        }
-        count
-    }
-
-    pub fn get(&self, name: &str) -> Option<AccessPoint<C, TS>> {
-        self.inner.read().unwrap().get(name).cloned()
-    }
-
-    pub fn contains(&self, name: &str) -> bool {
-        self.inner.read().unwrap().contains_key(name)
-    }
-
-    pub fn remove(&self, name: &str) -> Option<AccessPoint<C, TS>> {
-        self.inner.write().unwrap().remove(name)
-    }
-
-    pub fn len(&self) -> usize { self.inner.read().unwrap().len() }
-    pub fn is_empty(&self) -> bool { self.inner.read().unwrap().is_empty() }
-    pub fn names(&self) -> Vec<String> {
-        self.inner.read().unwrap().keys().cloned().collect()
-    }
-} 

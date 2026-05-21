@@ -10,8 +10,7 @@ use akari::extensions::{Locals, Params};
 use tokio::io::BufReader;
 
 use crate::{
-    app::common::RuntimeConfig,
-    connection::{ConnStream, TransportSpec}
+    app::common::RuntimeConfig, connection::{ConnStream, TransportSpec} 
 };
 
 /// Neutral protocol-entry boundary shared by server and client execution.
@@ -61,7 +60,7 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
         meta: <TS::Wire as ConnStream>::Meta,
         params: RwLock<Params>,
         locals: RwLock<Locals>,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
+    ) -> Pin<Box<dyn Future<Output = ()> + Send>>; 
 
     /// Returns the protocol's default connection-timeout policy.
     ///

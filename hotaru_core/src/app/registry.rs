@@ -35,7 +35,7 @@ use crate::{
     },
     extensions::ParamsClone,
     protocol::Protocol,
-    url::{UrlError, UrlRegistration, UrlRoot},
+    url::{PathPattern, UrlError, UrlRegistration, UrlRoot, node::StepName},
 };
 
 /// Optimization for single-protocol apps, which are common in practice.
@@ -128,6 +128,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
     // see file-level TODO)
     // ------------------------------------------------------------------
 
+    /// Find the root URL node for a protocol, if registered. Used by URL registration 
     pub fn url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
     ) -> Option<Arc<UrlRoot<P::Context, TS>>> {
@@ -145,8 +146,52 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
                 None
             }
         }
+    } 
+
+    /// Find the protocol entry for a protocol, if registered. Else, returns `None`. 
+    pub fn entry<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
+        &self
+    ) -> Option<&ProtocolEntry<P, TS>> {
+        match self {
+            Self::Single(handler) => handler
+                .as_any()
+                .downcast_ref::<ProtocolEntry<P, TS>>(),
+            Self::Multi(registry) => {
+                for handler in &registry.handlers {
+                    if let Some(ph) = handler.as_any().downcast_ref::<ProtocolEntry<P, TS>>() {
+                        return Some(ph);
+                    }
+                }
+                None
+            }
+        } 
+    } 
+
+    /// The canonical registration funnel. Caller passes a name, pre-parsed
+    /// path segments, and step-name metadata. Routes to the matching
+    /// concrete `ProtocolEntry<P>`'s `register` method, which updates both
+    /// the URL tree and the entry's `AccessPointTable`.
+    ///
+    /// Both pattern parsing (`url::parser::parse`) and literal splitting
+    /// are wrapper-level concerns done by `Server::url` / `Server::lit_url`
+    /// (and the `Client` mirrors) before reaching here.
+    pub fn register<P, N>(
+        &self,
+        name: N,
+        path: Vec<PathPattern>,
+        step_names: StepName,
+        executable: ExecutableBinding<P::Context>,
+        config: ParamsClone,
+    ) -> Result<UrlRegistration<P::Context, TS>, UrlError>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        N: Into<String>,
+    {
+        let entry = self.entry::<P>().ok_or(UrlError::ProtocolNotFound)?;
+        entry.register(name, path, step_names, executable, config)
     }
 
+    #[av::ver(deprecated, since = "0.8.0", note = "Use `register` after parsing the path. This method bypasses the protocol entry's AccessPointTable and will silently orphan named registrations from the freshness logic.")]
     pub fn lit_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         &self,
         url: T,
@@ -163,6 +208,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
+    #[av::ver(deprecated, since = "0.8.0", note = "Use `register` after parsing the path. This method bypasses the protocol entry's AccessPointTable and will silently orphan named registrations from the freshness logic.")]
     pub fn sub_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         &self,
         pattern: T,

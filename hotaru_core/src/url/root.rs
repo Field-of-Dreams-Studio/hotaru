@@ -47,6 +47,15 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
             .map_or(false, |n| n.has_handler())
     }
 
+    /// Returns a cloned `Arc` of the current root endpoint node, if the
+    /// slot is populated. Used by [`AccessPoint::resolve`] to follow the
+    /// `PRwLock` indirection for `UrlRegistration::Root` entries — every
+    /// call reads the current slot, so root-endpoint rebinds are picked
+    /// up automatically without explicit `refresh_path` notifications.
+    pub fn endpoint(&self) -> Option<Arc<UrlNode<C, TS>>> {
+        self.endpoint.read().clone()
+    }
+
     /// Walks from the root's children using a segment iterator.
     ///
     /// If the iterator is exhausted on entry the root endpoint is returned.
@@ -99,7 +108,16 @@ pub enum UrlRegistration<
 > {
     Root(Arc<RootNode<C, TS>>),
     Node(Arc<UrlNode<C, TS>>),
-}
+} 
+
+impl<C: RequestContext + Send + 'static, TS: TransportSpec> Clone for UrlRegistration<C, TS> { 
+    fn clone(&self) -> Self {
+        match self {
+            UrlRegistration::Root(root) => UrlRegistration::Root(root.clone()),
+            UrlRegistration::Node(node) => UrlRegistration::Node(node.clone()),
+        }
+    }
+} 
 
 /// Root wrapper for a URL tree.
 ///
@@ -184,7 +202,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
     ///   endpoint slot.
     /// - `Ok(Node(node))` — a child node was created or rebound.
     /// - `Err(e)` — the path pattern was invalid.
-    fn register(
+    pub(crate) fn register(
         &self,
         path: Vec<PathPattern>,
         binding: ExecutableBinding<C>,
@@ -245,6 +263,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
             .map(UrlRegistration::Node)
     }
 
+    #[av::ver(deprecated, since = "0.8.0", note = "Use `register` directly. Use url::parser::parse to parse patterns before calling `register`.")]
     /// Registers a literal URL path and returns a [`UrlRegistration`].
     ///
     /// Only the empty string `""` maps to the root endpoint (`Root` variant).
@@ -270,6 +289,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         self.register(path_vec, binding, params, StepName::default())
     }
 
+    #[av::ver(deprecated, since = "0.8.0", note = "Use `register` directly. Use url::parser::parse to parse patterns before calling `register`.")] 
     /// Registers a URL using Hotaru pattern syntax and returns a [`UrlRegistration`].
     ///
     /// Accepts the full Hotaru pattern language (literals, `<name>`, `<type:name>`,
@@ -288,7 +308,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
     ) -> Result<UrlRegistration<C, TS>, UrlError> {
         match parse(path.as_ref()) {
             Ok((path, names)) => self.register(path, binding, params, names.into()),
-            Err(e) => Err(UrlError::ParseError(e.to_string())),
+            Err(e) => Err(e.into()),
         }
     }
 }
@@ -297,7 +317,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> Default for UrlRoot<
     fn default() -> Self {
         Self::new()
     }
-}
+} 
 
 #[cfg(test)]
 mod tests {
