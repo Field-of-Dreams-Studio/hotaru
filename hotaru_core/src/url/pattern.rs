@@ -110,3 +110,218 @@ impl std::fmt::Display for PathPattern {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! `PartialEq` tests for `PathPattern`.
+    //!
+    //! These tests are load-bearing for `AccessPoints::refresh_path`
+    //! (Stage 4 of the outpoint plan), which uses `==` on path slices to
+    //! decide which named access points must be refreshed after an unnamed
+    //! registration rebinds a node. Equality must match the plan's contract:
+    //!
+    //! - Literal patterns: string equality
+    //! - Wildcards (`Any` / `AnyPath`): kind equality (different kinds are unequal)
+    //! - Regex patterns: identical source-string equality
+    //! - Different variants are never equal
+
+    use super::PathPattern;
+
+    // ------------------------------------------------------------------
+    // Reflexivity — every variant equals itself
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn literal_is_reflexive() {
+        let p = PathPattern::literal_path("users");
+        assert_eq!(p, p.clone());
+    }
+
+    #[test]
+    fn regex_is_reflexive() {
+        let p = PathPattern::regex_path(r"\d+");
+        assert_eq!(p, p.clone());
+    }
+
+    #[test]
+    fn any_is_reflexive() {
+        assert_eq!(PathPattern::Any, PathPattern::Any);
+    }
+
+    #[test]
+    fn any_path_is_reflexive() {
+        assert_eq!(PathPattern::AnyPath, PathPattern::AnyPath);
+    }
+
+    // ------------------------------------------------------------------
+    // Literal — string equality
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn literal_same_string_is_equal() {
+        assert_eq!(
+            PathPattern::literal_path("users"),
+            PathPattern::literal_path("users"),
+        );
+    }
+
+    #[test]
+    fn literal_different_string_is_not_equal() {
+        assert_ne!(
+            PathPattern::literal_path("users"),
+            PathPattern::literal_path("posts"),
+        );
+    }
+
+    #[test]
+    fn literal_case_sensitive() {
+        // Path patterns are case-sensitive — `Users` and `users` are distinct.
+        assert_ne!(
+            PathPattern::literal_path("Users"),
+            PathPattern::literal_path("users"),
+        );
+    }
+
+    #[test]
+    fn literal_empty_string_is_equal_to_itself() {
+        // The empty-string literal is the root-endpoint case — important for
+        // `UrlRegistration::Root` / `register_lit_named("", ...)` workflows.
+        assert_eq!(
+            PathPattern::literal_path(""),
+            PathPattern::literal_path(""),
+        );
+    }
+
+    #[test]
+    fn literal_empty_string_is_not_any_wildcard() {
+        // Despite the visual similarity, an empty literal is not the same as
+        // a wildcard. This is important for the root-endpoint contract.
+        assert_ne!(PathPattern::literal_path(""), PathPattern::Any);
+        assert_ne!(PathPattern::literal_path(""), PathPattern::AnyPath);
+    }
+
+    // ------------------------------------------------------------------
+    // Regex — identical source-string equality
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn regex_same_source_is_equal() {
+        assert_eq!(
+            PathPattern::regex_path(r"\d+"),
+            PathPattern::regex_path(r"\d+"),
+        );
+    }
+
+    #[test]
+    fn regex_different_source_is_not_equal() {
+        assert_ne!(
+            PathPattern::regex_path(r"\d+"),
+            PathPattern::regex_path(r"\w+"),
+        );
+    }
+
+    #[test]
+    fn regex_equivalent_but_different_source_is_not_equal() {
+        // Equality is by source string, NOT by language. `[0-9]+` and `\d+`
+        // match the same set but are textually distinct.
+        assert_ne!(
+            PathPattern::regex_path(r"\d+"),
+            PathPattern::regex_path(r"[0-9]+"),
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // Wildcards — kind equality
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn any_does_not_equal_any_path() {
+        // `Any` matches one segment; `AnyPath` matches multiple. Different
+        // kinds, different priorities (2 vs 3), must not compare equal.
+        assert_ne!(PathPattern::Any, PathPattern::AnyPath);
+    }
+
+    // ------------------------------------------------------------------
+    // Cross-variant inequality
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn literal_and_regex_are_not_equal_even_if_strings_match() {
+        // `Literal("\\d+")` and `Regex("\\d+")` share a source string but
+        // are different variants — they must not be equal.
+        assert_ne!(
+            PathPattern::literal_path(r"\d+"),
+            PathPattern::regex_path(r"\d+"),
+        );
+    }
+
+    #[test]
+    fn literal_and_wildcards_are_not_equal() {
+        let lit = PathPattern::literal_path("anything");
+        assert_ne!(lit, PathPattern::Any);
+        assert_ne!(lit, PathPattern::AnyPath);
+    }
+
+    #[test]
+    fn regex_and_wildcards_are_not_equal() {
+        let re = PathPattern::regex_path(r".*");
+        assert_ne!(re, PathPattern::Any);
+        assert_ne!(re, PathPattern::AnyPath);
+    }
+
+    // ------------------------------------------------------------------
+    // Symmetry — a == b ⟹ b == a
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn equality_is_symmetric() {
+        let lit_a = PathPattern::literal_path("x");
+        let lit_b = PathPattern::literal_path("x");
+        assert_eq!(lit_a == lit_b, lit_b == lit_a);
+
+        let re_a = PathPattern::regex_path("y");
+        let re_b = PathPattern::regex_path("y");
+        assert_eq!(re_a == re_b, re_b == re_a);
+
+        assert_eq!(
+            PathPattern::Any == PathPattern::AnyPath,
+            PathPattern::AnyPath == PathPattern::Any,
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // Slice equality — the shape `refresh_path` actually uses
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn path_slice_equality_matches_pattern_equality() {
+        // `AccessPoints::refresh_path` compares `&[PathPattern]` slices via
+        // the derived slice `==`, which delegates element-wise to
+        // `PathPattern::eq`. This test pins that delegation.
+        let lhs = vec![
+            PathPattern::literal_path(""),
+            PathPattern::literal_path("users"),
+            PathPattern::regex_path(r"\d+"),
+        ];
+        let rhs = vec![
+            PathPattern::literal_path(""),
+            PathPattern::literal_path("users"),
+            PathPattern::regex_path(r"\d+"),
+        ];
+        assert_eq!(lhs.as_slice(), rhs.as_slice());
+
+        // Differing in any element makes the slices unequal.
+        let mut rhs_diff = rhs.clone();
+        rhs_diff[1] = PathPattern::literal_path("posts");
+        assert_ne!(lhs.as_slice(), rhs_diff.as_slice());
+
+        // Differing only in the regex source string is enough.
+        let mut rhs_re = rhs.clone();
+        rhs_re[2] = PathPattern::regex_path(r"\w+");
+        assert_ne!(lhs.as_slice(), rhs_re.as_slice());
+
+        // Different length is unequal regardless of content.
+        let shorter: Vec<PathPattern> = rhs.iter().take(2).cloned().collect();
+        assert_ne!(lhs.as_slice(), shorter.as_slice());
+    }
+}
