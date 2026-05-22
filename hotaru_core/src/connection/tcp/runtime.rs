@@ -33,15 +33,32 @@ impl Inbound for TcpInbound {
 
 /// TCP outbound runtime using normal `TcpStream::connect`.
 ///
-/// The OS chooses the local address and port.
-pub struct TcpOutbound;
+/// The OS chooses the local address and port. The remote target is
+/// captured at `build` time and used by every `connect` call.
+pub struct TcpOutbound {
+    target: String,
+}
+
+impl TcpOutbound {
+    /// Returns the remote target this outbound is bound to.
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+}
 
 #[async_trait]
 impl Outbound for TcpOutbound {
     type Wire = TcpStream;
     type ConnectTarget = String;
 
-    async fn connect(target: Self::ConnectTarget) -> std::io::Result<Self::Wire> {
-        TcpStream::connect(target).await
+    async fn build(target: Self::ConnectTarget) -> std::io::Result<Self> {
+        // No work at build time for plain TCP — DNS resolution and socket
+        // creation happen per-`connect`. Future TLS / pooled variants can
+        // do more here.
+        Ok(Self { target })
+    }
+
+    async fn connect(&self) -> std::io::Result<Self::Wire> {
+        TcpStream::connect(&self.target).await
     }
 }

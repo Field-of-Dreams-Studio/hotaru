@@ -24,8 +24,9 @@ use super::common::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
 
 /// Server runtime for inbound protocol traffic.
 pub struct Server<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
-    pub registry: ProtocolRegistryKind<TS>,
+    pub registry: ProtocolRegistryKind<TS>, 
     pub binding: <TS::Inbound as Inbound>::BindTarget,
+    pub inbound: tokio::sync::OnceCell<Arc<TS::Inbound>>,
     pub runtime: Arc<RuntimeConfig>,
     pub config: OperationalConfig,
 }
@@ -236,11 +237,22 @@ impl<TS: TransportSpec> Server<TS> {
         .expect("Runtime task panicked");
     }
 
+    /// Returns the `TS::Inbound` instance, binding on first use.
+    pub async fn ensure_inbound(&self) -> std::io::Result<&Arc<TS::Inbound>> {
+        self.inbound
+            .get_or_try_init(|| async {
+                Ok(Arc::new(TS::Inbound::bind(self.binding.clone()).await?))
+            })
+            .await
+    }
+
     /// Internal application loop - listens for and handles connections
     async fn run_app_loop(self: Arc<Self>) {
-        let inbound = TS::Inbound::bind(self.binding.clone())
+        let inbound = self
+            .ensure_inbound()
             .await
-            .unwrap_or_else(|_| panic!("Failed to bind inbound transport"));
+            .unwrap_or_else(|_| panic!("Failed to bind inbound transport"))
+            .clone();
 
         debug_log!("Inbound transport bound");
 

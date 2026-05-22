@@ -70,6 +70,14 @@ where
         );
         Ok(reg)
     }
+
+    /// Wrap an acquired wire in this protocol's channel handle.
+    /// The caller (e.g. `Client::open_channel`) owns connection sourcing.
+    pub fn create_channel(&self, wire: TS::Wire) -> P::Channel {
+        let (read, write, meta) = wire.split();
+        let reader = BufReader::new(read);
+        self.protocol.clone().open_channel(reader, write, meta)
+    }
 }
 
 impl<P, TS> ProtocolEntryTrait<TS> for ProtocolEntry<P, TS>

@@ -13,12 +13,11 @@ use crate::{
 pub use crate::app::registry::ProtocolRegistryKind;
 
 /// Outbound runtime for protocol-routed requests.
-///
-/// `worker` in the shared operational config is interpreted as connection-pool
-/// size on the client side, rather than Tokio worker-thread count.
 pub struct Client<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
     pub registry: ProtocolRegistryKind<TS>,
     pub target: <TS::Outbound as Outbound>::ConnectTarget,
+    /// Built `TS::Outbound`, materialized on first `ensure_outbound`.
+    pub outbound: tokio::sync::OnceCell<Arc<TS::Outbound>>,
     pub runtime: Arc<RuntimeConfig>,
     pub config: OperationalConfig,
 }
@@ -137,9 +136,18 @@ impl<TS: TransportSpec> Client<TS> {
         self.config.max_frame_process_time()
     }
 
+    /// Returns the `TS::Outbound` instance, building on first use.
+    pub async fn ensure_outbound(self: &Arc<Self>) -> std::io::Result<&Arc<TS::Outbound>> {
+        self.outbound
+            .get_or_try_init(|| async {
+                Ok(Arc::new(TS::Outbound::build(self.target.clone()).await?))
+            })
+            .await
+    }
+
     /// Opens one outbound wire to this client's configured target.
     pub async fn connect(self: &Arc<Self>) -> std::io::Result<TS::Wire> {
-        TS::Outbound::connect(self.target.clone()).await
+        self.ensure_outbound().await?.connect().await
     }
 
     /// Runs protocol-side client handling on an existing wire.
@@ -182,8 +190,8 @@ impl<TS: TransportSpec> Client<TS> {
         path: &str,
         ctx: P::Context,
     ) -> Result<Result<P::Context, <P::Context as RequestContext>::Error>, UrlError> {
-        let endpoint = self.resolve::<P>(path).await?;
-        Ok(endpoint.run(ctx).await) 
+        let outpoint = self.resolve::<P>(path).await?;
+        Ok(outpoint.run(ctx).await) 
     }
 
     /// Executes one outbound route by path with an explicit depth limit.
@@ -193,7 +201,7 @@ impl<TS: TransportSpec> Client<TS> {
         max_depth: u32,
         ctx: P::Context,
     ) -> Result<Result<P::Context, <P::Context as RequestContext>::Error>, UrlError> {
-        let endpoint = self.resolve_with_limit::<P>(path, max_depth).await?;
-        Ok(endpoint.run(ctx).await)
+        let outpoint = self.resolve_with_limit::<P>(path, max_depth).await?;
+        Ok(outpoint.run(ctx).await)
     }
 }
