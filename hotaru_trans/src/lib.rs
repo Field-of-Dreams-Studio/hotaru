@@ -22,26 +22,33 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "trans")] {
         #[proc_macro]
         pub fn endpoint(input: TokenStream) -> TokenStream {
-            match url::parse_trans(input) {
-                Ok(url_args) => url_args.expand(),
-                Err(err) => err,
-            }
+            url::endpoint_trans(input)
+        }
+
+        #[proc_macro]
+        pub fn outpoint(input: TokenStream) -> TokenStream {
+            url::outpoint_trans(input)
         }
     } else if #[cfg(feature = "attr")] {
         #[proc_macro_attribute]
         pub fn endpoint(attr: TokenStream, input: TokenStream) -> TokenStream {
-            match url::parse_attr(attr, input) {
-                Ok(url_args) => url_args.expand(),
-                Err(err) => err,
-            }
+            url::endpoint_attr(attr, input)
+        }
+
+        #[proc_macro_attribute]
+        pub fn outpoint(attr: TokenStream, input: TokenStream) -> TokenStream {
+            url::outpoint_attr(attr, input)
         }
     } else {
+        // default: semi-trans
         #[proc_macro_attribute]
         pub fn endpoint(_attr: TokenStream, input: TokenStream) -> TokenStream {
-            match url::parse_semi_trans(input) {
-                Ok(url_args) => url_args.expand(),
-                Err(err) => err,
-            }
+            url::endpoint_semi_trans(input)
+        }
+
+        #[proc_macro_attribute]
+        pub fn outpoint(_attr: TokenStream, input: TokenStream) -> TokenStream {
+            url::outpoint_semi_trans(input)
         }
     }
 }

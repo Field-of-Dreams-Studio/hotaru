@@ -544,20 +544,21 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// This path no longer auto-parses/normalizes host string schemes (`http://`, `https://`)
     /// in `send_request`; it now trusts transport target type.
     ///
-    /// Connector creation is explicit: callers provide connector config and this
-    /// method constructs `TS::Connector` from that config (no default connector).
-    pub async fn send_request<TTarget, TConnectorConfig>(
+    /// The outbound runtime is instance-based: this builds `TS::Outbound` from
+    /// the transport target, then acquires one wire from it.
+    pub async fn send_request<TTarget>(
         target: TTarget,
-        connector_config: TConnectorConfig,
         request: HttpRequest,
         safety_config: HttpSafety,
     ) -> Result<HttpResponse, ConnectionError>
     where
         TTarget: Into<<TS::Outbound as Outbound>::ConnectTarget>,
-        TS::Outbound: From<TConnectorConfig>,
     {
-        let _outbound = TS::Outbound::from(connector_config);
-        let wire = <TS::Outbound as Outbound>::connect(target.into())
+        let outbound = TS::Outbound::build(target.into())
+            .await
+            .map_err(ConnectionError::IoError)?;
+        let wire = outbound
+            .connect()
             .await
             .map_err(ConnectionError::IoError)?;
         let (read, write, _meta) = wire.split();
@@ -607,16 +608,12 @@ impl HttpContext<crate::connection::tcp::TcpTransport> {
     ///
     /// This helper keeps old ergonomics (`host + optional port`) and then routes
     /// to the transport-target `send_request` API.
-    pub async fn send_request_host<T: Into<String>, TConnectorConfig>(
+    pub async fn send_request_host<T: Into<String>>(
         host: T,
         port: Option<u16>,
-        connector_config: TConnectorConfig,
         mut request: HttpRequest,
         safety_config: HttpSafety,
-    ) -> Result<HttpResponse, ConnectionError>
-    where
-        <crate::connection::tcp::TcpTransport as TransportSpec>::Outbound: From<TConnectorConfig>,
-    {
+    ) -> Result<HttpResponse, ConnectionError> {
         let host_str = host.into();
         let (is_https, without_scheme) = if host_str.starts_with("https://") {
             (true, host_str.trim_start_matches("https://"))
@@ -663,7 +660,7 @@ impl HttpContext<crate::connection::tcp::TcpTransport> {
         }
 
         let target = format!("{}:{}", host_part, final_port);
-        Self::send_request(target, connector_config, request, safety_config).await
+        Self::send_request(target, request, safety_config).await
     }
 }
 
