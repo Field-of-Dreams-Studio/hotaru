@@ -39,7 +39,7 @@ For detailed documentation and examples, see the [Hotaru web framework](https://
 
 ## License
 
-GPL-3 License
+MIT License
 
 ## Part of Hotaru Framework
 

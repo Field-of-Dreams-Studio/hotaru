@@ -2,11 +2,11 @@
 
 ![Latest Version](https://img.shields.io/badge/version-0.8.0-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
-[![GPL-3.0 License](https://img.shields.io/badge/license-GNU-blue.svg)](LICENSE)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > Small, sweet, easy framework for full-stack Rust web applications
 
-License note: currently GPL-3.0; we are considering a change to LGPL or MIT (not decided).
+License note: Already switched to MIT 
 
 ## Former Codebase 
 
@@ -425,7 +425,7 @@ The understanding requirement is uniform across Author-Owned, Human-Led, and Co-
 
 ## 📄 License
 
-GPL-3.0 License
+MIT License
 
 Copyright (c) 2024-2026 @ Field of Dreams Studio 
 

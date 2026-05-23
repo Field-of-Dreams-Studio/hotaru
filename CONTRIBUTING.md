@@ -126,7 +126,7 @@ We welcome contributions in the following areas:
 
 ## 📄 License
 
-By contributing to Hotaru, you agree that your contributions will be licensed under the GPL-3.0 License.
+By contributing to Hotaru, you agree that your contributions will be licensed under the MIT License.
 
 ## 🙏 Thank You
 
