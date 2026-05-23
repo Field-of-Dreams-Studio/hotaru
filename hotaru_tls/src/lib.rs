@@ -16,8 +16,8 @@ pub mod tls;
 
 // ── TLS stream layer ──────────────────────────────────────────────────────────
 pub use tls::{
-    TlsAccepter, TlsAccepterError, TlsConnector, TlsConnectorError, TlsMeta, TlsStream,
-    TlsTransport,
+    TlsAccepter, TlsAccepterError, TlsConnector, TlsConnectorError, TlsInbound,
+    TlsInboundTarget, TlsMeta, TlsOutbound, TlsOutboundTarget, TlsStream, TlsTransport,
 };
 
 // ── Configuration builders ────────────────────────────────────────────────────

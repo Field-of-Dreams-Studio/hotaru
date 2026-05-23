@@ -19,8 +19,8 @@ middleware! {
 }
 
 // Define the app with global middleware
-pub static APP: SApp = Lazy::new(|| {
-    App::new()
+pub static APP: SServer = Lazy::new(|| {
+    Server::new()
         .binding("127.0.0.1:3003")
         .set_config("This is a String Config")
         .single_protocol(

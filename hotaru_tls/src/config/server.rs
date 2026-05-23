@@ -1,7 +1,7 @@
 //! TLS configuration for server-side accepters.
 
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::BufReader;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -98,7 +98,7 @@ impl TlsConfig {
     pub(crate) fn build_server_config(&self) -> Result<ServerConfig, TlsConfigError> {
         let provider = Arc::new(default_provider());
 
-        let mut builder = ServerConfig::builder_with_provider(provider)
+        let builder = ServerConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
             .map_err(|e| TlsConfigError::InvalidConfig(e.to_string()))?;
 

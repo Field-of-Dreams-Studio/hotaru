@@ -39,8 +39,8 @@ MSRV: 1.86
 ```rust
 use hotaru::prelude::*;
 
-pub static APP: SApp = Lazy::new(|| {
-    App::new()
+pub static APP: SServer = Lazy::new(|| {
+    Server::new()
         .binding("127.0.0.1:3000")
         .build()
 });
@@ -150,7 +150,7 @@ This generates:
 - `programfiles/` - Directory for static assets (CSS, JS, images)
 
 The generated project uses the latest Hotaru features including:
-- `LApp!` macro for clean app initialization
+- `LServer!` macro for clean server initialization
 - `endpoint!` macro for routing
 - Proper resource management with build-time asset copying
 
@@ -222,8 +222,8 @@ Create reusable middleware:
 ```rust
 use htmstd::session::CookieSession;
 
-pub static APP: SApp = Lazy::new(|| {
-    App::new()
+pub static APP: SServer = Lazy::new(|| {
+    Server::new()
         .binding("127.0.0.1:3000")
         .append_middleware::<CookieSession>()
         .build()
@@ -324,8 +324,8 @@ Hotaru is built on a modular architecture:
 - Improved middleware system with protocol inheritance
 - Performance optimizations in URL routing
 - Comprehensive security testing
-- `.worker()` method now properly configures dedicated worker threads per App instance
-- New `LApp!`, `LUrl!`, `LPattern!` macros for simplified lazy static declarations
+- `.worker()` method now properly configures dedicated worker threads per Server instance
+- New `LServer!`, `LClient!`, `LUrl!`, `LPattern!` macros for simplified lazy static declarations
 - Fixed `hotaru new` and `hotaru init` to generate correct `endpoint!` macro syntax
 - Built-in constructor implementation (no external `ctor` dependency required)
 

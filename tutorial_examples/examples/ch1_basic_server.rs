@@ -7,7 +7,7 @@ use hotaru::prelude::*;
 use tutorial_examples::{json_response, text_response};
 
 // Define your application with a static binding
-pub static APP: SApp = Lazy::new(|| App::new().binding("127.0.0.1:3000").build());
+pub static APP: SServer = Lazy::new(|| Server::new().binding("127.0.0.1:3000").build());
 
 // The simplest possible endpoint
 endpoint! {

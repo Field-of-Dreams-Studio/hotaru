@@ -2,6 +2,7 @@ use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenSt
 
 // Procedural macros for Hotaru framework
 // Entry points will be moved here from hotaru_trans
+pub(crate) mod call;
 pub(crate) mod middleware;
 pub(crate) mod url;
 
@@ -53,6 +54,32 @@ cfg_if::cfg_if! {
     }
 }
 
+/// Spawn a persistent outpoint call. Two forms:
+///
+///   call!(APP<HTTP>::ping)      -> APP.call_fn::<HTTP>("ping")
+///   call!(APP<HTTP>: "/ping")   -> APP.call_url::<HTTP>("/ping")
+///
+/// Returns the method-call expression; caller awaits the
+/// `Result<JoinHandle, UrlError>` themselves.
+#[proc_macro]
+pub fn call(input: TokenStream) -> TokenStream {
+    match call::parse_call(input) {
+        Ok(args) => args.expand(),
+        Err(err) => err,
+    }
+}
+
+/// One-shot outpoint request:
+///
+///   run!(APP<HTTP>::ping, request) -> APP.request_fn::<HTTP>("ping", request)
+#[proc_macro]
+pub fn run(input: TokenStream) -> TokenStream {
+    match call::parse_run(input) {
+        Ok(args) => args.expand(),
+        Err(err) => err,
+    }
+}
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "trans")] {
         #[proc_macro]
@@ -81,8 +108,8 @@ cfg_if::cfg_if! {
     }
 }
 
-/// Helper macro to generate lazy static declarations
-/// Used by LApp!, LUrl!, and LPattern! macros
+/// Helper macro to generate lazy static declarations.
+/// Used by LServer!, LClient!, LUrl!, and LPattern! macros.
 macro_rules! generate_lazy_static {
     ($type_name:expr) => {
         |input: TokenStream| -> TokenStream {
@@ -162,21 +189,38 @@ macro_rules! generate_lazy_static {
     };
 }
 
-/// `LApp!` - Creates a lazy static App instance
+/// `LServer!` - Creates a lazy static Server instance.
 ///
 /// # Usage
 /// ```rust
-/// LApp!(APP = App::new().build());
+/// LServer!(APP = Server::new().build());
 /// ```
 ///
 /// # Expansion
 /// ```rust
-/// pub static APP: SApp = Lazy::new(|| App::new().build());
+/// pub static APP: SServer = Lazy::new(|| Server::new().build());
 /// ```
 #[allow(non_snake_case)]
 #[proc_macro]
-pub fn LApp(input: TokenStream) -> TokenStream {
-    generate_lazy_static!("SApp")(input)
+pub fn LServer(input: TokenStream) -> TokenStream {
+    generate_lazy_static!("SServer")(input)
+}
+
+/// `LClient!` - Creates a lazy static Client instance.
+///
+/// # Usage
+/// ```rust
+/// LClient!(CLIENT = Client::new().build());
+/// ```
+///
+/// # Expansion
+/// ```rust
+/// pub static CLIENT: SClient = Lazy::new(|| Client::new().build());
+/// ```
+#[allow(non_snake_case)]
+#[proc_macro]
+pub fn LClient(input: TokenStream) -> TokenStream {
+    generate_lazy_static!("SClient")(input)
 }
 
 /// `LUrl!` - Creates a lazy static Url instance

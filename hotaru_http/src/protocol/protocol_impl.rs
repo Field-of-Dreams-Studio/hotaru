@@ -211,7 +211,8 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
             }
         }
 
-        channel.send_request(ctx.request.clone()).await?;
+        let request = std::mem::take(&mut ctx.request);
+        channel.send_request(request).await?;
         ctx.response = channel.parse_response(&safety).await?;
 
         if !is_response_keep_alive(&ctx.response) {

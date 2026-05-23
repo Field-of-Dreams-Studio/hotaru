@@ -14,11 +14,11 @@ use tokio::time::sleep;
 // ============================================================================
 
 // Single protocol app
-pub static APP: SApp = Lazy::new(|| App::new().binding("127.0.0.1:3000").build());
+pub static APP: SServer = Lazy::new(|| Server::new().binding("127.0.0.1:3000").build());
 
 // Multi-protocol app example (commented out to avoid conflicts)
-// pub static MULTI_APP: SApp = Lazy::new(|| {
-//     App::new()
+// pub static MULTI_APP: SServer = Lazy::new(|| {
+//     Server::new()
 //         .binding("127.0.0.1:3001")
 //         .handle(
 //             HandlerBuilder::new()

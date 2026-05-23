@@ -9,8 +9,8 @@ use serde_json::json;
 // Response, StatusCode, Empty, and Bytes are already imported via h2per::prelude::*
 
 // Create the app with Hyper protocol registration
-pub static APP: SApp = Lazy::new(|| {
-    App::new()
+pub static APP: SServer = Lazy::new(|| {
+    Server::new()
         .binding("127.0.0.1:3090")
         .handle(
             HandlerBuilder::new()

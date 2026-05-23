@@ -302,8 +302,8 @@ impl ConnectionBuilder {
                     Ok(Item::X509Certificate(cert)) => Some(cert),
                     _ => None,
                 });
-            let (added, ignored) = root_store.add_parsable_certificates(certs);
-            debug_log!("Added {} certificates, ignored {}", added, ignored);
+            let (_added, _ignored) = root_store.add_parsable_certificates(certs);
+            debug_log!("Added {} certificates, ignored {}", _added, _ignored);
         } else {
             root_store.extend(TLS_SERVER_ROOTS.iter().cloned());
         }

@@ -1,6 +1,6 @@
 use hotaru_core::app::common::{RunMode, RuntimeConfig};
 use hotaru_core::connection::error::ConnectionError;
-use hotaru_core::connection::{ConnStream, Outbound, TransportSpec};
+use hotaru_core::connection::TransportSpec;
 use hotaru_core::debug_log;
 use hotaru_core::extensions::{Locals, Params};
 use hotaru_core::url::UrlNode;
@@ -11,7 +11,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use tokio::io::{AsyncBufRead, AsyncWrite, BufReader, BufWriter};
+use tokio::io::{AsyncBufRead, AsyncWrite};
 
 use crate::channel::Http1Channel;
 use crate::message::body::HttpBody;
@@ -568,40 +568,6 @@ impl<TS: TransportSpec> HttpContext<TS> {
         Self::new_client(host.into(), config)
     }
 
-    /// Sends a request to the given connector target and returns the response.
-    ///
-    /// This path no longer auto-parses/normalizes host string schemes (`http://`, `https://`)
-    /// in `send_request`; it now trusts transport target type.
-    ///
-    /// The outbound runtime is instance-based: this builds `TS::Outbound` from
-    /// the transport target, then acquires one wire from it.
-    pub async fn send_request<TTarget>(
-        target: TTarget,
-        request: HttpRequest,
-        safety_config: HttpSafety,
-    ) -> Result<HttpResponse, ConnectionError>
-    where
-        TTarget: Into<<TS::Outbound as Outbound>::ConnectTarget>,
-    {
-        let outbound = TS::Outbound::build(target.into())
-            .await
-            .map_err(ConnectionError::IoError)?;
-        let wire = outbound
-            .connect()
-            .await
-            .map_err(ConnectionError::IoError)?;
-        let (read, write, _meta) = wire.split();
-
-        let mut reader = BufReader::new(read);
-        let mut writer = BufWriter::new(write);
-
-        // Write the HTTP request frame
-        Self::write_frame(&mut writer, request).await?;
-        // Read the HTTP response frame
-        let response = Self::read_next_frame(&safety_config, &mut reader).await?;
-        Ok(response)
-    }
-
     pub fn request(&mut self, mut request: HttpRequest) {
         if request.meta.get_host().is_none() {
             if let Some(ref host) = self.host {
@@ -609,87 +575,6 @@ impl<TS: TransportSpec> HttpContext<TS> {
             }
         };
         self.request = request;
-    }
-
-    /// Write an HTTP request frame to the stream
-    pub async fn write_frame<W: AsyncWrite + Unpin>(
-        write_stream: &mut W,
-        request_frame: HttpRequest,
-    ) -> Result<(), ConnectionError> {
-        request_frame
-            .send(write_stream)
-            .await
-            .map_err(|e| ConnectionError::IoError(e))?;
-        Ok(())
-    }
-
-    /// Read an HTTP response frame from the stream
-    pub async fn read_next_frame<R: AsyncBufRead + Unpin>(
-        config: &HttpSafety,
-        read_stream: &mut R,
-    ) -> Result<HttpResponse, ConnectionError> {
-        Ok(HttpResponse::parse_lazy(read_stream, config, false).await)
-    }
-}
-
-impl HttpContext<crate::connection::tcp::TcpTransport> {
-    /// Backward-compatible helper for string hosts with optional port override.
-    ///
-    /// This helper keeps old ergonomics (`host + optional port`) and then routes
-    /// to the transport-target `send_request` API.
-    pub async fn send_request_host<T: Into<String>>(
-        host: T,
-        port: Option<u16>,
-        mut request: HttpRequest,
-        safety_config: HttpSafety,
-    ) -> Result<HttpResponse, ConnectionError> {
-        let host_str = host.into();
-        let (is_https, without_scheme) = if host_str.starts_with("https://") {
-            (true, host_str.trim_start_matches("https://"))
-        } else if host_str.starts_with("http://") {
-            (false, host_str.trim_start_matches("http://"))
-        } else {
-            (false, host_str.as_str())
-        };
-
-        if is_https {
-            return Err(ConnectionError::Other(
-                "HTTPS outbound requests are not supported yet; use http://".to_string(),
-            ));
-        }
-
-        // Parse optional host:port from input string.
-        let mut host_part = without_scheme;
-        let mut parsed_port: Option<u16> = None;
-
-        if let Some(colon_pos) = without_scheme.rfind(':') {
-            let port_part = &without_scheme[colon_pos + 1..];
-            if !port_part.is_empty()
-                && port_part.len() <= 5
-                && port_part.chars().all(|c| c.is_ascii_digit())
-            {
-                if let Ok(p) = port_part.parse::<u16>() {
-                    parsed_port = Some(p);
-                    host_part = &without_scheme[..colon_pos];
-                }
-            }
-        }
-
-        let final_port = port.or(parsed_port).unwrap_or(80);
-
-        // Auto set Host header when absent.
-        if request.meta.get_host().is_none() {
-            if final_port == 80 && port.is_none() && parsed_port.is_none() {
-                request.meta.set_host(Some(host_part.to_string()));
-            } else {
-                request
-                    .meta
-                    .set_host(Some(format!("{}:{}", host_part, final_port)));
-            }
-        }
-
-        let target = format!("{}:{}", host_part, final_port);
-        Self::send_request(target, request, safety_config).await
     }
 }
 

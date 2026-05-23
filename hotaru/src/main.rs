@@ -271,7 +271,7 @@ async fn main() {
     APP.clone().run().await;
 }
 
-LApp!(APP = App::new().build());
+LServer!(APP = Server::new().build());
 
 endpoint!{
     APP.url("/"),

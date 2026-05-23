@@ -118,8 +118,8 @@ middleware! {
 }
 
 // Define application with global middleware
-pub static APP: SApp = Lazy::new(|| {
-    App::new()
+pub static APP: SServer = Lazy::new(|| {
+    Server::new()
         .binding("127.0.0.1:3002")
         // Global middleware applied to all endpoints by default
         .middleware(request_logger)

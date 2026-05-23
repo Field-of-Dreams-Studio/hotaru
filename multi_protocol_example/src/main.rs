@@ -2,7 +2,7 @@ use hotaru::http::*;
 use hotaru::prelude::*;
 use htmstd::Cors;
 
-pub static APP: SApp = Lazy::new(|| App::new().binding("127.0.0.1:3031").build());
+pub static APP: SServer = Lazy::new(|| Server::new().binding("127.0.0.1:3031").build());
 
 #[tokio::main]
 async fn main() {

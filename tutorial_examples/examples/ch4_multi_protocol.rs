@@ -11,8 +11,8 @@ use tutorial_examples::{ChatRoom, TcpChat};
 static CHAT_ROOM: Lazy<ChatRoom> = Lazy::new(|| ChatRoom::new());
 
 // Multi-protocol application
-pub static APP: SApp = Lazy::new(|| {
-    App::new()
+pub static APP: SServer = Lazy::new(|| {
+    Server::new()
         .binding("127.0.0.1:3003")
         .handle(
             HandlerBuilder::new()

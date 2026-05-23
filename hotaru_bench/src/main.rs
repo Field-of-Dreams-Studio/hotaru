@@ -53,7 +53,7 @@ mod hotaru_impl {
         }
     }
 
-    pub static APP: SApp = Lazy::new(|| {
+    pub static APP: SServer = Lazy::new(|| {
         let pool = database::create_pool();
         let cache = database::create_cache();
         let runtime = tokio::runtime::Runtime::new().expect("Failed to create runtime");
@@ -61,7 +61,7 @@ mod hotaru_impl {
             eprintln!("Failed to warm cache at startup: {err}");
         }
 
-        App::new()
+        Server::new()
             .binding("0.0.0.0:8080")
             .set_statics("db_pool", pool)
             .set_statics("world_cache", cache)

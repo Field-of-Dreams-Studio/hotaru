@@ -1,7 +1,9 @@
 pub mod http;
 pub mod prelude;
 
-pub use hotaru_core::app::server::Server as App;
+pub use hotaru_core::app::client::Client;
+pub use hotaru_core::app::server::Server;
+pub type App<TS = hotaru_core::connection::tcp::TcpTransport> = Server<TS>;
 pub use hotaru_core::app::common::RunMode;
 pub use hotaru_core::url::PathPattern;
 pub use hotaru_core::url::UrlRoot as Url;
@@ -38,6 +40,9 @@ pub use hotaru_http::traits::{
     DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol,
 };
 
+#[cfg(feature = "https")]
+pub use hotaru_http::{HTTPS, Http1TlsProtocol, TlsClientConfig, TlsConfig, TlsOutbound, TlsOutboundTarget, TlsTransport};
+
 
 pub use hotaru_http::body::*;
 pub use hotaru_http::cookie::*;
@@ -55,9 +60,12 @@ pub use hotaru_http;
 
 pub use hotaru_trans as hrt;
 pub use hrt::ctor as hrt_ctor;
+pub use hrt::call;
 pub use hrt::endpoint;
 pub use hrt::middleware;
-pub use hrt::{LApp, LPattern, LUrl};
+pub use hrt::outpoint;
+pub use hrt::run;
+pub use hrt::{LClient, LPattern, LServer, LUrl};
 
 pub use ahttpm;
 

@@ -7,6 +7,14 @@
 
 // Re-export HTTP protocol and context
 pub use crate::{HTTP, HttpContext};
+
+// HTTPS + TLS types (gated by the `https` feature on the umbrella crate).
+#[cfg(feature = "https")]
+pub use crate::{
+    HTTPS, Http1TlsProtocol, TlsClientConfig, TlsConfig, TlsOutbound, TlsOutboundTarget,
+    TlsTransport,
+};
+
 // Re-export type alias for backward compatibility
 pub use hotaru_http::context::HttpReqCtx;
 // HttpResCtx was for client-side in old Starberry - use HttpContext for both now

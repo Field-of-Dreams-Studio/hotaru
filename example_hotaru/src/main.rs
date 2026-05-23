@@ -6,17 +6,34 @@ async fn main() {
     APP.clone().run().await;
 }
 
-LApp!(
-    APP = App::new()
+LServer!(
+    APP = Server::new()
         .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
         .build()
 );
+
+// HTTPS-targeted client for example.com:443. `TlsClientConfig::default()`
+// uses the bundled webpki root store for cert verification.
+//
+// `SClient` defaults TS to TcpTransport, so we bypass `LClient!` and declare
+// the static directly to pin TS=TlsTransport here.
+pub static CLIENT: Lazy<Arc<Client<TlsTransport>>> = Lazy::new(|| {
+    Client::<TlsTransport>::new()
+        .target(TlsOutboundTarget::new(
+            "example.com",
+            443,
+            TlsClientConfig::default(),
+        ))
+        .single_protocol(ProtocolBuilder::new(HTTPS::client(HttpSafety::default())))
+        .build()
+});
+
 
 // Trans
 
 endpoint! {
     APP.url("/"),
-    middleware = [LoggerMiddleware], 
+    middleware = [LoggerMiddleware],
 
     index <HTTP> {
         akari_render!(
@@ -32,6 +49,58 @@ endpoint! {
                 "Template rendering"
             ]
         )
+    }
+}
+
+// Proxy endpoint: fires an HTTPS outpoint to example.com, then renders the
+// fetched body inline as the response. The body is extracted from whichever
+// HttpBody variant the response landed in.
+endpoint! {
+    APP.url("/example_outpoint_fetch"),
+
+    example_outpoint_fetch <HTTP> {
+        let mut outbound = HttpRequest::default();
+        outbound.meta.set_host(Some("example.com".to_string()));
+
+        match run!(CLIENT<HTTPS>::ping_example, outbound).await {
+            Ok(Ok(resp)) => {
+                let body_bytes: Vec<u8> = match resp.body {
+                    HttpBody::Text(s) => s.into_bytes(),
+                    HttpBody::Binary(b) => b,
+                    HttpBody::Buffer { data, .. } => data,
+                    _ => Vec::new(),
+                };
+                let body_str = String::from_utf8_lossy(&body_bytes);
+                let html = format!(
+                    "<!doctype html><html><body>\
+                     <h1>Fetched from https://example.com/</h1>\
+                     <hr/>{body_str}</body></html>"
+                );
+                response_templates::html_response(html.into_bytes())
+            }
+            Ok(Err(e)) => response_templates::normal_response(
+                502u16,
+                format!("upstream error: {e}"),
+            ),
+            Err(e) => response_templates::normal_response(
+                500u16,
+                format!("lookup error: {e}"),
+            ),
+        }
+    }
+}
+
+// Client-side HTTPS outpoint. Host header drives SNI / certificate verify and
+// virtual hosting; user middleware fills it in if the caller didn't.
+outpoint! {
+    CLIENT.url("/"),
+
+    ping_example <HTTPS> {
+        if req.request.meta.get_host().is_none() {
+            req.request.meta.set_host(Some("example.com".to_string()));
+        }
+        send;
+        Ok(req)
     }
 }
 
@@ -101,4 +170,3 @@ middleware! {
 // }
 
 // mod resource;
-

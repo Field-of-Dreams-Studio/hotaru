@@ -6,7 +6,7 @@ use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
     },
-    connection::{Outbound,TransportSpec}, executable::ExecutableBinding, protocol::RequestContext, url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
+    connection::{ConnStream, Outbound, TransportSpec}, executable::ExecutableBinding, protocol::{Channel, RequestContext}, url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
     protocol::Protocol,
 };
 
@@ -250,5 +250,104 @@ impl<TS: TransportSpec> Client<TS> {
         .await;
 
         Ok(inner)
+    }
+
+    /// Spawn a persistent call task: one outpoint, one channel, looped while
+    /// the channel stays open. Lookup errors surface as `UrlError`; runtime
+    /// errors land in the join handle's inner result.
+    pub async fn call_fn<P>(
+        self: &Arc<Self>,
+        name: &str,
+    ) -> Result<
+        tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
+        UrlError,
+    >
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: From<std::io::Error>,
+    {
+        let entry = self
+            .registry
+            .entry::<P>()
+            .ok_or(UrlError::ProtocolNotFound)?;
+        let ap = entry
+            .access_points
+            .get(name)
+            .ok_or_else(|| UrlError::InvalidPath(name.to_string()))?;
+        let node = ap
+            .resolve()
+            .ok_or_else(|| UrlError::InvalidPath(name.to_string()))?;
+
+        Ok(self.spawn_call_loop::<P>(entry.protocol.clone(), node))
+    }
+
+    /// Same as `call_fn`, addressed by path instead of name. Resolves once
+    /// before the loop; subsequent root-endpoint rebinds are not picked up.
+    pub async fn call_url<P>(
+        self: &Arc<Self>,
+        path: &str,
+    ) -> Result<
+        tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
+        UrlError,
+    >
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: From<std::io::Error>,
+    {
+        let node = self.resolve::<P>(path).await?;
+        let entry = self
+            .registry
+            .entry::<P>()
+            .ok_or(UrlError::ProtocolNotFound)?;
+
+        Ok(self.spawn_call_loop::<P>(entry.protocol.clone(), node))
+    }
+
+    /// Drive one outpoint over one channel until the channel closes, an
+    /// error fires, or `max_connection_time` expires.
+    fn spawn_call_loop<P>(
+        self: &Arc<Self>,
+        protocol: P,
+        node: Arc<UrlNode<P::Context, TS>>,
+    ) -> tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: From<std::io::Error>,
+    {
+        let this = self.clone();
+        let deadline_setting = self.config.max_connection_time();
+
+        tokio::spawn(async move {
+            // Connect + wrap channel inside the task so I/O errors fall into
+            // the join handle's inner result, not the outer UrlError.
+            let wire = this.connect().await?;
+            let (read, write, meta) = wire.split();
+            let reader = tokio::io::BufReader::new(read);
+            let channel = protocol.open_channel(reader, write, meta);
+
+            // One ctx, reused across iterations; channel stays installed.
+            let mut ctx = <P::Context as Default>::default();
+            P::install_channel(&mut ctx, channel.clone());
+
+            let deadline = match deadline_setting {
+                TimeoutSetting::Fixed(d) => Some(tokio::time::Instant::now() + d),
+                _ => None,
+            };
+
+            while channel.is_open() {
+                let iter = node.run(ctx);
+                ctx = match deadline {
+                    Some(d) => tokio::select! {
+                        result = iter => result?,
+                        _ = tokio::time::sleep_until(d) => {
+                            channel.close();
+                            break;
+                        }
+                    },
+                    None => iter.await?,
+                };
+            }
+            Ok(())
+        })
     }
 }

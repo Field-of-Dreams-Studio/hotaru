@@ -438,19 +438,35 @@ impl MWFunc {
         // dbg!(handle_fn.clone().to_string());
         impl_body.extend(handle_fn);
 
-        // Final: struct + type alias + impl ...
+        // Final assembly.
+        //
+        // The struct stays at module scope (users name it directly). The
+        // `type _Ctx = ...` alias is wrapped in an anonymous `const _: () = { ... };`
+        // scope alongside the impl so the alias doesn't leak into the
+        // surrounding module — otherwise two middlewares in the same module
+        // would each define `_Ctx` at module scope and collide.
+        let mut impl_block = TokenStream::new();
+        impl_block.extend(impl_head);
+        impl_block.extend(std::iter::once(TokenTree::Group(Group::new(
+            Delimiter::Brace,
+            impl_body,
+        ))));
+
+        let mut const_scope_body = TokenStream::new();
+        const_scope_body.extend(type_alias);
+        const_scope_body.extend(impl_block);
+
         let mut out = TokenStream::new();
         out.extend(struct_decl);
-        out.extend(type_alias);
-        out.extend({
-            let mut impl_block = TokenStream::new();
-            impl_block.extend(impl_head);
-            impl_block.extend(std::iter::once(TokenTree::Group(Group::new(
-                Delimiter::Brace,
-                impl_body,
-            ))));
-            impl_block
-        });
+        out.extend(vec![
+            TokenTree::Ident(Ident::new("const", Span::call_site())),
+            TokenTree::Ident(Ident::new("_", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
+            TokenTree::Punct(Punct::new('=', Spacing::Alone)),
+            TokenTree::Group(Group::new(Delimiter::Brace, const_scope_body)),
+            TokenTree::Punct(Punct::new(';', Spacing::Alone)),
+        ]);
         out
     }
 }

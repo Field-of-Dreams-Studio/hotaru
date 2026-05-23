@@ -10,7 +10,7 @@ use hotaru::prelude::*;
 // Application Setup - Static APP Pattern
 // ============================================================================
 
-pub static APP: SApp = Lazy::new(|| App::new().binding("127.0.0.1:3000").build());
+pub static APP: SServer = Lazy::new(|| Server::new().binding("127.0.0.1:3000").build());
 
 // ============================================================================
 // Main Entry Point

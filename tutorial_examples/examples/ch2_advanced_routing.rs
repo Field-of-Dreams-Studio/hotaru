@@ -50,7 +50,7 @@ impl User {
 }
 
 // Define your application
-pub static APP: SApp = Lazy::new(|| App::new().binding("127.0.0.1:3001").build());
+pub static APP: SServer = Lazy::new(|| Server::new().binding("127.0.0.1:3001").build());
 
 // List all users
 endpoint! {

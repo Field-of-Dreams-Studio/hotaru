@@ -35,6 +35,9 @@ debug = ["hotaru_core/dev-log"]
 # When enabled, you must add ctor = "0.4.0" to your own dependencies
 external-ctor = ["hotaru_trans/external-ctor", "ctor"]
 
-trans = ["hotaru_trans/trans"] 
-semi-trans = ["hotaru_trans/semi-trans"] 
-attr = ["hotaru_trans/attr"] 
+trans = ["hotaru_trans/trans"]
+semi-trans = ["hotaru_trans/semi-trans"]
+attr = ["hotaru_trans/attr"]
+
+# HTTPS support — forwards to hotaru_http's tls feature, which pulls in hotaru_tls.
+https = ["hotaru_http/tls"]

@@ -9,7 +9,7 @@ use crate::executable::ExecutableBinding;
 use crate::{debug_error, debug_log, debug_warn};
 
 use crate::connection::{Inbound, TransportSpec};
-use crate::protocol::Protocol;
+use crate::protocol::{Protocol, RequestContext};
 use crate::url::{PathPattern, UrlError, node::StepName};
 
 pub use crate::executable::ProtocolRegistryBuilder;
@@ -235,6 +235,44 @@ impl<TS: TransportSpec> Server<TS> {
         })
         .await
         .expect("Runtime task panicked");
+    }
+
+    /// Synthetically invoke a registered endpoint by name. Builds a fresh
+    /// context, injects the request, runs the endpoint's chain, returns the
+    /// response. No wire is opened — intended for tests and in-process
+    /// simulation. Outer `UrlError` covers "name not found"; inner protocol
+    /// error covers chain failures.
+    pub async fn request_fn<P>(
+        self: &Arc<Self>,
+        name: &str,
+        request: <P::Context as RequestContext>::Request,
+    ) -> Result<
+        Result<<P::Context as RequestContext>::Response, <P::Context as RequestContext>::Error>,
+        UrlError,
+    >
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+    {
+        let entry = self
+            .registry
+            .entry::<P>()
+            .ok_or(UrlError::ProtocolNotFound)?;
+        let ap = entry
+            .access_points
+            .get(name)
+            .ok_or_else(|| UrlError::InvalidPath(name.to_string()))?;
+        let node = ap
+            .resolve()
+            .ok_or_else(|| UrlError::InvalidPath(name.to_string()))?;
+
+        let mut ctx = P::Context::default();
+        ctx.inject_request(request);
+
+        let inner = match node.run(ctx).await {
+            Ok(ctx) => Ok(ctx.into_response()),
+            Err(e) => Err(e),
+        };
+        Ok(inner)
     }
 
     /// Returns the `TS::Inbound` instance, binding on first use.

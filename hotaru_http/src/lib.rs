@@ -31,6 +31,11 @@ pub use protocol::{DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol};
 #[cfg(feature = "tls")]
 pub use protocol::{HTTPS, Http1TlsProtocol};
 
+// Surface the TLS transport/config pieces so users with the `tls` feature
+// don't need a direct `hotaru_tls` dep.
+#[cfg(feature = "tls")]
+pub use hotaru_tls::{TlsClientConfig, TlsConfig, TlsOutbound, TlsOutboundTarget, TlsTransport};
+
 pub use protocol::HttpError;
 
 // ============================================================================

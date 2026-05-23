@@ -86,7 +86,7 @@ impl TlsClientConfig {
             root_store.extend(custom_roots.roots.iter().cloned());
         }
 
-        let mut builder = ClientConfig::builder_with_provider(provider)
+        let builder = ClientConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
             .map_err(|e| TlsClientConfigError::InvalidConfig(e.to_string()))?
             .with_root_certificates(root_store);

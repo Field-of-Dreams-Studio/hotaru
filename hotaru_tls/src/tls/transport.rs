@@ -2,20 +2,21 @@
 
 use hotaru_core::connection::TransportSpec;
 
-use super::{accepter::TlsAccepter, connector::TlsConnector, stream::TlsStream};
+use super::{
+    runtime::{TlsInbound, TlsOutbound},
+    stream::TlsStream,
+};
 
 /// Transport policy for TLS-encrypted connections.
 ///
-/// Ties `TlsStream` as the wire type with `TlsAccepter` (server side)
-/// and `TlsConnector` (client side).
+/// Ties `TlsStream` as the wire type with TLS inbound/outbound runtimes.
 ///
-/// Note: `TlsAccepter` and `TlsConnector` both require runtime config
-/// (certificates/keys), so `default_accepter()` and `default_connector()`
-/// return `None`. Build them via `TlsAccepter::new(config)` / `TlsConnector::new(config)`.
+/// TLS requires certificate config, so no default bind/connect target is
+/// provided. Build `TlsInboundTarget` / `TlsOutboundTarget` explicitly.
 pub struct TlsTransport;
 
 impl TransportSpec for TlsTransport {
     type Wire = TlsStream;
-    type Accepter = TlsAccepter;
-    type Connector = TlsConnector;
+    type Inbound = TlsInbound;
+    type Outbound = TlsOutbound;
 }

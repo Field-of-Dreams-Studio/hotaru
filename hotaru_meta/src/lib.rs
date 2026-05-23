@@ -1901,8 +1901,8 @@ pub fn ctor(_attr: TokenStream, item: TokenStream) -> TokenStream {
     output
 }
 
-/// Helper macro to generate lazy static declarations
-/// Used by LApp!, LUrl!, and LPattern! macros
+/// Helper macro to generate lazy static declarations.
+/// Used by LServer!, LClient!, LUrl!, and LPattern! macros.
 macro_rules! generate_lazy_static {
     ($type_name:expr) => {
         |input: TokenStream| -> TokenStream {
@@ -1982,21 +1982,38 @@ macro_rules! generate_lazy_static {
     };
 }
 
-/// `LApp!` - Creates a lazy static App instance
+/// `LServer!` - Creates a lazy static Server instance.
 ///
 /// # Usage
 /// ```rust
-/// LApp!(APP = App::new().build());
+/// LServer!(APP = Server::new().build());
 /// ```
 ///
 /// # Expansion
 /// ```rust
-/// pub static APP: SApp = Lazy::new(|| App::new().build());
+/// pub static APP: SServer = Lazy::new(|| Server::new().build());
 /// ```
 #[allow(non_snake_case)]
 #[proc_macro]
-pub fn LApp(input: TokenStream) -> TokenStream {
-    generate_lazy_static!("SApp")(input)
+pub fn LServer(input: TokenStream) -> TokenStream {
+    generate_lazy_static!("SServer")(input)
+}
+
+/// `LClient!` - Creates a lazy static Client instance.
+///
+/// # Usage
+/// ```rust
+/// LClient!(CLIENT = Client::new().build());
+/// ```
+///
+/// # Expansion
+/// ```rust
+/// pub static CLIENT: SClient = Lazy::new(|| Client::new().build());
+/// ```
+#[allow(non_snake_case)]
+#[proc_macro]
+pub fn LClient(input: TokenStream) -> TokenStream {
+    generate_lazy_static!("SClient")(input)
 }
 
 /// `LUrl!` - Creates a lazy static Url instance
