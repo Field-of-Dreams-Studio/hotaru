@@ -1,4 +1,6 @@
-A major update of Hotaru is scheduled in 16/May/2026. There will not be further release before that. 
+A major update of Hotaru is scheduled on 23/May/2026. There will not be further release before that. 
+
+Hotaru 0.8.0 is released on 23/May/2026. 
 
 # Hotaru Web Framework
 
