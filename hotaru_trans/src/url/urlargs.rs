@@ -2,7 +2,14 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 
 use crate::ctor::gen_ctor;
 use crate::url::url_func::UrlFunc;
-use crate::url::urlexpr::UrlExpr; 
+use crate::url::urlexpr::UrlExpr;
+
+/// Which registration shape `reg_func` emits.
+#[derive(Clone, Copy)]
+pub enum UrlKind {
+    Endpoint,
+    Outpoint,
+}
 
 /// Arguments for the `url` macro.
 pub struct UrlArgs {
@@ -27,15 +34,20 @@ impl UrlArgs {
         }
     }
 
-    pub fn reg_func(&self) -> TokenStream {
+    pub fn reg_func(&self, kind: UrlKind) -> TokenStream {
         // Generate constructor attributes using gen_ctor()
         let ctor_attrs = gen_ctor();
 
+        // Endpoint chain handler = __wrapper_<fn>; outpoint = __outpoint_final_<fn>.
+        let handler_prefix = match kind {
+            UrlKind::Endpoint => "__wrapper_",
+            UrlKind::Outpoint => "__outpoint_final_",
+        };
         let mut reg_func = TokenStream::new();
         reg_func.extend(vec![TokenTree::Ident(Ident::new(
-            &format!("__wrapper_{}", &self.op.fn_name),
+            &format!("{}{}", handler_prefix, &self.op.fn_name),
             Span::call_site(),
-        ))]); 
+        ))]);
 
         let mut cont = TokenStream::new(); 
 
@@ -119,10 +131,12 @@ impl UrlArgs {
             TokenTree::Punct(Punct::new(';', Spacing::Alone)),
         ]); 
 
-        if let Some(mws) = self.middlewares.clone() {
-            // Middleware inheritance implementation
-            // This section handles the special ".." token which inherits middleware from the protocol's root URL
+        // Outpoint always needs a middlewares vec (to hold the prepended
+        // __Outpoint_MW_<fn>); endpoint only needs it when the user
+        // supplied middlewares.
+        let needs_mw_vec = matches!(kind, UrlKind::Outpoint) || self.middlewares.is_some();
 
+        if needs_mw_vec {
             // let mut middlewares: Vec<std::sync::Arc<dyn hotaru::hotaru_core::app::middleware::AsyncMiddleware<Protocol> + 'static>> = vec![];
             let mut mw_decl = TokenStream::new();
             mw_decl.extend(vec![
@@ -166,8 +180,52 @@ impl UrlArgs {
                 TokenTree::Group(Group::new(Delimiter::Bracket, TokenStream::new())),
                 TokenTree::Punct(Punct::new(';', Spacing::Alone)),
             ]);
-
             cont.extend(mw_decl);
+        }
+
+        // Prepend the outpoint user-body middleware (`__Outpoint_MW_<fn>`)
+        // so it wraps the entire inner chain. `MWFunc::expand` emits a
+        // `return_self()` factory, so `Arc::new(...::return_self())` gives
+        // us the concrete-typed handle that coerces to dyn AsyncMiddleware.
+        if matches!(kind, UrlKind::Outpoint) {
+            // middlewares.push(std::sync::Arc::new(__Outpoint_MW_<fn>::return_self()));
+            let mut return_self_call = TokenStream::new();
+            return_self_call.extend(vec![
+                TokenTree::Ident(Ident::new(
+                    &format!("__Outpoint_MW_{}", &self.op.fn_name),
+                    Span::call_site(),
+                )),
+                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                TokenTree::Ident(Ident::new("return_self", Span::call_site())),
+                TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
+            ]);
+            let mut arc_new = TokenStream::new();
+            arc_new.extend(vec![
+                TokenTree::Ident(Ident::new("std", Span::call_site())),
+                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                TokenTree::Ident(Ident::new("sync", Span::call_site())),
+                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                TokenTree::Ident(Ident::new("Arc", Span::call_site())),
+                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                TokenTree::Ident(Ident::new("new", Span::call_site())),
+                TokenTree::Group(Group::new(Delimiter::Parenthesis, return_self_call)),
+            ]);
+            cont.extend(vec![
+                TokenTree::Ident(Ident::new("middlewares", Span::call_site())),
+                TokenTree::Punct(Punct::new('.', Spacing::Alone)),
+                TokenTree::Ident(Ident::new("push", Span::call_site())),
+                TokenTree::Group(Group::new(Delimiter::Parenthesis, arc_new)),
+                TokenTree::Punct(Punct::new(';', Spacing::Alone)),
+            ]);
+        }
+
+        if let Some(mws) = self.middlewares.clone() {
+            // Middleware inheritance implementation
+            // This section handles the special ".." token which inherits middleware from the protocol's root URL
 
             // Process middleware array, handling both regular middleware and the special ".." inheritance token
             // The ".." token inherits all middleware from the protocol's root URL handler
@@ -273,7 +331,9 @@ impl UrlArgs {
                     cont.extend(push_call);
                 }
             }
+        }
 
+        if needs_mw_vec {
             // binding.set_middlewares(middlewares);
             cont.extend(vec![
                 TokenTree::Ident(Ident::new("binding", Span::call_site())),
@@ -289,7 +349,7 @@ impl UrlArgs {
                 })),
                 TokenTree::Punct(Punct::new(';', Spacing::Alone)),
             ]);
-        } 
+        }
         
         // Modify url_expr to inject the protocol type parameter
         let modified_url_expr = self.url_expr.expand(
@@ -322,7 +382,16 @@ impl UrlArgs {
         let mut tokens = TokenStream::new();
         tokens.extend(self.op.generate_function());
         tokens.extend(self.op.wrapper_function());
-        tokens.extend(self.reg_func());
+        tokens.extend(self.reg_func(UrlKind::Endpoint));
+        tokens
+    }
+
+    /// Outpoint orchestrator: __Outpoint_MW_<fn> + __outpoint_final_<fn> + ctor.
+    pub fn expand_outpoint(&self) -> TokenStream {
+        let mut tokens = TokenStream::new();
+        tokens.extend(self.op.expand_middleware());
+        tokens.extend(self.op.outpoint_final_function());
+        tokens.extend(self.reg_func(UrlKind::Outpoint));
         tokens
     }
 }

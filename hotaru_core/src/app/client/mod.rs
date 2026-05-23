@@ -207,4 +207,48 @@ impl<TS: TransportSpec> Client<TS> {
         let outpoint = self.resolve_with_limit::<P>(path, max_depth).await?;
         Ok(outpoint.run(ctx).await)
     }
+
+    /// Run a named outpoint: look up the access point, open a wire, build the
+    /// context, run its chain, return the response. Outer `UrlError` covers
+    /// "name not found"; inner protocol error covers I/O and chain failures.
+    pub async fn request_fn<P>(
+        self: &Arc<Self>,
+        name: &str,
+        request: <P::Context as RequestContext>::Request,
+    ) -> Result<
+        Result<<P::Context as RequestContext>::Response, <P::Context as RequestContext>::Error>,
+        UrlError,
+    >
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: From<std::io::Error>,
+    {
+        let entry = self
+            .registry
+            .entry::<P>()
+            .ok_or(UrlError::ProtocolNotFound)?;
+        let ap = entry
+            .access_points
+            .get(name)
+            .ok_or_else(|| UrlError::InvalidPath(name.to_string()))?;
+        let node = ap
+            .resolve()
+            .ok_or_else(|| UrlError::InvalidPath(name.to_string()))?;
+
+        // Inner: connect-IO + chain errors land in CtxError<P>.
+        let inner: Result<_, <P::Context as RequestContext>::Error> = async {
+            let wire = self.connect().await?;
+            let channel = entry.create_channel(wire);
+
+            let mut ctx = P::Context::default();
+            P::install_channel(&mut ctx, channel);
+            ctx.inject_request(request);
+
+            let ctx = node.run(ctx).await?;
+            Ok(ctx.into_response())
+        }
+        .await;
+
+        Ok(inner)
+    }
 }

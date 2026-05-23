@@ -175,6 +175,105 @@ impl UrlFunc {
         tokens
     }
 
+    /// Emit `__outpoint_final_<fn_name>` — the outpoint chain's final handler.
+    /// Lifted to `AsyncFinalHandler<Ctx>` via the blanket `Fn(C) -> Fut` impl.
+    //
+    // Expanded form:
+    //
+    // async fn __outpoint_final_<fn_name>(
+    //     <req_var_name>: <P as Protocol>::Context,
+    // ) -> Result<
+    //     <P as Protocol>::Context,
+    //     <<P as Protocol>::Context as RequestContext>::Error,
+    // > {
+    //     <P as Protocol>::send(<req_var_name>).await
+    // }
+    pub fn outpoint_final_function(&self) -> TokenStream {
+        // <req_var_name>: <P as Protocol>::Context
+        let mut arguments = TokenStream::new();
+        arguments.extend(vec![
+            TokenTree::Ident(self.req_var_name.clone()),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+            TokenTree::Ident(self.protocol.clone()),
+            TokenTree::Ident(Ident::new("as", Span::call_site())),
+            TokenTree::Ident(Ident::new("Protocol", Span::call_site())),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("Context", Span::call_site())),
+        ]);
+
+        // <P as Protocol>::send(<req_var_name>).await
+        let mut body = TokenStream::new();
+        body.extend(vec![
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+            TokenTree::Ident(self.protocol.clone()),
+            TokenTree::Ident(Ident::new("as", Span::call_site())),
+            TokenTree::Ident(Ident::new("Protocol", Span::call_site())),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("send", Span::call_site())),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, {
+                let mut g = TokenStream::new();
+                g.extend(std::iter::once(TokenTree::Ident(self.req_var_name.clone())));
+                g
+            })),
+            TokenTree::Punct(Punct::new('.', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("await", Span::call_site())),
+        ]);
+
+        let final_name = Ident::new(
+            &format!("__outpoint_final_{}", self.fn_name),
+            Span::call_site(),
+        );
+
+        let mut tokens = TokenStream::new();
+        tokens.extend(vec![
+            TokenTree::Ident(Ident::new("async", Span::call_site())),
+            TokenTree::Ident(Ident::new("fn", Span::call_site())),
+            TokenTree::Ident(final_name),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, arguments)),
+            TokenTree::Punct(Punct::new('-', Spacing::Joint)),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            // Result<
+            TokenTree::Ident(Ident::new("Result", Span::call_site())),
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+            //   <P as Protocol>::Context,
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+            TokenTree::Ident(self.protocol.clone()),
+            TokenTree::Ident(Ident::new("as", Span::call_site())),
+            TokenTree::Ident(Ident::new("Protocol", Span::call_site())),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("Context", Span::call_site())),
+            TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+            //   <<P as Protocol>::Context as RequestContext>::Error
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+            TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+            TokenTree::Ident(self.protocol.clone()),
+            TokenTree::Ident(Ident::new("as", Span::call_site())),
+            TokenTree::Ident(Ident::new("Protocol", Span::call_site())),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("Context", Span::call_site())),
+            TokenTree::Ident(Ident::new("as", Span::call_site())),
+            TokenTree::Ident(Ident::new("RequestContext", Span::call_site())),
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("Error", Span::call_site())),
+            // >
+            TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Group(Group::new(Delimiter::Brace, body)),
+        ]);
+
+        tokens
+    }
+
     /// Expand the outpoint body into a `__Outpoint_MW_<fn_name>` struct
     /// plus its `AsyncMiddleware` trait impl (via [`MWFunc::expand`]).
     pub fn expand_middleware(&self) -> TokenStream {
