@@ -7,8 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time;
 
 use hotaru_core::executable::middleware::AsyncMiddleware;
-use hotaru_core::connection::Protocol;
-use hotaru_http::context::HttpContext;
+use hotaru_core::protocol::{Protocol, RequestContext};
 use hotaru_http::traits::HTTP;
 use hotaru_trans::middleware;
 
@@ -135,13 +134,13 @@ middleware!(
         });
         session.touch(ttl); // Refresh session expiration
         req.params.set(session);
-        let mut req = next(req).await; // Continue middleware chain
+        let mut req = next(req).await?; // Continue middleware chain
         req.response = req.response.add_cookie(
             "session_id",
             Cookie::new(session_id.to_string())
                 .path("/")
         ); // Set cookie with session ID
-        req
+        Ok(req)
     }
 );
 

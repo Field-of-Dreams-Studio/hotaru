@@ -1,5 +1,5 @@
 use hotaru_core::executable::middleware::AsyncMiddleware;
-use hotaru_core::connection::Protocol;
+use hotaru_core::protocol::{Protocol, RequestContext};
 use hotaru_http::traits::HTTP;
 use hotaru_http::http_value::{HttpMethod, StatusCode};
 use hotaru_http::response::response_templates;
@@ -25,13 +25,13 @@ middleware! {
                 response.meta.set_attribute(key, value);
             }
             req.response = response;
-            return req;
+            return Ok(req);
         }
-        let mut req = next(req).await;
+        let mut req = next(req).await?;
         for (key, value) in cors_settings.write_headers(&req.meta().get_header("origin").unwrap_or("".to_string()), false) {
             req.response.meta.set_attribute(key, value);
         }
-        return req;
+        Ok(req)
 
     }
 }

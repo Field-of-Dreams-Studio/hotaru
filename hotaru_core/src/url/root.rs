@@ -327,24 +327,37 @@ mod tests {
 
     use crate::{
         executable::{ExecutableBinding, middleware::AsyncFinalHandler},
-        protocol::ProtocolRole,
+        protocol::{Channel, ProtocolRole},
         url::PathPattern,
     };
 
     use super::*;
 
+    #[derive(Clone)]
+    struct TestChannel;
+
+    impl Channel for TestChannel {
+        fn is_open(&self) -> bool { true }
+        fn close(&self) {}
+    }
+
+    #[derive(Default)]
     struct TestContext;
 
     impl RequestContext for TestContext {
         type Request = ();
         type Response = ();
-        type Error = std::io::Error; 
+        type Error = std::io::Error;
+        type Channel = TestChannel;
 
         fn handle_error(&mut self) {}
 
         fn role(&self) -> ProtocolRole {
             ProtocolRole::Server
         }
+
+        fn inject_request(&mut self, _: Self::Request) {}
+        fn into_response(self) -> Self::Response {}
     }
 
     fn binding_with_handler() -> ExecutableBinding<TestContext> {

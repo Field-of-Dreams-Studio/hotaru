@@ -14,7 +14,7 @@ members = [
     # "h2per",
     # "hotaru_grpc",
 
-    "multi_protocol_example",
+    # "multi_protocol_example",
     "example_hotaru",
     # "example_hotaru_2",
     # "hyper_hotaru_example",

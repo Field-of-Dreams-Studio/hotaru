@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use akari::Value;
 use hotaru_core::executable::middleware::AsyncMiddleware;
 use hotaru_http::cookie::Cookie;
-use hotaru_core::connection::Protocol;
+use hotaru_core::protocol::{Protocol, RequestContext};
 use hotaru_http::traits::HTTP;
 use hotaru_trans::middleware;
 
@@ -101,7 +101,7 @@ middleware!(
         println!("CookieSession: Setting session in params");
         req.params.set(session);
         println!("CookieSession: About to call next middleware");
-        let mut req = next(req).await; // Continue middleware chain
+        let mut req = next(req).await?; // Continue middleware chain
         println!("CookieSession: Returned from middleware chain");
 
         let (session, is_modified) = req
@@ -126,6 +126,6 @@ middleware!(
                 ); // Set cookie with session ID
         }
 
-        req
+        Ok(req)
     }
 );

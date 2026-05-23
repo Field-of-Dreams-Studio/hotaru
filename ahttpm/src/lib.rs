@@ -186,11 +186,12 @@ fn convert_expr_to_pathpattern(expr: &Expr) -> proc_macro2::TokenStream {
 /// A macro for rendering templates with context data.
 ///
 /// # Example
-/// ```no_run
-/// use hotaru::ahttpm::akari_render;
-/// use hotaru::response_templates::template_response;
-/// use hotaru::Value;
-/// use hotaru::object;
+/// ```ignore
+/// // (Reach the macro and the helpers below from the `hotaru` umbrella crate
+/// // — they are re-exported in `hotaru::ahttpm::akari_render`,
+/// // `hotaru::response_templates::template_response`, `hotaru::Value`,
+/// // and `hotaru::object` respectively.)
+///
 /// // Simple template with no context
 /// akari_render!("template.html");
 ///
