@@ -1,4 +1,4 @@
-use crate::protocol::{ProtocolError, ProtocolRole};
+use crate::protocol::{Channel, ProtocolError, ProtocolRole};
 
 // ----------------------------------------------------------------------------
 // RequestContext Trait
@@ -11,7 +11,7 @@ use crate::protocol::{ProtocolError, ProtocolRole};
 ///
 /// Both server and client contexts implement this trait, with the role
 /// determining the direction of communication.
-pub trait RequestContext: Send + 'static {
+pub trait RequestContext: Default + Send + 'static {
     /// The request type for this context
     type Request;
 
@@ -22,9 +22,23 @@ pub trait RequestContext: Send + 'static {
     /// that owns this context.
     type Error: ProtocolError;
 
+    /// Type-system anchor for the channel of the current exchange. No
+    /// accessor is exposed on this trait; the matching `Protocol` impl
+    /// reaches the channel through visibility-controlled accessors on
+    /// the concrete context type.
+    type Channel: Channel;
+
     /// Handle protocol errors (bad request for server, bad response for client)
     fn handle_error(&mut self);
 
     /// Get the role of this context (Server or Client)
     fn role(&self) -> ProtocolRole;
+
+    /// Install a user-provided request into a freshly-built context.
+    /// Called by `Client::request_fn` before running the outpoint chain.
+    fn inject_request(&mut self, request: Self::Request);
+
+    /// Consume the context and return its response. Called by
+    /// `Client::request_fn` / `Server::request_fn` after the chain finishes.
+    fn into_response(self) -> Self::Response;
 }

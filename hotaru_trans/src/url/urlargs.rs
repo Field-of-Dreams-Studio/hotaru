@@ -317,7 +317,8 @@ impl UrlArgs {
         tokens
     }
 
-    pub fn expand(&self) -> TokenStream {
+    /// Endpoint orchestrator: inner fn + wrapper fn + registration ctor.
+    pub fn expand_endpoint(&self) -> TokenStream {
         let mut tokens = TokenStream::new();
         tokens.extend(self.op.generate_function());
         tokens.extend(self.op.wrapper_function());

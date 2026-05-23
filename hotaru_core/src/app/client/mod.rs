@@ -121,7 +121,10 @@ impl<TS: TransportSpec> Client<TS> {
         self.runtime.get_static::<T>(key).unwrap_or_default()
     }
 
-    /// Returns the configured outbound connection-pool size.
+    /// Returns the configured client worker count.
+    ///
+    /// Client worker scheduling is not implemented yet. This currently only
+    /// exposes the configured value; it does not create a client worker pool.
     pub fn get_worker(self: &Arc<Self>) -> usize {
         self.config.worker()
     }

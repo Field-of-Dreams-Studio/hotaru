@@ -6,7 +6,7 @@ use crate::{app::common::RuntimeConfig, protocol::ProtocolFlow};
 use crate::connection::TransportSpec;
 use crate::connection::stream::ConnStream;
 use crate::protocol::ProtocolRole;
-use crate::url::{UrlNode, UrlRoot};
+use crate::url::UrlRoot;
 
 use super::{Message, RequestContext, Stream as ProtocolStream, Channel};
 
@@ -42,8 +42,8 @@ pub trait Protocol: Clone + Send + Sync + 'static {
     /// The protocol's message format.
     type Message: Message;
 
-    /// The protocol's request context type.
-    type Context: RequestContext; 
+    /// Context type, pinned so its `Channel` equals `Self::Channel`.
+    type Context: RequestContext<Channel = Self::Channel>;
 
     /// Returns the name of this protocol (for logging and diagnostics).
     fn name(&self) -> &'static str;
@@ -89,11 +89,12 @@ pub trait Protocol: Clone + Send + Sync + 'static {
         root: Arc<UrlRoot<Self::Context, Self::TS>>,
     ) -> Result<ProtocolFlow, CtxError<Self>>; 
 
-    /// Client-side: send the request currently in `ctx` and read the response.
-    /// Invoked by the generated outpoint final handler.
-    async fn send(
-        channel: &Self::Channel,
-        ctx: &mut Self::Context,
-        outpoint: &Arc<UrlNode<Self::Context, Self::TS>>,
-    ) -> Result<ProtocolFlow, CtxError<Self>>;
+    /// Outpoint final handler: send the request in `ctx`, read the response
+    /// back into `ctx`, return ctx. Impl reads channel + request + any
+    /// safety config from ctx via same-crate accessors on the concrete type.
+    async fn send(ctx: Self::Context) -> Result<Self::Context, CtxError<Self>>;
+
+    /// Install a channel into a freshly-built context. Impl writes the
+    /// channel into Context's private slot via its same-crate accessor.
+    fn install_channel(ctx: &mut Self::Context, channel: Self::Channel);
 }

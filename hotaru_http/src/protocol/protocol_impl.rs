@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use hotaru_core::{
     app::common::RuntimeConfig,
     connection::{ConnStream, TransportSpec},
-    protocol::{Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext},
-    url::{UrlNode, UrlRoot},
+    protocol::{Channel, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext},
+    url::UrlRoot,
 };
 use tokio::io::BufReader;
 use tokio::net::TcpStream;
@@ -21,6 +21,7 @@ use crate::{
     channel::{Http1Channel, HttpChannel},
     context::HttpContext,
     protocol::{
+        error::HttpError,
         helpers::{error_response_from, is_keep_alive, is_response_keep_alive, not_found_response},
     },
     security::safety::HttpSafety,
@@ -171,13 +172,14 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         };
 
         // 3. Build context, run chain. Addresses come from the channel's meta.
-        let ctx = HttpContext::new_server(
+        let mut ctx = HttpContext::new_server(
             runtime.clone(),
             endpoint.clone(),
             request,
             channel.remote_addr(),
             channel.local_addr(),
         );
+        ctx.install_channel(channel.clone());
 
         match endpoint.run(ctx).await {
             Ok(ctx) => {
@@ -194,10 +196,13 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
     }
 
     async fn send(
-        channel: &Self::Channel,
-        ctx: &mut Self::Context,
-        _outpoint: &Arc<UrlNode<Self::Context, Self::TS>>,
-    ) -> Result<ProtocolFlow, <Self::Context as RequestContext>::Error> {
+        mut ctx: Self::Context,
+    ) -> Result<Self::Context, <Self::Context as RequestContext>::Error> {
+        let channel = ctx
+            .channel()
+            .cloned()
+            .ok_or_else(|| HttpError::ProtocolViolation("outpoint channel is not installed".to_string()))?;
+
         let safety = ctx.safety.clone();
 
         if ctx.request.meta.get_host().is_none() {
@@ -209,11 +214,14 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         channel.send_request(ctx.request.clone()).await?;
         ctx.response = channel.parse_response(&safety).await?;
 
-        Ok(if is_response_keep_alive(&ctx.response) {
-            ProtocolFlow::Continue
-        } else {
-            ProtocolFlow::Close
-        })
+        if !is_response_keep_alive(&ctx.response) {
+            channel.close();
+        }
+        Ok(ctx)
+    }
+
+    fn install_channel(ctx: &mut Self::Context, channel: Self::Channel) {
+        ctx.install_channel(channel);
     }
 }
 

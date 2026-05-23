@@ -13,6 +13,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::io::{AsyncBufRead, AsyncWrite, BufReader, BufWriter};
 
+use crate::channel::Http1Channel;
 use crate::message::body::HttpBody;
 use crate::message::http_value::{HttpMethod, StatusCode};
 use crate::protocol::HttpError;
@@ -57,6 +58,9 @@ pub struct HttpContext<TS: TransportSpec = crate::connection::tcp::TcpTransport>
     // Shared fields for middleware/handlers
     pub params: Params,
     pub locals: Locals,
+
+    // Protocol-private exchange channel. Kept off the RequestContext trait.
+    channel: Option<Http1Channel<TS::Wire>>,
 }
 
 // Type alias for backward compatibility
@@ -86,6 +90,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
             local_addr,
             params: Default::default(),
             locals: Default::default(),
+            channel: None,
         }
     }
 
@@ -101,7 +106,16 @@ impl<TS: TransportSpec> HttpContext<TS> {
             local_addr: None,
             params: Default::default(),
             locals: Default::default(),
+            channel: None,
         }
+    }
+
+    pub(crate) fn install_channel(&mut self, channel: Http1Channel<TS::Wire>) {
+        self.channel = Some(channel);
+    }
+
+    pub(crate) fn channel(&self) -> Option<&Http1Channel<TS::Wire>> {
+        self.channel.as_ref()
     }
 
     // /// Creates a new Request Context (backward compatibility)
@@ -497,6 +511,7 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
     type Request = HttpRequest;
     type Response = HttpResponse;
     type Error = crate::protocol::HttpError;
+    type Channel = Http1Channel<TS::Wire>;
 
     fn handle_error(&mut self) {
         match &self.executable {
@@ -521,6 +536,20 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
             Executable::Request { .. } => ProtocolRole::Server,
             Executable::<TS>::Response => ProtocolRole::Client,
         }
+    }
+
+    fn inject_request(&mut self, request: Self::Request) {
+        self.request(request);
+    }
+
+    fn into_response(self) -> Self::Response {
+        self.response
+    }
+}
+
+impl<TS: TransportSpec> Default for HttpContext<TS> {
+    fn default() -> Self {
+        Self::new_client(String::new(), HttpSafety::default())
     }
 }
 
