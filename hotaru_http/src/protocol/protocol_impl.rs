@@ -21,8 +21,7 @@ use crate::{
     channel::{Http1Channel, HttpChannel},
     context::HttpContext,
     protocol::{
-        error::HttpError,
-        helpers::{error_response_from, is_keep_alive, not_found_response},
+        helpers::{error_response_from, is_keep_alive, is_response_keep_alive, not_found_response},
     },
     security::safety::HttpSafety,
 };
@@ -195,14 +194,26 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
     }
 
     async fn send(
-        _channel: &Self::Channel,
-        _ctx: &mut Self::Context,
+        channel: &Self::Channel,
+        ctx: &mut Self::Context,
         _outpoint: &Arc<UrlNode<Self::Context, Self::TS>>,
     ) -> Result<ProtocolFlow, <Self::Context as RequestContext>::Error> {
-        Err(HttpError::Io(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "P::send is implemented in Stage 5",
-        )))
+        let safety = ctx.safety.clone();
+
+        if ctx.request.meta.get_host().is_none() {
+            if let Some(host) = ctx.host.clone() {
+                ctx.request.meta.set_host(Some(host));
+            }
+        }
+
+        channel.send_request(ctx.request.clone()).await?;
+        ctx.response = channel.parse_response(&safety).await?;
+
+        Ok(if is_response_keep_alive(&ctx.response) {
+            ProtocolFlow::Continue
+        } else {
+            ProtocolFlow::Close
+        })
     }
 }
 

@@ -19,6 +19,8 @@ use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::sync::Mutex;
 
 use crate::channel::http_channel::HttpChannel;
+use crate::message::body::HttpBody;
+use crate::message::http_value::StatusCode;
 use crate::message::request::HttpRequest;
 use crate::message::response::HttpResponse;
 use crate::protocol::error::HttpError;
@@ -86,14 +88,35 @@ impl<W: ConnStream> HttpChannel for Http1Channel<W> {
 
     async fn send_request(&self, request: HttpRequest) -> Result<(), HttpError> {
         let mut writer = self.writer.lock().await;
-        request.send(&mut *writer).await.map_err(HttpError::Io)?;
-        writer.flush().await.map_err(HttpError::Io)?;
+        if let Err(err) = request.send(&mut *writer).await {
+            self.open.store(false, Ordering::Release);
+            return Err(HttpError::Io(err));
+        }
+        if let Err(err) = writer.flush().await {
+            self.open.store(false, Ordering::Release);
+            return Err(HttpError::Io(err));
+        }
         Ok(())
     }
 
     async fn parse_response(&self, safety: &HttpSafety) -> Result<HttpResponse, HttpError> {
         let mut reader = self.reader.lock().await;
-        Ok(HttpResponse::parse_lazy(&mut *reader, safety, false).await)
+        let response = HttpResponse::parse_lazy(&mut *reader, safety, false).await;
+
+        // The current parser returns `HttpResponse::default()` on parse failure.
+        // Treat an empty default response as a closed/broken channel for now.
+        if response.meta.start_line.status_code() == StatusCode::OK
+            && response.meta.header.is_empty()
+            && matches!(response.body, HttpBody::Unparsed)
+        {
+            self.open.store(false, Ordering::Release);
+            return Err(HttpError::Io(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "server closed connection",
+            )));
+        }
+
+        Ok(response)
     }
 
     fn local_addr(&self) -> Option<SocketAddr> {

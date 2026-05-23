@@ -4,6 +4,7 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 
 use crate::helper::generate_compile_error;
 
+#[derive(Clone)]
 pub struct OuterAttr {
     pub attrs: Vec<TokenStream>,
 }

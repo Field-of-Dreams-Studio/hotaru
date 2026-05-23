@@ -147,7 +147,7 @@ impl UrlExpr {
             TokenTree::Group(Group::new(Delimiter::Parenthesis, {
                 let mut g = TokenStream::new();
                 g.extend(vec![
-                    TokenTree::Literal(Literal::string("failed to register endpoint")),
+                    TokenTree::Literal(Literal::string("failed to register URL")),
                 ]); 
                 g 
             })), 

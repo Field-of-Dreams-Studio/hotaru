@@ -1,6 +1,8 @@
 use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
-use crate::OuterAttr; 
+use crate::OuterAttr;
+use crate::middleware::MWFunc;
+use crate::url::send::rewrite_send;
 
 pub struct UrlFunc {
     pub is_pub: bool,
@@ -82,7 +84,7 @@ impl UrlFunc {
         tokens
     }
 
-    pub fn wrapper_function(&self) -> TokenStream {
+    pub(crate) fn wrapper_function(&self) -> TokenStream {
         let mut arguments = TokenStream::new();
         arguments.extend(vec![
             TokenTree::Ident(Ident::new("mut", Span::call_site())),
@@ -172,5 +174,28 @@ impl UrlFunc {
         ]);
         tokens
     }
-} 
 
+    /// Expand the outpoint body into a `__Outpoint_MW_<fn_name>` struct
+    /// plus its `AsyncMiddleware` trait impl (via [`MWFunc::expand`]).
+    pub fn expand_middleware(&self) -> TokenStream {
+        // Rewrite `send;` -> `<req> = next(<req>).await?;`
+        let body = rewrite_send(self.fn_cont.clone(), &self.req_var_name);
+
+        // Build an MWFunc with the synthetic name.
+        let mw_name = Ident::new(
+            &format!("__Outpoint_MW_{}", self.fn_name),
+            Span::call_site(),
+        );
+        let mw = MWFunc::new(
+            false,
+            mw_name,
+            self.protocol.clone(),
+            self.req_var_name.clone(),
+            body,
+            self.attrs.clone(),
+        );
+
+        // Reuse the middleware codegen.
+        mw.expand()
+    }
+}

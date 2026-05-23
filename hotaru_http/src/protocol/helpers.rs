@@ -17,6 +17,16 @@ pub fn is_keep_alive(request: &HttpRequest) -> bool {
     }
 }
 
+/// Check whether an HTTP response allows the channel to remain open.
+pub fn is_response_keep_alive(response: &HttpResponse) -> bool {
+    if let Some(connection) = response.meta.header.get("connection") {
+        connection.as_str().to_lowercase() != "close"
+    } else {
+        // HTTP/1.1 defaults to keep-alive
+        true
+    }
+}
+
 /// Build a minimal HTML error page body for the given status code.
 ///
 /// Produces a self-contained HTML document with a single `<h1>` showing the
