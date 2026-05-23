@@ -5,7 +5,7 @@ use hotaru_core::executable::middleware::AsyncMiddleware;
 use hotaru_http::cookie::Cookie;
 use hotaru_core::connection::Protocol;
 use hotaru_http::traits::HTTP;
-use hotaru_meta::middleware;
+use hotaru_trans::middleware;
 
 use hotaru_lib::ende::aes;
 

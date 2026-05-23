@@ -4,7 +4,7 @@ version = "0.7.0"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"] 
 description = "Hyper integration for Hotaru" 
-license = "GPL-3.0" 
+license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru" 
 homepage = "https://fds.rs" 
 categories = ["network-programming", "web-programming::http-server" ]
@@ -14,7 +14,7 @@ readme = "readme.md"
 [dependencies] 
 hotaru_meta = { path = "../hotaru_meta", version="0.8.0"} 
 hotaru_core = { path = "../hotaru_core", version="0.8.0" }
-hotaru_lib = { path = "../hotaru_lib", version="0.7.3", features = ["url_encoding", "compression"]  }
+hotaru_lib = { path = "../hotaru_lib", version="0.8.0", features = ["url_encoding", "compression"]  }
 
 # Hyper and HTTP protocol support
 hyper = { version = "1.6.0", features = ["full", "http1", "http2", "server", "client"] }

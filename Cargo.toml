@@ -3,24 +3,23 @@ members = [
     "hotaru",
     "hotaru_core",
     "hotaru_trans",
-    # "hotaru_mqtt",
     
-    "hotaru_meta",
     "hotaru_tls",
     "hotaru_http", 
+    # "hotaru_mqtt",
     "hotaru_lib",
     "ahttpm",
 
     "htmstd",
     # "h2per",
-    "hotaru_grpc",
+    # "hotaru_grpc",
 
     "multi_protocol_example",
     "example_hotaru",
-    "example_hotaru_2",
-    "hyper_hotaru_example",
-    "hotaru_bench",
-    "hotaru_style_guide",
-    "tutorial_examples" 
+    # "example_hotaru_2",
+    # "hyper_hotaru_example",
+    # "hotaru_bench",
+    # "hotaru_style_guide",
+    # "tutorial_examples" 
 ] 
 resolver = "3" 

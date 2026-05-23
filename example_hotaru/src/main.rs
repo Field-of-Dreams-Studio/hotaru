@@ -57,6 +57,7 @@ endpoint! {
 // HttpBody variant the response landed in.
 endpoint! {
     APP.url("/example_outpoint_fetch"),
+    middleware = [LoggerMiddleware], 
 
     example_outpoint_fetch <HTTP> {
         let mut outbound = HttpRequest::default();

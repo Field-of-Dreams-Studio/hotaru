@@ -3,7 +3,7 @@ use hotaru_core::connection::Protocol;
 use hotaru_http::traits::HTTP;
 use hotaru_http::http_value::{HttpMethod, StatusCode};
 use hotaru_http::response::response_templates;
-use hotaru_meta::middleware;
+use hotaru_trans::middleware;
 
 use super::cors_settings::*;
 

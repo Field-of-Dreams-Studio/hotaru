@@ -432,7 +432,7 @@ endpoint! {
     APP.url("/api/standard"),
     
     pub standard_endpoint <HTTP> {
-        // Automatically inherits: GlobalLogger → GlobalMetrics → Handler
+        // Automatically inherits: GlobalLogger -> GlobalMetrics -> Handler
         text_response("Uses global middleware by default")
     }
 }
@@ -443,7 +443,7 @@ endpoint! {
     middleware = [.., LocalAuth],
     
     pub data_endpoint <HTTP> {
-        // Order: GlobalLogger → GlobalMetrics → LocalAuth → Handler
+        // Order: GlobalLogger -> GlobalMetrics -> LocalAuth -> Handler
         json_response(object!({ data: "secure" }))
     }
 }
@@ -454,7 +454,7 @@ endpoint! {
     middleware = [RateLimit, ..],
     
     pub public_endpoint <HTTP> {
-        // Order: RateLimit → GlobalLogger → GlobalMetrics → Handler
+        // Order: RateLimit -> GlobalLogger -> GlobalMetrics -> Handler
         text_response("Public data")
     }
 }
@@ -465,7 +465,7 @@ endpoint! {
     middleware = [Auth, .., Cache],
     
     pub complex_endpoint <HTTP> {
-        // Order: Auth → GlobalLogger → GlobalMetrics → Cache → Handler
+        // Order: Auth -> GlobalLogger -> GlobalMetrics -> Cache -> Handler
         json_response(object!({ complex: true }))
     }
 }
@@ -477,7 +477,7 @@ endpoint! {
     
     pub logged_endpoint <HTTP> {
         // Same as having no middleware field
-        // Order: GlobalLogger → GlobalMetrics → Handler
+        // Order: GlobalLogger -> GlobalMetrics -> Handler
         text_response("Logged")
     }
 }
@@ -489,7 +489,7 @@ endpoint! {
     
     pub isolated_endpoint <HTTP> {
         // IMPORTANT: Without .., global middleware is excluded
-        // Order: OnlyLocal → Handler (no global middleware)
+        // Order: OnlyLocal -> Handler (no global middleware)
         text_response("Isolated")
     }
 }

@@ -69,6 +69,26 @@ fn init_project() {
         println!("build.rs already exists");
     }
 
+    // Create or migrate the source entry without overwriting real user code.
+    let src_dir = Path::new("src");
+    let main_path = src_dir.join("main.rs");
+    let lib_path = src_dir.join("lib.rs");
+    if !main_path.exists() && !lib_path.exists() {
+        if let Err(e) = fs::create_dir_all(src_dir) {
+            eprintln!("Failed to create src directory: {}", e);
+            exit(1);
+        }
+        fs::write(&main_path, MAIN_RS_CONTENT).unwrap_or_else(|e| {
+            eprintln!("Failed to write src/main.rs: {}", e);
+            exit(1);
+        });
+        println!("Created src/main.rs");
+    } else if main_path.exists() {
+        migrate_or_replace_main(&main_path);
+    } else {
+        println!("Source entry already exists");
+    }
+
     println!("\nHotaru has been initialized in this project!");
     println!("Make sure to add the following to your Cargo.toml:");
     println!("\n[package]");
@@ -76,6 +96,51 @@ fn init_project() {
     println!("\n[dependencies]");
     println!("hotaru = \"{VERSION}\"");
     println!("{}", DEPS);
+}
+
+/// Update `src/main.rs` for the current public server names.
+///
+/// - Cargo's default hello-world file is replaced with the Hotaru starter.
+/// - Existing Hotaru starter code using removed `LApp!` / `SApp` names is
+///   migrated in place.
+/// - Other user code is left untouched.
+fn migrate_or_replace_main(main_path: &Path) {
+    let Ok(content) = fs::read_to_string(main_path) else {
+        println!("Source entry already exists");
+        return;
+    };
+
+    if is_default_cargo_main(&content) {
+        fs::write(main_path, MAIN_RS_CONTENT).unwrap_or_else(|e| {
+            eprintln!("Failed to write {}: {}", main_path.display(), e);
+            exit(1);
+        });
+        println!("Replaced default src/main.rs with Hotaru starter");
+        return;
+    }
+
+    let migrated = migrate_legacy_app_names(&content);
+    if migrated != content {
+        fs::write(main_path, migrated).unwrap_or_else(|e| {
+            eprintln!("Failed to update {}: {}", main_path.display(), e);
+            exit(1);
+        });
+        println!("Updated src/main.rs from LApp/SApp to LServer/SServer");
+    } else {
+        println!("Source entry already exists");
+    }
+}
+
+fn is_default_cargo_main(content: &str) -> bool {
+    let compact: String = content.chars().filter(|c| !c.is_whitespace()).collect();
+    compact == r#"fnmain(){println!("Hello,world!");}"#
+}
+
+fn migrate_legacy_app_names(content: &str) -> String {
+    content
+        .replace("LApp!", "LServer!")
+        .replace("SApp", "SServer")
+        .replace("App::new()", "Server::new()")
 }
 
 /// Creates a new project with the given app name.
@@ -163,7 +228,7 @@ hotaru = "{VERSION}"
 /// - `run`: Runs `cargo run` with any extra arguments.
 /// - `release`: Runs `cargo build --release` with any extra arguments, then copies templates.
 /// - `new <app_name>`: Creates a new project with the given name, writes a default `main.rs`
-///   with Starberry code, updates `Cargo.toml` with dependencies, and creates a new templates directory.
+///   with Hotaru code, updates `Cargo.toml` with dependencies, and creates a new templates directory.
 /// - `init`: Initialize hotaru in an existing Cargo project.
 ///
 /// # Example Usage
@@ -200,10 +265,10 @@ fn main() {
             r#"Usage: hotaru <build|run|release|new|init|version> [arguments]
 - `new <app_name>`: Creates a new project with the given name, a hello world program is provided by default. Dependencies are added to the Cargo.toml file. A templates directory is created at the same level as src.
 - `init`: Initialize hotaru in an existing Cargo project. Creates templates/programfiles directories and build.rs.
-- `build [arguments]`: Build the Starberry project (Do not use cargo build since it does not copies template). Any other extra arguments are passed to `cargo build`. 
-- `run`: Runs the hotaru project. 
-- `release`: Build the Starberry project in release mode (Do not use cargo build --release since it does not copies template). Any other extra arguments are passed to `cargo build`.  
-- `version`: Prints the version of Starberry. 
+- `build [arguments]`: Build the Hotaru project (Do not use cargo build since it does not copies template). Any other extra arguments are passed to `cargo build`.
+- `run`: Runs the hotaru project.
+- `release`: Build the Hotaru project in release mode (Do not use cargo build --release since it does not copies template). Any other extra arguments are passed to `cargo build`.
+- `version`: Prints the version of Hotaru.
 "#
         );
         exit(1);
@@ -243,7 +308,7 @@ fn main() {
             init_project();
         }
         "version" => {
-            println!("Starberry version: {}", VERSION);
+            println!("Hotaru version: {}", VERSION);
             exit(0);
         }
         _ => {
@@ -252,10 +317,10 @@ fn main() {
                 r#"Usage: hotaru <build|run|release|new|init|version> [arguments]
 - `new <app_name>`: Creates a new project with the given name, a hello world program is provided by default. Dependencies are added to the Cargo.toml file. A templates directory is created at the same level as src.
 - `init`: Initialize hotaru in an existing Cargo project. Creates templates/programfiles directories and build.rs.
-- `build [arguments]`: Build the Starberry project (Do not use cargo build since it does not copies template). Any other extra arguments are passed to `cargo build`. 
-- `run`: Runs the hotaru project. 
-- `release`: Build the Starberry project in release mode (Do not use cargo build --release since it does not copies template). Any other extra arguments are passed to `cargo build`.  
-- `version`: Prints the version of Starberry. 
+- `build [arguments]`: Build the Hotaru project (Do not use cargo build since it does not copies template). Any other extra arguments are passed to `cargo build`.
+- `run`: Runs the hotaru project.
+- `release`: Build the Hotaru project in release mode (Do not use cargo build --release since it does not copies template). Any other extra arguments are passed to `cargo build`.
+- `version`: Prints the version of Hotaru.
 "#
             );
             exit(1);

@@ -187,10 +187,10 @@ fn convert_expr_to_pathpattern(expr: &Expr) -> proc_macro2::TokenStream {
 ///
 /// # Example
 /// ```no_run
-/// use starberry_macro::akari_render;
-/// use starberry_core::http::response::request_templates::template_response;
-/// use starberry_core::Value;
-/// use starberry_core::object;
+/// use hotaru::ahttpm::akari_render;
+/// use hotaru::response_templates::template_response;
+/// use hotaru::Value;
+/// use hotaru::object;
 /// // Simple template with no context
 /// akari_render!("template.html");
 ///

@@ -1,10 +1,12 @@
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.7.6-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.0-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![GPL-3.0 License](https://img.shields.io/badge/license-GNU-blue.svg)](LICENSE)
 
 > Small, sweet, easy framework for full-stack Rust web applications
+
+License note: currently GPL-3.0; we are considering a change to LGPL or MIT (not decided).
 
 ## Former Codebase 
 
@@ -80,7 +82,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.7.3"
+hotaru = "0.8.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -89,12 +91,13 @@ tokio = { version = "1", features = ["full"] }
 Hotaru supports the following optional features:
 
 - **`debug`**: Enable debug logging for development and troubleshooting
+- **`https`**: HTTPS support — pulls in `hotaru_tls` and surfaces `HTTPS` / `TlsTransport` / `TlsOutboundTarget` / `TlsClientConfig`
 - **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation
 
   **Note**: When enabling `external-ctor`, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.7.3", features = ["external-ctor"] }
+  hotaru = { version = "0.8.0", features = ["external-ctor"] }
   ctor = "0.4.0"  # Required when external-ctor feature is enabled
   tokio = { version = "1", features = ["full"] }
   ```
@@ -209,7 +212,7 @@ endpoint! {
 
 - `endpoint!` and `middleware!` auto-register at startup (constructor-based), so there is no manual `router.register()` step.
 - Always use brace syntax `{}` and place doc comments inside the macro block.
-- Optional fn-style: `pub fn name(req: HTTP) { ... }`; angle-bracket form defaults to `req`.
+- Optional fn-style: `pub fn name(req: HTTP) { ... }` (new in 0.7.7); angle-bracket form (hotaru blocks) defaults to `req`.
 - Our philosophy is to wrap anything into macros to keep endpoints and middleware self-contained; see `macro_ra.md` for the minimal syntax and rationale.
 - Analyzer support is planned via custom analyzer tools.
 
@@ -305,23 +308,38 @@ Hotaru is built on a modular architecture:
 
 - **[hotaru](https://crates.io/crates/hotaru)** - Main framework with convenient API
 - **[hotaru_core](https://crates.io/crates/hotaru_core)** - Core protocol and routing engine
-- **[hotaru_meta](https://crates.io/crates/hotaru_meta)** - Procedural macros for endpoint! and middleware!
+- **[hotaru_trans](https://crates.io/crates/hotaru_trans)** - Procedural macros for endpoint! and middleware! 
+- **[hotaru_http](https://crates.io/crates/hotaru_http)** - HTTP implementation for Hotaru 
+- **[hotaru_tls](https://crates.io/crates/hotaru_tls)** - TLS/HTTPS implementation for Hotaru 
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
 ## 📋 Changelog 
 
-### 0.7.x (Current)
+### 0.8.0 (Current)
+- **Client / outpoint runtime**: new `Client<TS>` for outbound traffic, mirroring `Server<TS>`. Includes `Client::request_fn`, `Client::call_fn`, `Client::call_url` for one-shot and persistent outpoint invocation.
+- **`outpoint!` macro**: client-side counterpart to `endpoint!`. The user body becomes the outermost middleware; the `send;` marker triggers the registered chain (terminating in `<P as Protocol>::send(ctx).await`).
+- **`run!` and `call!` macros**: invocation-style sugar — `run!(APP<HTTP>::name, request)` -> `APP.request_fn::<HTTP>("name", request)`; `call!(APP<HTTP>::name)` -> `APP.call_fn::<HTTP>("name")` (plus `: "/path"` form for `call!`).
+- **Protocol trait reshape**: channel-based `open_channel` / `handle(channel, runtime, root)` / `send(ctx) -> ctx`, plus a per-protocol `install_channel(&mut ctx, channel)` bridge. `type Context: RequestContext<Channel = Self::Channel>` pins channel-type alignment.
+- **RequestContext trait**: `Default` supertrait; declares `type Channel: Channel` as a type anchor only (channel lives as a private field on each concrete context — no trait-exposed accessor). Adds `inject_request` / `into_response`. `type Error: ProtocolError` is the single source of truth for chain errors.
+- **Result-typed execution chain**: middleware, final handlers, `ExecutionChain::run`, and `UrlNode::run` all return `Result<C, <C as RequestContext>::Error>` — no boxing at the chain boundary.
+- **Named access points**: every registered endpoint/outpoint has an explicit name. `ProtocolEntry::register(name, path, step_names, binding, config)` is the single canonical funnel; `AccessPointTable` per protocol entry refreshes Node-variant entries on rebind. `Server::url(url, name, ...)` / `Client::url(url, name, ...)` are URL-first.
+- **Instance-based transports**: `TransportSpec::Inbound` / `Outbound` replace the old `Accepter` / `Connector` shape. `TcpInbound::bind(target)` and `TcpOutbound::build(target)` materialize once per `Server`/`Client`.
+- **HTTPS feature**: new `https` cargo feature on the umbrella `hotaru` crate forwards to `hotaru_http/tls`, surfacing `HTTPS`, `TlsTransport`, `TlsOutboundTarget`, `TlsClientConfig`. `HTTPS = Http1Protocol<TlsStream, TlsTransport>`.
+- **`Channel` trait + `ProtocolFlow`**: per-exchange close semantics (HTTP/1 closes the connection; multiplexed protocols may close only the stream). `Channel: Clone` is the framework's sharing contract; protocols are free to back the handle with `Arc<...>` internally.
+- New `LServer!`, `LClient!`, `LUrl!`, `LPattern!` macros for simplified lazy static declarations (replaces the old `LApp!`). Defaults to `TcpTransport`; HTTPS clients with `Client<TlsTransport>` currently need a direct `Lazy::new(...)` declaration until the `LClient!` type-parameter passthrough lands.
+
+### 0.7.x
 - Multi-protocol support (HTTP, WebSocket, custom TCP)
 - Enhanced security controls with HttpSafety
 - Improved middleware system with protocol inheritance
 - Performance optimizations in URL routing
 - Comprehensive security testing
 - `.worker()` method now properly configures dedicated worker threads per Server instance
-- New `LServer!`, `LClient!`, `LUrl!`, `LPattern!` macros for simplified lazy static declarations
 - Fixed `hotaru new` and `hotaru init` to generate correct `endpoint!` macro syntax
-- Built-in constructor implementation (no external `ctor` dependency required) 
-- **Client IP access**: `ctx.client_ip()` and related methods for accessing socket addresses in handlers
+- Built-in constructor implementation (no external `ctor` dependency required)
+- Fn-style blocks: New syntax `pub fn name(req: HTTP) { ... }` for `endpoint!` and `middleware!` macros (original hotaru blocks syntax preserved)
+- Bug fix for URL routing
 
 ### 0.6.x
 - Protocol abstraction layer
@@ -334,15 +352,7 @@ Hotaru is built on a modular architecture:
 - Akari templating integration
 - Cookie manipulation APIs
 - File upload handling
-- Form data processing improvements
-
-## 🔮 Schedule 
-
-| Version No. | Content | Release Date (Approx.) | 
-| --- | --- | --- | 
-| 0.8.0 | HTTP Outbound | Jan.2026 | 
-| 0.8.3 | Using new template engine | Jan.2026 | 
-| 0.8.9 | Bug Fixes | May.2026 | 
+- Form data processing improvements 
 
 ## 📚 Learn More
 
@@ -358,34 +368,65 @@ Hotaru is built on a modular architecture:
 
 ## 🤖 AI Declaration of each Mod
 
-We believe in transparency about AI-assisted development. Below is an honest breakdown of AI involvement per module: 
+We believe in transparency about AI-assisted development. The framework is governed jointly by two maintainer groups using a shared four-tier system that prioritizes understanding over line counts.
 
-| Name | Usage of AI | Comments |
+### Maintained by: PMINE/Research
+
+| Name | Tier | Comments |
 | --- | --- | --- |
-| hotaru_core/app | Minimal | |
-| hotaru_core/connection | Some | |
-| hotaru_core/url | Minor | |
-| hotaru_core/http | Minor | |
-| hotaru_lib | Some | Basic API Access |
-| hotaru_meta/endpoint | None | |
-| hotaru_meta/middleware | None | |
-| ahttpm | Major | Import Akari_macro and Improvements |
-| h2per | Major | Integration of Hyper - Not stable yet |
-| htmstd/cors | Minimal | |
-| htmstd/session | Minimal | |
+| hotaru_core/app | Author-Owned | |
+| hotaru_core/connection | Author-Owned | |
+| hotaru_core/executable | Author-Owned | |
+| hotaru_core/url | Author-Owned | |
+| hotaru_core/protocol | Author-Owned | |
+| hotaru_http/trails | Co-Authored | |
+| hotaru_http/* | Human-Led | |
+| hotaru_mqtt/broker | Co-Authored | |
+| hotaru_mqtt/traits | Co-Authored | |
+| hotaru_mqtt/* | Human-Led | |
+| hotaru_lib | Human-Led | Basic API Access |
+| h2per | Co-Authored | Integration of Hyper - Not stable yet |
+| htmstd/cors | Human-Led | |
+| htmstd/session | Human-Led | |
 
-**Explanation of terms:**
+### Maintained by: Project-StarFall
+
+| Name | Tier | Comments |
+| --- | --- | --- |
+| hotaru_trans/endpoint | Author-Owned | Proof and language design must be fully understood by humans |
+| hotaru_trans/outpoint | Author-Owned | Proof and language design must be fully understood by humans |
+| hotaru_trans/middleware | Author-Owned | Proof and language design must be fully understood by humans |
+| hotaru_trans/cors | Co-Authored | Trivial user-level abstraction |
+| ahttpm | Co-Authored | Imports akari_macro plus improvements |
+| SFX | Co-Authored | Trivial user-level abstraction |
+| akari | External | https://crates.io/crates/akari |
+| akari_lang | External (TBD) | |
+| akari_macro | External | https://crates.io/crates/akari |
+
+### Shared term meanings
 
 | Term | Meaning |
 | --- | --- |
-| None | Full human code, no AI tools used |
-| Minimal | AI used for autocompletion, minor suggestions, or documentation only |
-| Minor | Some tabs. A few AI generated functions for logic. Testing code maybe written by AI |
-| Some | Planning maybe done by AI. Overall structure written by human. Less than a third of real implementation written by AI |
-| Major | Planning is done by AI. Overall structure generated by AI with supervision of human. More than a third of real implementation written by AI | 
+| **Forbidden** | The intelligence work in this module — design decisions, proof obligations, language semantics, novel logic — is authored by humans. AI is not used for this content (the mechanical/test/doc carve-out in operating rule 2 still applies). Reserved for modules where the work *is* the thinking, not the typing. |
+| **Author-Owned** | AI may assist with drafts and completion, but the committed code reads as the author's own throughout. A reviewer should not be able to tell where AI helped. The module signals "a human owns the design and the prose." |
+| **Human-Led** | The human authored the structure and the load-bearing pieces; AI filled in helpers, repetitive sections, or boilerplate. Some sections may visibly bear AI's hand, but the design choices and non-trivial logic are clearly human. The author can defend every part without re-consulting AI. |
+| **Co-Authored** | AI participated substantively in both design exploration and implementation. The human author has internalized the result and can defend, modify, and debug without re-prompting. Appropriate for well-understood patterns and third-party integrations. |
+
+The understanding requirement is uniform across Author-Owned, Human-Led, and Co-Authored: the author can explain any line, modify surrounding code without AI help, and walk a reviewer through the code on request. The tiers differ only in where AI's voice is allowed to show through, not in what the author owes the team.
+
+### Operating rules
+
+1. **No quantification.** Tiers describe the kind of collaboration, not the amount of AI-authored code. Counting lines is brittle and incentivizes the wrong behavior.
+2. **Tests, documentation, and mechanical typing are permitted in every tier — including Forbidden.** AI assistance is allowed across all modules for: unit tests; doc comments and inline prose; and mechanical typing where the design decision has already been made by a human and AI is only writing it out (e.g., applying a settled pattern across similar cases, expanding hand-authored pseudocode, regenerating a table from a spec). The defining criterion is that no *intelligence work* is delegated to AI — design, proof, and semantics decisions remain with the human. The author remains responsible for understanding what was generated.
+3. **Reviewer-driven understanding check.** Any reviewer may flag a PR with "this doesn't feel author-owned" — regardless of the module's tier. The author clears the flag by demonstrating understanding in PR comments or a short walkthrough. Flags are requests for evidence, not accusations.
+4. **Smell-test threshold scales with tier.** Author-Owned code is flagged if any section visibly reads as AI-generated. Human-Led is flagged if the structural code reads as AI-generated or AI's hand pervades rather than appearing locally. Co-Authored is flagged only if the author cannot defend the code in review.
+5. **Tier reflects the work, not preferences.** Maintainers set tiers based on the nature of the module. If the character of a module changes, the tier is re-set rather than stretched.
+6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked.
 
 ## 📄 License
 
 GPL-3.0 License
 
-Copyright (c) 2024-2025 Redstone @ Field of Dreams Studio
+Copyright (c) 2024-2026 @ Field of Dreams Studio 
+
+[Project-StarFall](https://sf.fds.moe), [PMINE](https://pmine.fds.moe) 

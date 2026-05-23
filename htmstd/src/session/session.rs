@@ -10,7 +10,7 @@ use hotaru_core::executable::middleware::AsyncMiddleware;
 use hotaru_core::connection::Protocol;
 use hotaru_http::context::HttpContext;
 use hotaru_http::traits::HTTP;
-use hotaru_meta::middleware;
+use hotaru_trans::middleware;
 
 #[derive(Debug, Clone)]
 pub struct SessionCont {

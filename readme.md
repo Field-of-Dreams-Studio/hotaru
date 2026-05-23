@@ -1,12 +1,10 @@
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.7.7-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.0-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
-[![GPL-3.0 License](https://img.shields.io/badge/license-GNU-blue.svg)](LICENSE)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
 > Small, sweet, easy framework for full-stack Rust web applications
-
-License note: currently GPL-3.0; we are considering a change to LGPL or MIT (not decided).
 
 ## Former Codebase 
 
@@ -21,6 +19,10 @@ Hotaru is a lightweight, intuitive web framework focused on simplicity and produ
 **[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru)**
 
 MSRV: 1.86
+
+### Stability
+
+Hotaru is in the `0.x` series. By Rust/Cargo convention this means **the public API may change between minor versions** (e.g. `0.8.x` → `0.9.x`). Patch releases within a minor (`0.8.0` → `0.8.1`) stay backward-compatible. We aim for `1.0` once the protocol traits and outpoint flow have seen real-world deployment feedback.
 
 ## ✨ Key Features
 
@@ -82,7 +84,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.7.7"
+hotaru = "0.8.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -91,12 +93,13 @@ tokio = { version = "1", features = ["full"] }
 Hotaru supports the following optional features:
 
 - **`debug`**: Enable debug logging for development and troubleshooting
+- **`https`**: HTTPS support — pulls in `hotaru_tls` and surfaces `HTTPS` / `TlsTransport` / `TlsOutboundTarget` / `TlsClientConfig`
 - **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation
 
   **Note**: When enabling `external-ctor`, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.7.7", features = ["external-ctor"] }
+  hotaru = { version = "0.8.0", features = ["external-ctor"] }
   ctor = "0.4.0"  # Required when external-ctor feature is enabled
   tokio = { version = "1", features = ["full"] }
   ```
@@ -307,16 +310,26 @@ Hotaru is built on a modular architecture:
 
 - **[hotaru](https://crates.io/crates/hotaru)** - Main framework with convenient API
 - **[hotaru_core](https://crates.io/crates/hotaru_core)** - Core protocol and routing engine
-- **[hotaru_meta](https://crates.io/crates/hotaru_meta)** - Procedural macros for endpoint! and middleware!
+- **[hotaru_trans](https://crates.io/crates/hotaru_trans)** - Procedural macros for endpoint! and middleware! 
+- **[hotaru_http](https://crates.io/crates/hotaru_http)** - HTTP implementation for Hotaru 
+- **[hotaru_tls](https://crates.io/crates/hotaru_tls)** - TLS/HTTPS implementation for Hotaru 
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
 ## 📋 Changelog 
 
-### 0.7.7 (Current)
-- **Fn-style blocks**: New syntax `pub fn name(req: HTTP) { ... }` for `endpoint!` and `middleware!` macros (original hotaru blocks syntax preserved)
-- **Client IP access**: `req.client_ip()`, `req.client_ip_only()`, `req.server_addr()` and related methods for accessing socket addresses in handlers
-- Bug fix for URL routing
+### 0.8.0 (Current)
+- **Client / outpoint runtime**: new `Client<TS>` for outbound traffic, mirroring `Server<TS>`. Includes `Client::request_fn`, `Client::call_fn`, `Client::call_url` for one-shot and persistent outpoint invocation.
+- **`outpoint!` macro**: client-side counterpart to `endpoint!`. The user body becomes the outermost middleware; the `send;` marker triggers the registered chain (terminating in `<P as Protocol>::send(ctx).await`).
+- **`run!` and `call!` macros**: invocation-style sugar — `run!(APP<HTTP>::name, request)` -> `APP.request_fn::<HTTP>("name", request)`; `call!(APP<HTTP>::name)` -> `APP.call_fn::<HTTP>("name")` (plus `: "/path"` form for `call!`).
+- **Protocol trait reshape**: channel-based `open_channel` / `handle(channel, runtime, root)` / `send(ctx) -> ctx`, plus a per-protocol `install_channel(&mut ctx, channel)` bridge. `type Context: RequestContext<Channel = Self::Channel>` pins channel-type alignment.
+- **RequestContext trait**: `Default` supertrait; declares `type Channel: Channel` as a type anchor only (channel lives as a private field on each concrete context — no trait-exposed accessor). Adds `inject_request` / `into_response`. `type Error: ProtocolError` is the single source of truth for chain errors.
+- **Result-typed execution chain**: middleware, final handlers, `ExecutionChain::run`, and `UrlNode::run` all return `Result<C, <C as RequestContext>::Error>` — no boxing at the chain boundary.
+- **Named access points**: every registered endpoint/outpoint has an explicit name. `ProtocolEntry::register(name, path, step_names, binding, config)` is the single canonical funnel; `AccessPointTable` per protocol entry refreshes Node-variant entries on rebind. `Server::url(url, name, ...)` / `Client::url(url, name, ...)` are URL-first.
+- **Instance-based transports**: `TransportSpec::Inbound` / `Outbound` replace the old `Accepter` / `Connector` shape. `TcpInbound::bind(target)` and `TcpOutbound::build(target)` materialize once per `Server`/`Client`.
+- **HTTPS feature**: new `https` cargo feature on the umbrella `hotaru` crate forwards to `hotaru_http/tls`, surfacing `HTTPS`, `TlsTransport`, `TlsOutboundTarget`, `TlsClientConfig`. `HTTPS = Http1Protocol<TlsStream, TlsTransport>`.
+- **`Channel` trait + `ProtocolFlow`**: per-exchange close semantics (HTTP/1 closes the connection; multiplexed protocols may close only the stream). `Channel: Clone` is the framework's sharing contract; protocols are free to back the handle with `Arc<...>` internally.
+- New `LServer!`, `LClient!`, `LUrl!`, `LPattern!` macros for simplified lazy static declarations (replaces the old `LApp!`). Defaults to `TcpTransport`; HTTPS clients with `Client<TlsTransport>` currently need a direct `Lazy::new(...)` declaration until the `LClient!` type-parameter passthrough lands.
 
 ### 0.7.x
 - Multi-protocol support (HTTP, WebSocket, custom TCP)
@@ -325,9 +338,10 @@ Hotaru is built on a modular architecture:
 - Performance optimizations in URL routing
 - Comprehensive security testing
 - `.worker()` method now properly configures dedicated worker threads per Server instance
-- New `LServer!`, `LClient!`, `LUrl!`, `LPattern!` macros for simplified lazy static declarations
 - Fixed `hotaru new` and `hotaru init` to generate correct `endpoint!` macro syntax
 - Built-in constructor implementation (no external `ctor` dependency required)
+- Fn-style blocks: New syntax `pub fn name(req: HTTP) { ... }` for `endpoint!` and `middleware!` macros (original hotaru blocks syntax preserved)
+- Bug fix for URL routing
 
 ### 0.6.x
 - Protocol abstraction layer
@@ -381,9 +395,9 @@ We believe in transparency about AI-assisted development. The framework is gover
 
 | Name | Tier | Comments |
 | --- | --- | --- |
-| hotaru_trans/endpoint | Forbidden | Proof and language design must be fully understood by humans |
-| hotaru_trans/outpoint | Forbidden | Proof and language design must be fully understood by humans |
-| hotaru_trans/middleware | Forbidden | Proof and language design must be fully understood by humans |
+| hotaru_trans/endpoint | Author-Owned | Proof and language design must be fully understood by humans |
+| hotaru_trans/outpoint | Author-Owned | Proof and language design must be fully understood by humans |
+| hotaru_trans/middleware | Author-Owned | Proof and language design must be fully understood by humans |
 | hotaru_trans/cors | Co-Authored | Trivial user-level abstraction |
 | ahttpm | Co-Authored | Imports akari_macro plus improvements |
 | SFX | Co-Authored | Trivial user-level abstraction |
@@ -413,6 +427,6 @@ The understanding requirement is uniform across Author-Owned, Human-Led, and Co-
 
 ## 📄 License
 
-GPL-3.0 License
+MIT License — see [LICENSE.txt](LICENSE.txt).
 
-Copyright (c) 2024-2026 @ Field of Dreams Studio
+Copyright (c) 2024-2026 @ [Field of Dreams Studio (FDS)](https://fds.moe) & [Project-StarFall](https://sf.fds.moe) & [PMINE-FDS](https://pmine.fds.moe) 

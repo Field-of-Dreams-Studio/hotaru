@@ -1,6 +1,6 @@
-//! This file is introduced in starberry since v0.6.3-rc2
-//! Now starberry run/build/release behaves the same as cargo run/build
-//! This file will copy and paste all templates & programfiles into the binary's dir
+//! This file copies templates & programfiles into the binary's dir on build.
+//! Hotaru's `hotaru run/build/release` CLI commands behave the same as
+//! `cargo run/build` with this build script in place.
 //! Specially, in a workspace, it will copy and paste them into the root of workspace for direct `cargo run`
 //! The correct places to put those file is inside the crate not at the root of workspace
 

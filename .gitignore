@@ -25,6 +25,7 @@ hotaru_core/OUTPOINT_TEAM_PLAN.md
 
 # IDE / Editor files
 .vscode/
+.claude/
 .idea/
 *.iml
 .project
