@@ -10,8 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use hotaru_core::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, TransportSpec},
-    protocol::{Channel, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext},
+    connection::{ConnStream, Outbound, TransportSpec},
+    protocol::{Channel, CtxError, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext},
     url::UrlRoot,
 };
 use tokio::io::BufReader;
@@ -193,6 +193,19 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
             }
             Err(_) => Ok(ProtocolFlow::Close),
         }
+    }
+
+    async fn acquire_channel(
+        &self,
+        _runtime: &Arc<RuntimeConfig>,
+        outbound: Arc<<Self::TS as TransportSpec>::Outbound>,
+    ) -> Result<Self::Channel, CtxError<Self>> {
+        // Dial fresh per request. Future pooling slots in behind a
+        // `self.pool` field without changing this signature.
+        let wire = outbound.connect().await?;
+        let (read, write, meta) = wire.split();
+        let reader = BufReader::new(read);
+        Ok(self.clone().open_channel(reader, write, meta))
     }
 
     async fn send(

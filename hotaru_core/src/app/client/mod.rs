@@ -6,7 +6,7 @@ use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
     },
-    connection::{ConnStream, Outbound, TransportSpec}, executable::ExecutableBinding, protocol::{Channel, RequestContext}, url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
+    connection::{Outbound, TransportSpec}, executable::ExecutableBinding, protocol::{Channel, RequestContext}, url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
     protocol::Protocol,
 };
 
@@ -221,7 +221,6 @@ impl<TS: TransportSpec> Client<TS> {
     >
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
-        <P::Context as RequestContext>::Error: From<std::io::Error>,
     {
         let entry = self
             .registry
@@ -237,8 +236,11 @@ impl<TS: TransportSpec> Client<TS> {
 
         // Inner: connect-IO + chain errors land in CtxError<P>.
         let inner: Result<_, <P::Context as RequestContext>::Error> = async {
-            let wire = self.connect().await?;
-            let channel = entry.create_channel(wire);
+            let outbound = self.ensure_outbound().await?.clone();
+            let channel = entry
+                .protocol
+                .acquire_channel(&self.runtime, outbound)
+                .await?;
 
             let mut ctx = P::Context::default();
             P::install_channel(&mut ctx, channel);
@@ -264,7 +266,6 @@ impl<TS: TransportSpec> Client<TS> {
     >
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
-        <P::Context as RequestContext>::Error: From<std::io::Error>,
     {
         let entry = self
             .registry
@@ -292,7 +293,6 @@ impl<TS: TransportSpec> Client<TS> {
     >
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
-        <P::Context as RequestContext>::Error: From<std::io::Error>,
     {
         let node = self.resolve::<P>(path).await?;
         let entry = self
@@ -312,18 +312,17 @@ impl<TS: TransportSpec> Client<TS> {
     ) -> tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
-        <P::Context as RequestContext>::Error: From<std::io::Error>,
     {
         let this = self.clone();
         let deadline_setting = self.config.max_connection_time();
 
         tokio::spawn(async move {
-            // Connect + wrap channel inside the task so I/O errors fall into
+            // Acquire the channel inside the task so I/O errors fall into
             // the join handle's inner result, not the outer UrlError.
-            let wire = this.connect().await?;
-            let (read, write, meta) = wire.split();
-            let reader = tokio::io::BufReader::new(read);
-            let channel = protocol.open_channel(reader, write, meta);
+            let outbound = this.ensure_outbound().await?.clone();
+            let channel = protocol
+                .acquire_channel(&this.runtime, outbound)
+                .await?;
 
             // One ctx, reused across iterations; channel stays installed.
             let mut ctx = <P::Context as Default>::default();

@@ -7,7 +7,7 @@ pub mod stream;
 pub mod types;
 
 pub use context::RequestContext;
-pub use error::{BoxProtocolError, DefaultProtocolError, ProtocolError};
+pub use error::{BoxProtocolError, DefaultProtocolError, EmptyError, ProtocolError};
 pub use message::Message;
 pub use protocol::{Protocol, CtxError}; 
 pub use stream::Stream;

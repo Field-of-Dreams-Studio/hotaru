@@ -89,6 +89,23 @@ pub trait Protocol: Clone + Send + Sync + 'static {
         root: Arc<UrlRoot<Self::Context, Self::TS>>,
     ) -> Result<ProtocolFlow, CtxError<Self>>; 
 
+    /// Client-side: produce a `Self::Channel` for one outbound exchange.
+    /// The impl owns whatever sits behind it — a fresh dial through
+    /// `outbound.connect()`, a stream carved from a pooled session, a
+    /// packet-id slot in a long-lived MQTT connection. None of that is
+    /// visible to the caller.
+    ///
+    /// `&self` so the impl can hang internal pool/session state on the
+    /// Protocol instance. `outbound` is the already-built transport
+    /// instance from `Client::ensure_outbound`, handed in as an owned
+    /// `Arc` so pool-bearing impls can stash it as a cache key without
+    /// further allocation.
+    async fn acquire_channel(
+        &self,
+        runtime: &Arc<RuntimeConfig>,
+        outbound: Arc<<Self::TS as TransportSpec>::Outbound>,
+    ) -> Result<Self::Channel, CtxError<Self>>;
+
     /// Outpoint final handler: send the request in `ctx`, read the response
     /// back into `ctx`, return ctx. Impl reads channel + request + any
     /// safety config from ctx via same-crate accessors on the concrete type.

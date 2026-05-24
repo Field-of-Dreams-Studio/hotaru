@@ -1,7 +1,7 @@
 # htmstd - Hotaru Standard Middleware Library
 
 [![Crates.io](https://img.shields.io/crates/v/htmstd)](https://crates.io/crates/htmstd)
-[![MIT License](https://img.shields.io/badge/license-GNU-blue.svg)](LICENSE)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Standard middleware collection for the Hotaru web framework, providing common functionality like CORS, sessions, and authentication.
 
