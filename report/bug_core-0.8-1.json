@@ -1,0 +1,29 @@
+{
+  "type": "bug", 
+  "report": {
+    "id": "0.8-core-1",
+    "title": "`AnyPath` only matches one segment in URL walking",
+    "summary": "`PathPattern::AnyPath` is documented and parsed as a catch-all path segment, but the URL walker treated it like a normal one-segment wildcard when more path segments remained."
+  },
+  "existing_version": {
+    "hotaru_core": "0.8.0",
+    "hotaru": "0.8.0"
+  },
+  "impact": "Routes such as `/files/<**path:rest>` matched `/files/a`, but failed to match deeper paths such as `/files/a/b/c`.",
+  "behavior_diff": {
+    "expected": "Once an `AnyPath` child is matched, traversal should stop and return that child, regardless of how many path segments remain.",
+    "actual": "The walker recursed into the `AnyPath` node when additional segments remained. Since the `AnyPath` node usually has no children, deeper paths returned `None`."
+  },
+  "reproduction": {
+    "language": "rust",
+    "code": "let root = empty_node(PathPattern::literal_path(\"files\"));\nlet rest = empty_node(PathPattern::AnyPath);\nroot.insert_child(rest.clone());\n\nlet path = vec![\"a\", \"b\", \"c\"];\nassert!(root.walk(path.iter()).await.is_some());"
+  },
+  "status": {
+    "state": "fixed",
+    "fix": "Updated node-rooted and root-rooted walk implementations to recurse only when the matched child is not `AnyPath`.",
+    "verification": [
+      "cargo test -p hotaru_core url::node::tests::walk --lib",
+      "cargo test -p hotaru_core url:: --lib"
+    ]
+  }
+}

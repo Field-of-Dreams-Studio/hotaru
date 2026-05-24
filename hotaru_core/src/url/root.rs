@@ -47,6 +47,11 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
             .map_or(false, |n| n.has_handler())
     }
 
+    /// Crate-visible borrow of the root's child table (used by `WalkCursor`).
+    pub(crate) fn children_ref(&self) -> &Children<C, TS> {
+        &self.children
+    }
+
     /// Returns a cloned `Arc` of the current root endpoint node, if the
     /// slot is populated. Used by [`AccessPoint::resolve`] to follow the
     /// `PRwLock` indirection for `UrlRegistration::Root` entries — every
@@ -82,8 +87,8 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
                     continue;
                 };
 
-                if path.len() >= 1 {
-                    if let Some(result) = child.clone().walk(path.clone()).await {
+                if path.len() >= 1 && !child.path().is_any_path() {
+                    if let Some(result) = child.clone().walk(path.clone(), PartialState::NotStart).await {
                         return Some(result);
                     }
                 } else {
@@ -174,6 +179,20 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         }
         let segments: Vec<&str> = path.split('/').collect();
         self.root.clone().walk(segments.iter()).await
+    }
+
+    /// Resumable cursor over every node matching `path`, in priority
+    /// order. Caller owns `segments` (split as for `walk_str`) and
+    /// drains via `cursor.find_next(&segments)`. Empty `path` →
+    /// empty cursor; use `walk_str("")` for the root endpoint slot.
+    //
+    // TODO: `futures::Stream` wrapper once a fan-out protocol needs it.
+    #[av::ver(unstable, since = "0.8.1", note = "Resumable URL traversal — surface may change", date = "2026-05-25")]
+    pub fn walk_cursor(&self, path: &str) -> super::node::WalkCursor<C, TS> {
+        if path.is_empty() {
+            return super::node::WalkCursor::empty();
+        }
+        super::node::WalkCursor::from_root(self.root.clone())
     }
 
     /// Walks the URL tree from a string path, rejecting paths deeper than `max_depth`.
@@ -511,5 +530,24 @@ mod tests {
         // Parser index: [Literal("")=0, Literal("users")=1, Regex=2] — "id" maps to index 2.
         assert_eq!(node.names().index("id"), Some(2));
         assert!(root.walk_str("/users/alice").await.is_some());
+    }
+
+    #[tokio::test]
+    async fn walk_cursor_yields_priority_ordered_matches() {
+        let root = Arc::new(UrlRoot::<TestContext>::new());
+        root.literal_url("/literal", binding_with_handler(), ParamsClone::default()).unwrap();
+        root.sub_url("/<slug>", binding_with_handler(), ParamsClone::default()).unwrap();
+        root.sub_url("/<**path>", binding_with_handler(), ParamsClone::default()).unwrap();
+
+        let path = "/literal";
+        let segments: Vec<&str> = path.split('/').collect();
+        let mut cursor = root.walk_cursor(path);
+        let mut hits: Vec<PathPattern> = Vec::new();
+        while let Some(n) = cursor.find_next(&segments) {
+            hits.push(n.path().clone());
+        }
+
+        assert_eq!(hits.len(), 3);
+        assert_eq!(hits[0], PathPattern::literal_path("literal"));
     }
 }

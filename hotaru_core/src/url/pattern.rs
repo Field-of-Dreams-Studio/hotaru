@@ -114,12 +114,7 @@ impl std::fmt::Display for PathPattern {
 #[cfg(test)]
 mod tests {
     //! `PartialEq` tests for `PathPattern`.
-    //!
-    //! These tests are load-bearing for `AccessPoints::refresh_path`
-    //! (Stage 4 of the outpoint plan), which uses `==` on path slices to
-    //! decide which named access points must be refreshed after an unnamed
-    //! registration rebinds a node. Equality must match the plan's contract:
-    //!
+    //! 
     //! - Literal patterns: string equality
     //! - Wildcards (`Any` / `AnyPath`): kind equality (different kinds are unequal)
     //! - Regex patterns: identical source-string equality
