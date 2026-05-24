@@ -8,6 +8,7 @@ async fn main() {
 
 LServer!(
     APP = Server::new()
+        .binding("127.0.0.1:3003")
         .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
         .build()
 );

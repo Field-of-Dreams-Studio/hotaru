@@ -1,0 +1,30 @@
+{
+  "type": "bug",
+  "report": {
+    "id": "0.8-hotaru-1",
+    "title": "Onboarding broken: scaffolded project panics, macro-flavor features silently no-op, and 0.8.1 symbols unreachable via umbrella",
+    "summary": "A fresh `hotaru new` project panics at startup instead of serving on `127.0.0.1:3003`, the documented `semi-trans` and `attr` macro flavors fall back to `trans` due to Cargo feature unification, and the 0.8.1 additions listed in the changelog (`EmptyError`, `WalkCursor` and friends) cannot be reached through the `hotaru` or `hotaru::prelude::*` import paths the readme uses."
+  },
+  "existing_version": {
+    "hotaru": "0.8.0",
+    "hotaru_trans": "0.8.0"
+  },
+  "impact": "Three independent breakages along the documented happy path: (1) `hotaru new my_app && cd my_app && cargo run` aborts with `AppBuilder::registry(...) must be set for App<TS>` because the scaffolded `src/main.rs` writes `Server::new().build()` without `.binding(...)` or `.single_protocol(...)`; (2) opting into `features = [\"semi-trans\"]` or `[\"attr\"]` on the `hotaru` dep leaves `endpoint!` as the bang macro, so attribute-form snippets from the readme fail with `cannot find attribute \\\"endpoint\\\" in this scope`; (3) custom `RequestContext` authors looking for `EmptyError` and protocol authors looking for `WalkCursor` can only reach them at `hotaru::hotaru_core::protocol::EmptyError` / `hotaru::hotaru_core::url::node::WalkCursor`, not at the umbrella paths the changelog implies. Scaffolded `Cargo.toml` also carries unused `ctor` and `once_cell` direct deps the user has to maintain.",
+  "behavior_diff": {
+    "expected": "`hotaru new my_app && cd my_app && cargo run` serves `Hello, world!` on `127.0.0.1:3003`. Setting `default-features = false, features = [\"semi-trans\"]` on the `hotaru` dep switches `endpoint` to the attribute-macro form. `EmptyError` and `WalkCursor` are importable via `hotaru::EmptyError` and `hotaru::WalkCursor` (and `EmptyError` via the prelude).",
+    "actual": "Scaffolded `main.rs` panics on first run because the builder requires both `binding` and `registry`. Flavor switching is silently ignored: `hotaru/Cargo.toml` pulled `hotaru_trans` without `default-features = false`, so `hotaru_trans/trans` (its crate-level default) stayed active alongside whatever the user enabled, and the cfg_if in `hotaru_trans/src/lib.rs:22` picks `trans` first. The 0.8.1 changelog symbols live in the leaf crates but the umbrella `hotaru` crate never re-exported them."
+  },
+  "reproduction": {
+    "language": "bash",
+    "code": "# (1) Scaffold panic\ncargo install --path /path/to/hotaru/hotaru\ncd /tmp && hotaru new my_app && cd my_app && cargo run\n# thread 'main' panicked at hotaru_core/src/app/common/builder.rs: AppBuilder::registry(...) must be set for App<TS>\n\n# (2) Macro flavor ignored\n# In Cargo.toml: hotaru = { version = \"0.8.0\", default-features = false, features = [\"semi-trans\"] }\n# In main.rs:\n#   #[endpoint] #[url(\"/\")] pub fn index<HTTP>() { /* ... */ }\n# cargo build → error: cannot find attribute `endpoint` in this scope\n\n# (3) Umbrella reachability\n# In main.rs: use hotaru::EmptyError;  // unresolved\n# In main.rs: use hotaru::WalkCursor;  // unresolved"
+  },
+  "status": {
+    "state": "fixed",
+    "fix": "Five coordinated changes in 0.8.1: (a) `hotaru/src/main.rs` scaffolder template's `LServer!` body now includes `.binding(\"127.0.0.1:3003\")` and `.single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))`, and the `DEPS` string drops `ctor` and `once_cell` (both already flow through `hotaru::prelude::*`); (b) `hotaru/Cargo.toml` adds `default-features = false` to the `hotaru_trans` dep so the user's flavor selection is honored once they also set `default-features = false` on `hotaru`; (c) `hotaru/src/lib.rs` re-exports `EmptyError`, `ProtocolError`, `BoxProtocolError`, `DefaultProtocolError`, `WalkCursor`, `WalkFrame`, and `FrameNode` from the umbrella; (d) `hotaru/src/prelude.rs` adds `EmptyError` and `ProtocolError`; (e) readme `Macro Notes` now spells out the required `default-features = false` when switching flavors.",
+    "verification": [
+      "cargo build --workspace",
+      "cargo build in /tmp/hotaru-feature-check/{semitrans,attr}/ with features = [\"semi-trans\"] / [\"attr\"] (attribute-form endpoint snippets compile cleanly)",
+      "hotaru new my_app (using rebuilt /target/release/hotaru), then cargo run, then curl http://127.0.0.1:3003/ → HTTP 200, 13 bytes"
+    ]
+  }
+}

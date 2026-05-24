@@ -2,11 +2,11 @@ pub mod http;
 pub mod prelude;
 
 pub use hotaru_core::app::client::Client;
-pub use hotaru_core::app::server::Server;
-pub type App<TS = hotaru_core::connection::tcp::TcpTransport> = Server<TS>;
+pub use hotaru_core::app::server::Server; 
 pub use hotaru_core::app::common::RunMode;
 pub use hotaru_core::url::PathPattern;
 pub use hotaru_core::url::UrlRoot as Url;
+pub use hotaru_core::url::{FrameNode, WalkCursor, WalkFrame};
 pub use hotaru_core::url::pattern::path_pattern_creator::{
     any as AnyUrl, any_path as AnyPath, literal_path as LitUrl, regex_path as RegUrl,
     trailing_slash as TrailingSlash,
@@ -24,7 +24,8 @@ pub use hotaru_core::object;
 pub use hotaru_core::connection::ConnStream;
 pub use hotaru_core::connection::error::{ConnectionError, Result};
 pub use hotaru_core::protocol::{
-    Message, Protocol, ProtocolRole, RequestContext, Stream,
+    BoxProtocolError, DefaultProtocolError, EmptyError, Message, Protocol, ProtocolError,
+    ProtocolRole, RequestContext, Stream,
 };
 pub use hotaru_core::connection::{
     TcpAccepter, TcpConnector, TcpConnectorAddr, TcpMeta, TcpTransport,

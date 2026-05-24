@@ -336,7 +336,12 @@ async fn main() {
     APP.clone().run().await;
 }
 
-LServer!(APP = Server::new().build());
+LServer!(
+    APP = Server::new()
+        .binding("127.0.0.1:3003")
+        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
+        .build()
+);
 
 endpoint!{
     APP.url("/"),
@@ -348,9 +353,7 @@ endpoint!{
 }
 "#;
 
-const DEPS: &'static str = r#"ctor = "0.4.0"
-once_cell = "1.17"
-tokio = { version = "1", features = ["full"] }
+const DEPS: &'static str = r#"tokio = { version = "1", features = ["full"] }
 "#;
 
 const BUILD_RS: &'static str = r###"//! This file is introduced in hotaru since v0.6.3-rc2 
