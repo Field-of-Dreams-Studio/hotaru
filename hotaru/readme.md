@@ -1,49 +1,45 @@
+The Hotaru 0.8 era starts from 23/May/2026.
+
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.0-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.1-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-> Small, sweet, easy framework for full-stack Rust web applications
+> Small, sweet, easy framework for full-stack Rust web applications 
 
-License note: Already switched to MIT 
-
-## Former Codebase 
-
-We rebased our code since July this year. Please refer to the following link if you are interested in our history of building the framework 
-
-https://github.com/Redstone-D/starberry 
-
-## 📋 Overview
+## Overview
 
 Hotaru is a lightweight, intuitive web framework focused on simplicity and productivity. It supports regex-based routing, tree-structured URLs, and integrates seamlessly with the Akari templating system.
 
-**[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru)**
+**[Official Website](https://hotaru.rs)**
+
+**[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
 
 MSRV: 1.86
 
-## ✨ Key Features
+## Key Features
 
+- **Multi-Protocol Support**: Handle HTTP/HTTPS, WebSocket, and custom TCP protocols 
 - **Simple API**: Intuitive request/response handling with minimal boilerplate
 - **Full-Stack**: Built-in template rendering with Akari templates
 - **Flexible Routing**: Support for regex patterns, literal URLs, and nested routes
 - **Asynchronous**: Built with Tokio for efficient async handling
 - **Form Handling**: Easy processing of form data and file uploads
 - **Middleware Support**: Create reusable request processing chains
-- **Multi-Protocol Support**: Handle HTTP/HTTPS, WebSocket, and custom TCP protocols
-- **Security**: Built-in request validation, size limits, and safety controls
-- **Client Information**: Access client IP addresses and connection details directly from handlers
 
-## 🚀 Quick Start
+## Quick Start
 
 ```rust
 use hotaru::prelude::*;
+use hotaru::http::*;
 
-pub static APP: SServer = Lazy::new(|| {
-    Server::new()
-        .binding("127.0.0.1:3000")
+LServer!(
+    APP = Server::new()
+        .binding("127.0.0.1:3003")
+        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))
         .build()
-});
+);
 
 #[tokio::main]
 async fn main() {
@@ -58,7 +54,7 @@ endpoint! {
 }
 ```
 
-## 📦 Installation
+## Installation
 
 ### Using the CLI Tool (Recommended)
 
@@ -82,7 +78,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.8.0"
+hotaru = "0.8.1"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -97,85 +93,23 @@ Hotaru supports the following optional features:
   **Note**: When enabling `external-ctor`, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.8.0", features = ["external-ctor"] }
+  hotaru = { version = "0.8.1", features = ["external-ctor"] }
   ctor = "0.4.0"  # Required when external-ctor feature is enabled
   tokio = { version = "1", features = ["full"] }
   ```
 
   By default, Hotaru uses a built-in constructor implementation that doesn't require any external dependencies.
 
-## 🛠️ Binary Commands
+## Binary Commands
 
-Hotaru provides a CLI tool to help you scaffold and manage projects quickly.
-
-**⚠️ IMPORTANT**: It is **crucial** to use the CLI tool (`hotaru new` or `hotaru init`) when creating a new Hotaru project. The CLI automatically generates essential files including:
-- `build.rs` - Required for asset management and resource copying
-- `resource.rs` - Helper module for locating templates and static files at runtime
-
-Without these files, your project will not be able to properly locate and serve templates or static assets. Manual setup is significantly more complex and error-prone.
-
-### Installation
+Use the CLI to scaffold projects — it generates `build.rs` for asset copying and `src/resource.rs` for runtime template/static lookup, which are non-trivial to wire up by hand.
 
 ```bash
-cargo install hotaru
+cargo install hotaru                   # install the CLI (see Installation above)
+hotaru new my_app                      # scaffold a new project
+hotaru init                            # or scaffold into the current Cargo crate
+cd my_app && cargo run                 # serves http://127.0.0.1:3003
 ```
-
-**Note**: After installation, make sure Cargo's bin directory is in your PATH. If the `hotaru` command is not found, add Cargo's bin directory to your PATH:
-
-```bash
-# Linux/macOS
-export PATH="$HOME/.cargo/bin:$PATH"
-
-# Windows (PowerShell)
-$env:Path += ";$env:USERPROFILE\.cargo\bin"
-```
-
-To make this permanent, add the export line to your shell configuration file (`~/.bashrc`, `~/.zshrc`, etc.).
-
-### Available Commands
-
-#### `hotaru new <project_name>`
-
-Create a new Hotaru project with a complete project structure:
-
-```bash
-hotaru new my_app
-```
-
-This generates:
-- `src/main.rs` - Main application entry point with a hello world endpoint
-- `src/resource.rs` - Resource file locator helper module
-- `build.rs` - Build script for asset management
-- `Cargo.toml` - Pre-configured with Hotaru dependencies
-- `templates/` - Directory for Akari HTML templates
-- `programfiles/` - Directory for static assets (CSS, JS, images)
-
-The generated project uses the latest Hotaru features including:
-- `LServer!` macro for clean server initialization
-- `endpoint!` macro for routing
-- Proper resource management with build-time asset copying
-
-#### `hotaru init`
-
-Initialize an existing Cargo project with Hotaru scaffolding:
-
-```bash
-cd my_existing_project
-hotaru init
-```
-
-This command adds the same structure as `hotaru new` but to your current project directory.
-
-### Running Your Project
-
-After creating a project:
-
-```bash
-cd my_app
-cargo run
-```
-
-Your server will start at `http://127.0.0.1:3000` by default, serving a "Hello, world!" response at the root path.
 
 ### Project Structure
 
@@ -184,63 +118,91 @@ my_app/
 ├── Cargo.toml              # Dependencies and project metadata
 ├── build.rs                # Asset copying build script
 ├── src/
-│   ├── main.rs            # Application entry point
+│   ├── main.rs            # Application entry point with LServer! + endpoint!
 │   └── resource.rs        # Resource locator helpers
 ├── templates/             # Akari HTML templates
 └── programfiles/          # Static assets (CSS, JS, images)
 ```
 
-The build script automatically copies `templates/` and `programfiles/` to the target directory during compilation, making them accessible to your application at runtime.
+The build script copies `templates/` and `programfiles/` to the target directory at compile time so they're accessible at runtime.
 
-## 🎯 Core Concepts
+## Core Concepts
 
 ### Endpoints
 
-Define routes with the `endpoint!` macro:
+Three macro flavors, enabled by the `trans` / `semi-trans` / `attr` cargo features. Pick one per project; **`trans` is the default**. All three register the same route at startup; they only differ in syntax.
+
+**`trans` (default) — bang macro with hotaru-blocks body:**
 
 ```rust
 endpoint! {
     APP.url("/users/<int:id>"),
     pub get_user<HTTP> {
-        let user_id = req.param("id");
-        json_response(json!({ "id": user_id }))
+        let user_id = req.param("id").unwrap_or_default();
+        akari_json!({ id: user_id })
     }
 }
 ```
 
+**`semi-trans` — stacked attributes above an `fn`:**
+
+```rust
+#[endpoint]
+#[url("/users/<int:id>")]
+pub fn get_user<HTTP>() {
+    let user_id = req.param("id").unwrap_or_default();
+    akari_json!({ id: user_id })
+}
+```
+
+**`attr` — single attribute with args:**
+
+```rust
+#[endpoint("/users/<int:id>")]
+pub fn get_user<HTTP>() {
+    let user_id = req.param("id").unwrap_or_default();
+    akari_json!({ id: user_id })
+}
+```
+
+> `akari_json!` is the JSON-response macro re-exported via `hotaru::prelude`; it already wraps `json_response(...)` so callers don't compose the two. Keys are bare idents (not `"..."`). `req.param(...)` returns `Option<String>`.
+
 ### Macro Notes
 
-- `endpoint!` and `middleware!` auto-register at startup (constructor-based), so there is no manual `router.register()` step.
-- Always use brace syntax `{}` and place doc comments inside the macro block.
-- Optional fn-style: `pub fn name(req: HTTP) { ... }` (new in 0.7.7); angle-bracket form (hotaru blocks) defaults to `req`.
-- Our philosophy is to wrap anything into macros to keep endpoints and middleware self-contained; see `macro_ra.md` for the minimal syntax and rationale.
-- Analyzer support is planned via custom analyzer tools.
+- Endpoints and middleware auto-register at startup — no manual `router.register()`.
+- `trans` form: brace syntax `{}` with doc comments inside the block; angle-bracket body defaults to `req`. Optional fn-style `pub fn name(req: HTTP) { ... }` is also accepted.
+- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.1", default-features = false, features = ["semi-trans"] }`. Cargo feature unification would otherwise keep `trans` on alongside it.
+- See `macro_ra.md` for syntax details. Analyzer support is planned.
 
 ### Middleware
 
-Create reusable middleware:
+Attach a middleware to a protocol via the `ProtocolBuilder`. Add `htmstd = "0.8"` to your `Cargo.toml` for the bundled middleware library:
 
 ```rust
 use htmstd::session::CookieSession;
 
-pub static APP: SServer = Lazy::new(|| {
-    Server::new()
-        .binding("127.0.0.1:3000")
-        .append_middleware::<CookieSession>()
+LServer!(
+    APP = Server::new()
+        .binding("127.0.0.1:3003")
+        .single_protocol(
+            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+                .append_middleware::<CookieSession>(),
+        )
         .build()
-});
+);
 ```
+
+Middleware can also be attached per-endpoint via `middleware = [...]` inside the `endpoint!` block — see `example_hotaru` for the pattern.
 
 ### Templates
 
-Render HTML with Akari:
+Render HTML with Akari via `akari_render!` — the macro looks up the template file and substitutes the named bindings:
 
 ```rust
 endpoint! {
     APP.url("/profile"),
     pub profile<HTTP> {
-        let data = json!({ "name": "Alice" });
-        template_response("profile.html", data)
+        akari_render!("profile.html", name = "Alice")
     }
 }
 ```
@@ -262,38 +224,7 @@ endpoint! {
 }
 ```
 
-### Client Information
-
-Access client IP addresses and connection details directly from your handlers:
-
-```rust
-endpoint! {
-    APP.url("/api/whoami"),
-    pub whoami<HTTP> {
-        // Get client's full socket address (IP + port)
-        match req.client_ip() {
-            Some(addr) => text_response(format!("Your address: {}", addr)),
-            None => text_response("Unknown client"),
-        }
-    }
-}
-```
-
-**Available Methods:**
-
-| Method | Return Type | Description |
-|--------|-------------|-------------|
-| `client_ip()` | `Option<SocketAddr>` | Client's socket address (IP + port) |
-| `client_ip_or_default()` | `SocketAddr` | Returns `0.0.0.0:0` if unknown |
-| `client_ip_only()` | `Option<IpAddr>` | Just the IP address, no port |
-| `client_ip_only_or_default()` | `IpAddr` | Returns `0.0.0.0` if unknown |
-| `server_addr()` | `Option<SocketAddr>` | Server's bound address |
-| `remote_addr()` | `Option<SocketAddr>` | Alias for `client_ip()` |
-| `local_addr()` | `Option<SocketAddr>` | Alias for `server_addr()` |
-
-**Note**: When behind a reverse proxy, `client_ip()` returns the proxy's address. Use headers like `X-Forwarded-For` or `X-Real-IP` to get the original client IP.
-
-## 📚 Examples
+## Examples
 
 Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hotaru-example) for:
 - Basic routing and handlers
@@ -302,7 +233,7 @@ Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hot
 - CORS configuration
 - Multi-protocol applications
 
-## 🔧 Crate Ecosystem
+## Crate Ecosystem
 
 Hotaru is built on a modular architecture:
 
@@ -314,9 +245,15 @@ Hotaru is built on a modular architecture:
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
-## 📋 Changelog 
+## Changelog 
 
-### 0.8.0 (Current)
+### 0.8.1 (Current)
+- **`WalkCursor` + `UrlRoot::walk_cursor` (unstable)**: resumable URL-tree traversal cursor. Drains every node whose path-pattern matches a given path, in priority order (literal → regex → `*` → `**`). Foundation for fan-out protocols (MQTT publish → matching subscriptions, broadcast hooks); existing `walk` / `walk_str` are unchanged.
+- **`EmptyError`**: zero-payload template error type implementing every bound `RequestContext::Error` requires (`ProtocolError`, `From<std::io::Error>`, `Send + Sync + 'static`). Use it when prototyping a new `RequestContext` impl, in tests, or in protocols with no meaningful error payload.
+- **`RequestContext::Error: From<std::io::Error>`**: this bound is now part of the trait itself rather than every `Client::*` method's where-clause. The client path touches transport-level I/O which surfaces `std::io::Error`, so every protocol's error type has to absorb it. **Breaking** for hand-written `RequestContext` impls whose `Error` type doesn't already convert from `io::Error` — add a `From<std::io::Error>` impl or use `EmptyError`.
+- **`Protocol::acquire_channel`**: client-side mirror of `open_channel`. Default flow dials fresh per request; multiplexing protocols (HTTP/2, MQTT) can slot a connection pool behind this method without changing the signature. Internally backed by the instance-cached `Arc<TS::Outbound>` on `Client`.
+
+### 0.8.0
 - **Client / outpoint runtime**: new `Client<TS>` for outbound traffic, mirroring `Server<TS>`. Includes `Client::request_fn`, `Client::call_fn`, `Client::call_url` for one-shot and persistent outpoint invocation.
 - **`outpoint!` macro**: client-side counterpart to `endpoint!`. The user body becomes the outermost middleware; the `send;` marker triggers the registered chain (terminating in `<P as Protocol>::send(ctx).await`).
 - **`run!` and `call!` macros**: invocation-style sugar — `run!(APP<HTTP>::name, request)` -> `APP.request_fn::<HTTP>("name", request)`; `call!(APP<HTTP>::name)` -> `APP.call_fn::<HTTP>("name")` (plus `: "/path"` form for `call!`).
@@ -354,7 +291,7 @@ Hotaru is built on a modular architecture:
 - File upload handling
 - Form data processing improvements 
 
-## 📚 Learn More
+## Learn More
 
 - **Akari Template Engine**: https://crates.io/crates/akari
 - **Homepage**: https://hotaru.rs 
@@ -366,9 +303,12 @@ Hotaru is built on a modular architecture:
 | --- | --- | 
 | Quick Tutorial | Youtube: https://www.youtube.com/watch?v=8pV-o04GuKk&t=6s <br> Bilibili: https://www.bilibili.com/video/BV1BamFB7E8n/ | 
 
-## 🤖 AI Declaration of each Mod
+## AI Declaration of each Mod
 
 We believe in transparency about AI-assisted development. The framework is governed jointly by two maintainer groups using a shared four-tier system that prioritizes understanding over line counts.
+
+<details> 
+<summary><b>Click for more details</b></summary> 
 
 ### Maintained by: PMINE/Research
 
@@ -421,12 +361,11 @@ The understanding requirement is uniform across Author-Owned, Human-Led, and Co-
 3. **Reviewer-driven understanding check.** Any reviewer may flag a PR with "this doesn't feel author-owned" — regardless of the module's tier. The author clears the flag by demonstrating understanding in PR comments or a short walkthrough. Flags are requests for evidence, not accusations.
 4. **Smell-test threshold scales with tier.** Author-Owned code is flagged if any section visibly reads as AI-generated. Human-Led is flagged if the structural code reads as AI-generated or AI's hand pervades rather than appearing locally. Co-Authored is flagged only if the author cannot defend the code in review.
 5. **Tier reflects the work, not preferences.** Maintainers set tiers based on the nature of the module. If the character of a module changes, the tier is re-set rather than stretched.
-6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked.
+6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked. 
+</details> 
 
 ## 📄 License
 
-MIT License
+MIT License — see [LICENSE.txt](LICENSE.txt).
 
-Copyright (c) 2024-2026 @ Field of Dreams Studio 
-
-[Project-StarFall](https://sf.fds.moe), [PMINE](https://pmine.fds.moe) 
+Copyright (c) 2024-2026 @ [Field of Dreams Studio (FDS)](https://fds.moe) & [Project-StarFall](https://sf.fds.moe) & [PMINE-FDS](https://pmine.fds.moe) 
