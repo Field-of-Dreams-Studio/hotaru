@@ -1,0 +1,30 @@
+{
+  "type": "bug",
+  "report": {
+    "id": "0.8-core-2",
+    "title": "`AccessPointTable` used `std::sync::RwLock` with `.unwrap()` everywhere, poisoning the access-point lookup on any in-guard panic",
+    "summary": "Every read/write on the per-`ProtocolEntry` `AccessPointTable` went through `self.inner.read().unwrap()` / `self.inner.write().unwrap()` against a `std::sync::RwLock`. `std::sync::RwLock` poisons when a thread panics while holding the guard; once poisoned, every subsequent `read()` / `write()` returns `Err(PoisonError)` and the call site's `unwrap()` panics — turning a single in-guard panic into a permanent process-wide failure of every `Client::request_fn`, `register`, `insert`, `remove`, `len`, `names` call against that table."
+  },
+  "existing_version": {
+    "hotaru_core": ["0.8.0", "0.8.1"]
+  },
+  "impact": "A single panic that happens while any thread is holding the `AccessPointTable` guard (most plausibly during the `Drop` of a stored `AccessPoint<C, TS>` triggered by `refresh_path`'s `*slot = node.clone()` reassignment, or from an unwinding in a downstream type's `Drop`) poisons the lock for the lifetime of the `Server` / `Client`. From that moment on, every named-endpoint lookup (`Client::request_fn(name, ...)`, `serve` paths reaching the table, registration calls, introspection helpers) panics on the `.unwrap()`. Because each lookup runs inside a Tokio task, the panic aborts the request-handling task — the connection drops without a response, and the server keeps accepting new connections that will panic on the same unwrap, indefinitely. Crate-wide convention in `src/alias.rs` already mandates `PRwLock` (parking_lot) for exactly this reason; `AccessPointTable` was the lone std-RwLock holdout.",
+  "behavior_diff": {
+    "expected": "An in-guard panic on one request should not affect any other request. Lookups against `AccessPointTable` should never panic on lock-state alone; the only allowable panic surface is the user's own code path running outside the lock.",
+    "actual": "After any in-guard panic, every subsequent `self.inner.read().unwrap()` / `.write().unwrap()` returns `Err(PoisonError)` from std's `RwLock` and `.unwrap()` panics. The 8 call sites in `src/executable/access/table.rs` (lines 66, 78, 95, 99, 103, 107, 111, 117 in 0.8.1) are all reachable from the public API surface (`insert`, `refresh_path`, `get`, `contains`, `remove`, `len`, `is_empty`, `names`) and every named-endpoint dispatch panics permanently."
+  },
+  "reproduction": {
+    "language": "rust",
+    "code": "// 0.8.0 / 0.8.1 — illustrative; the bug is structural, not input-driven.\n// Any panic while holding the guard poisons the lock; the std-RwLock\n// type below stands in for `AccessPointTable::inner` in those versions.\nuse std::sync::{Arc, RwLock};\nuse std::thread;\n\nstruct PanickyDrop;\nimpl Drop for PanickyDrop {\n    fn drop(&mut self) { panic!(\"drop in guard scope\"); }\n}\n\nlet table: Arc<RwLock<Vec<PanickyDrop>>> = Arc::new(RwLock::new(vec![PanickyDrop]));\n\n// Thread T1: holds the write guard, triggers an in-guard panic via Drop.\nlet t = {\n    let table = table.clone();\n    thread::spawn(move || {\n        let mut g = table.write().unwrap();\n        g.clear(); // PanickyDrop::drop panics while we hold the guard\n    })\n};\nlet _ = t.join();\n\n// Thread T2: every subsequent access panics on .unwrap() — lock is poisoned.\n// In 0.8.0/0.8.1 this is exactly what `AccessPointTable::get`, `insert`,\n// `refresh_path`, etc. do on every request after the first in-guard panic.\nlet _ = table.read().unwrap(); // panics: PoisonError"
+  },
+  "status": {
+    "state": "fixed",
+    "fix": "Replaced `std::sync::RwLock` with `crate::alias::PRwLock` (re-export of `parking_lot::RwLock`) in `src/executable/access/table.rs`. parking_lot's `RwLock` does not poison — guards are returned directly, not wrapped in `Result`. All 8 `.read().unwrap()` / `.write().unwrap()` call sites were simplified to `.read()` / `.write()`. The crate's own `src/alias.rs` already documents `PRwLock` as the mandatory choice for all internal code (`All internal code MUST import from this module`), so this change aligns `AccessPointTable` with the rest of the crate. No public API surface changed.",
+    "verification": [
+      "cargo check -p hotaru_core",
+      "cargo check --workspace",
+      "grep -n 'std::sync::RwLock' hotaru_core/src/executable/access/table.rs (no matches)",
+      "grep -nE '\\.(read|write)\\(\\)\\.unwrap\\(\\)' hotaru_core/src/executable/access/table.rs (no matches)"
+    ]
+  }
+}

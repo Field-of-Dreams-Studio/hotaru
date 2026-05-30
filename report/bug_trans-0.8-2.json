@@ -1,0 +1,29 @@
+{
+  "type": "bug",
+  "report": {
+    "id": "0.8-trans-2",
+    "title": "`..` middleware-inheritance codegen hardcoded the `APP` ident, ignoring the parsed `UrlExpr::app` and silently binding to the wrong global in multi-app setups",
+    "summary": "When an `endpoint!` / `outpoint!` invocation used the `..` middleware-inheritance marker, the proc-macro emitted `APP.handler.get_protocol_middlewares::<Protocol>()` regardless of which app ident the user actually wrote on the URL form. Users who set up a custom server such as `MY_APP.url(\"/foo\")` and listed `..` in `middleware` got middleware inherited from a global called `APP` (which they did not necessarily declare), not from `MY_APP`. With no `APP` symbol in scope this produced a confusing `cannot find value APP in this scope` error far from the macro call; with both `APP` and `MY_APP` in scope it silently inherited the wrong set."
+  },
+  "existing_version": {
+    "hotaru_trans": ["0.8.0", "0.8.1"]
+  },
+  "impact": "Any project running more than one app (e.g. a primary `APP` plus an admin `ADMIN_APP`, or a single non-default-named server like `MY_APP`) that used `..` to inherit protocol-root middleware on `MY_APP.url(\"/foo\")` got middleware from the wrong server, or a hard compile error blaming the user's site. Middleware inheritance is the documented mechanism for layering auth / CORS / tracing onto routes; binding to the wrong server silently turns route-level security off (or applies the wrong policy). The bug is structural — every `..` site in a non-`APP`-named server is affected. Single-app users hit no symptom because their app *is* `APP` and the hardcoded ident matched by coincidence.",
+  "behavior_diff": {
+    "expected": "For `endpoint!(MY_APP.url(\"/foo\"), middleware = [..], fn handler<HTTP> { ... })` the generated inheritance block reads protocol middleware from `MY_APP`, matching the app the URL was registered against. The codegen should use whichever ident was parsed by `UrlExpr` (either the user-written ident or the documented `APP` default for bare-literal forms).",
+    "actual": "`hotaru_trans/src/url/urlargs.rs:268` emitted `Ident::new(\"APP\", Span::call_site())` unconditionally. Generated body: `let protocol_middlewares = APP.handler.get_protocol_middlewares::<Protocol>(); middlewares.extend(protocol_middlewares);`. For `MY_APP.url(...)` this reaches for the wrong symbol; the URL itself is registered on `MY_APP` via `UrlExpr::expand` (which correctly uses `self.app.clone()` at urlexpr.rs:125), so registration succeeds but inheritance is misdirected."
+  },
+  "reproduction": {
+    "language": "rust",
+    "code": "// 0.8.0 / 0.8.1\nuse hotaru::prelude::*;\nuse hotaru::{HTTP, HttpSafety, ProtocolBuilder, Server};\nuse hotaru_trans::endpoint;\n\nLServer!(MY_APP, () => {\n    Server::<TcpTransport>::new()\n        .binding(\"127.0.0.1:3003\")\n        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))\n        .build()\n});\n\n// Use the non-default app ident on the URL form,\n// then ask for protocol-root middleware via `..`:\nendpoint!(\n    MY_APP.url(\"/admin\"),\n    middleware = [..],\n    fn admin<HTTP> { /* ... */ }\n);\n\n// 0.8.0 / 0.8.1: compile error\n//   error[E0425]: cannot find value `APP` in this scope\n//     --> src/main.rs (macro call site)\n// Or, if the user also has an `APP` global for another server,\n// the route silently inherits *that* server's protocol middleware\n// rather than MY_APP's, dropping/swapping auth + CORS layers without warning."
+  },
+  "status": {
+    "state": "fixed",
+    "fix": "Two-line change in `hotaru_trans`: (1) added a `pub fn app(&self) -> &Ident` accessor to `UrlExpr` in `src/url/urlexpr.rs` exposing the already-parsed app ident; (2) replaced the hardcoded `Ident::new(\"APP\", Span::call_site())` at `src/url/urlargs.rs:268` with `self.url_expr.app().clone()`. The `APP` fallback for bare-literal URL forms (`endpoint!(\"/foo\", ...)`) is preserved because `UrlExpr::from_tokens` already stores `Ident::new(\"APP\", Span::call_site())` in `self.app` when no app ident was written. Single-app users see no behavioural change; multi-app users now inherit from the server they actually registered against.",
+    "verification": [
+      "cargo check -p hotaru_trans",
+      "cargo check --workspace",
+      "grep -n 'Ident::new(\"APP\"' hotaru_trans/src/url/urlargs.rs (no matches; only the existing fallback in urlexpr.rs remains)"
+    ]
+  }
+}

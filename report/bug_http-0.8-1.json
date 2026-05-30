@@ -6,7 +6,7 @@
     "summary": "`UrlEncodedForm::parse` in `hotaru_http/src/util/form.rs` and the query-string parser in `RequestPath::from_string` (`hotaru_http/src/message/http_value.rs`) treat `+` as a literal `+`. Per the WHATWG URL spec and the `application/x-www-form-urlencoded` form-submission rules, a `+` on the wire must decode to a space — browsers emit `+` for every space in `<form method=\"POST\">` bodies and in URL query strings. The body parser also percent-decoded `%XX` but skipped the plus-to-space step; the query parser did no decoding at all."
   },
   "existing_version": {
-    "hotaru_http": "0.8.2",
+    "hotaru_http": ["0.8.0", "0.8.1"],
     "hotaru_lib": "0.8.0"
   },
   "impact": "Any HTML form field containing a space is silently corrupted: a user typing `Hello world` is stored, echoed, or persisted as `Hello+world`, and the original space is unrecoverable downstream (database writes, template rendering, search indexing). Query strings are worse — neither `+` nor `%XX` was decoded, so `?q=Hello+world` and `?q=Hello%20world` both surfaced to handlers as their raw on-the-wire bytes. Affects every endpoint reached via `req.form().get(...)` or `req.query(...)`.",

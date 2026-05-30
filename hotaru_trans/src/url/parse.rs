@@ -26,7 +26,7 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
     ) -> Result<UrlFunc, TokenStream> {
         let attrs = parse_outer_attrs(tokens)?;
         let is_pub = match_ident_consume(tokens, "pub");
-        let fn_name = match match_punct_consume(tokens, "_") {
+        let fn_name = match match_ident_consume(tokens, "_") {
             true => {
                 let random_name = format!("auto_generated_{}", random_alpha_string(8));
                 Ident::new(&random_name, Span::call_site())
@@ -134,7 +134,7 @@ pub fn parse_semi_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
         "fn",
         "Expected 'fn' keyword for function definition",
     )?;
-    let fn_name = match match_punct_consume(&mut tokens, "_") {
+    let fn_name = match match_ident_consume(&mut tokens, "_") {
         true => {
             let random_name = format!("auto_generated_{}", random_alpha_string(8));
             Ident::new(&random_name, Span::call_site())
@@ -214,7 +214,7 @@ pub fn parse_attr(attr: TokenStream, args: TokenStream) -> Result<UrlArgs, Token
         "fn",
         "Expected 'fn' keyword for function definition",
     )?;
-    let fn_name = match match_punct_consume(&mut tokens, "_") {
+    let fn_name = match match_ident_consume(&mut tokens, "_") {
         true => {
             let random_name = format!("auto_generated_{}", random_alpha_string(8));
             Ident::new(&random_name, Span::call_site())

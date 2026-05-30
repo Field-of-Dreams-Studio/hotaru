@@ -6,7 +6,7 @@
     "summary": "The compile-time URL format check in `hotaru_trans` calls `parse_check_url` with the source representation of the string literal (quotes included) instead of its unescaped value, so the trailing `\"` lands in the final segment and the parser reports `AnyPathMixedWithOtherContent`. Every `<**path>` usage in `endpoint!`, `outpoint!`, and their semi-trans / attr forms is rejected at macro expansion time even though the underlying runtime parser would accept it."
   },
   "existing_version": {
-    "hotaru_trans": "0.8.1"
+    "hotaru_trans": ["0.8.0", "0.8.1"] 
   },
   "impact": "Blocks any route that uses a multi-segment catch-all. `APP.url(\"/static/<**path>\")`, `#[url(\"/files/<**path:rest>\")]`, and `#[endpoint(\"/static/<**path>\")]` all fail to compile with `Invalid URL literal format: <**path> must be the only content within its segment at index N`. No workaround within the macro — users have to comment out the route and rebuild it as multiple `<str:…>` levels, which is not equivalent because single-segment patterns will not match `/static/css/main.css`.",
   "behavior_diff": {

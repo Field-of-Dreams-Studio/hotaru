@@ -260,12 +260,12 @@ impl UrlArgs {
                     // Create the content of the scoped block
                     let mut block_content = TokenStream::new();
 
-                    // let protocol_middlewares = APP.handler.get_protocol_middlewares::<Protocol>();
+                    // let protocol_middlewares = <app>.handler.get_protocol_middlewares::<Protocol>();
                     block_content.extend(vec![
                         TokenTree::Ident(Ident::new("let", Span::call_site())),
                         TokenTree::Ident(Ident::new("protocol_middlewares", Span::call_site())),
                         TokenTree::Punct(Punct::new('=', Spacing::Alone)),
-                        TokenTree::Ident(Ident::new("APP", Span::call_site())),
+                        TokenTree::Ident(self.url_expr.app().clone()),
                         TokenTree::Punct(Punct::new('.', Spacing::Alone)),
                         TokenTree::Ident(Ident::new("handler", Span::call_site())),
                         TokenTree::Punct(Punct::new('.', Spacing::Alone)),

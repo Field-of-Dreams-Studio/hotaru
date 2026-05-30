@@ -53,6 +53,27 @@ endpoint! {
     }
 }
 
+endpoint! {
+    APP.url("/"),
+    middleware = [LoggerMiddleware],
+
+    _ <HTTP> {
+        akari_render!(
+            "home.html",
+            title = "Hotaru Example",
+            page_title = "Welcome to Hotaru 0.8!",
+            show_message = true,
+            message = "Framework successfully running!",
+            items = [
+                "Protocol Abstraction Layer",
+                "Async/await support",
+                "Middleware system",
+                "Template rendering"
+            ]
+        )
+    }
+}
+
 // Proxy endpoint: fires an HTTPS outpoint to example.com, then renders the
 // fetched body inline as the response. The body is extracted from whichever
 // HttpBody variant the response landed in.

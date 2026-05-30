@@ -19,6 +19,13 @@ impl UrlExpr {
         }
     }
 
+    /// The app identifier this URL is bound to. Either the user-written
+    /// `MY_APP` ident or the default `APP` fallback when the user wrote a
+    /// bare literal.
+    pub fn app(&self) -> &Ident {
+        &self.app
+    }
+
     /// Accepts any of the following forms:
     /// APP_IDENTIFIER("path")
     /// APP_IDENTIFIER: "path"

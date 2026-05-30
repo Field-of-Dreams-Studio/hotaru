@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 use crate::{
+    alias::PRwLock,
     connection::TransportSpec,
     protocol::RequestContext,
     url::{PathPattern, UrlNode, UrlRegistration},
@@ -48,12 +48,12 @@ use super::access_point::AccessPoint;
 /// entries with matching path, refresh `Node` variants only) — a sharded
 /// map needs cross-shard iteration support, which `dashmap` provides.
 pub struct AccessPointTable<C: RequestContext, TS: TransportSpec> {
-    inner: RwLock<HashMap<String, AccessPoint<C, TS>>>,
+    inner: PRwLock<HashMap<String, AccessPoint<C, TS>>>,
 }
 
 impl<C: RequestContext, TS: TransportSpec> AccessPointTable<C, TS> {
     pub fn new() -> Self {
-        Self { inner: RwLock::new(HashMap::new()) }
+        Self { inner: PRwLock::new(HashMap::new()) }
     }
 
     /// Insert a named access point, returning the previous entry under that
@@ -63,7 +63,7 @@ impl<C: RequestContext, TS: TransportSpec> AccessPointTable<C, TS> {
         name: N,
         ap: AccessPoint<C, TS>,
     ) -> Option<AccessPoint<C, TS>> {
-        self.inner.write().unwrap().insert(name.into(), ap)
+        self.inner.write().insert(name.into(), ap)
     }
 
     /// Refresh the stored node for every **Node-variant** entry whose path
@@ -75,7 +75,7 @@ impl<C: RequestContext, TS: TransportSpec> AccessPointTable<C, TS> {
         path: &[PathPattern],
         node: &Arc<UrlNode<C, TS>>,
     ) -> usize {
-        let mut guard = self.inner.write().unwrap();
+        let mut guard = self.inner.write();
         let mut count = 0;
         for ap in guard.values_mut() {
             if ap.path.as_slice() == path {
@@ -92,29 +92,29 @@ impl<C: RequestContext, TS: TransportSpec> AccessPointTable<C, TS> {
     /// Look up a named access point. Returns a cloned snapshot; callers
     /// should call `resolve()` on the result to obtain the current node.
     pub fn get(&self, name: &str) -> Option<AccessPoint<C, TS>> {
-        self.inner.read().unwrap().get(name).cloned()
+        self.inner.read().get(name).cloned()
     }
 
     pub fn contains(&self, name: &str) -> bool {
-        self.inner.read().unwrap().contains_key(name)
+        self.inner.read().contains_key(name)
     }
 
     pub fn remove(&self, name: &str) -> Option<AccessPoint<C, TS>> {
-        self.inner.write().unwrap().remove(name)
+        self.inner.write().remove(name)
     }
 
     pub fn len(&self) -> usize {
-        self.inner.read().unwrap().len()
+        self.inner.read().len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.inner.read().unwrap().is_empty()
+        self.inner.read().is_empty()
     }
 
     /// Returns all registered names. Allocated; useful for introspection
     /// and tests, not the hot path.
     pub fn names(&self) -> Vec<String> {
-        self.inner.read().unwrap().keys().cloned().collect()
+        self.inner.read().keys().cloned().collect()
     }
 }
 

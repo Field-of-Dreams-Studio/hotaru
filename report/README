@@ -1,4 +1,6 @@
 Report tickets are intended to be written by an AI agent. 
 
+Human are responsible for fixing bugs. After bugs fixed, let AI agents to read diff to write tickets. 
+
 For AI agents: Please follow the pattern for bug_hotaru-0.8-1.json for bugs. 
 

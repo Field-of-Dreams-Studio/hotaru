@@ -1,0 +1,29 @@
+{
+  "type": "bug",
+  "report": {
+    "id": "0.8-trans-3",
+    "title": "Anonymous-function `_` form in `endpoint!`/`outpoint!` was silently dead — `_` was matched as `Punct`, not `Ident`, so it fell through to literal use and emitted `fn _<HTTP>(...)` which Rust rejects",
+    "summary": "All three macro-flavor parsers (`parse_trans`, `parse_semi_trans`, `parse_attr`) gated the auto-generated-name branch on `match_punct_consume(&mut tokens, \"_\")`. Rust's lexer produces `_` as a `TokenTree::Ident` (with `to_string() == \"_\"`), not a `TokenTree::Punct` — so the punct-match always returned `false`, the parser fell through to `expect_any_ident`, accepted `_` as the literal function name, and the codegen emitted `fn _<HTTP>(req: ...) { ... }` verbatim. `_` is a reserved identifier in Rust and cannot be the name of an item, so the user got `error: expected identifier, found reserved identifier \\`_\\`` at *their* macro call site — making the documented anonymous-function feature effectively unreachable."
+  },
+  "existing_version": {
+    "hotaru_trans": ["0.8.0", "0.8.1"]
+  },
+  "impact": "Anyone following the documented `_ <HTTP> { ... }` form (no explicit function name) — including the in-repo `example_hotaru/src/main.rs` after its recent rewrite — got a confusing rustc error pointing at the macro invocation with no hint that the framework's name-elision feature was the issue. The pattern was intended to let users register many one-off endpoints without inventing throwaway identifiers; instead every such site failed to compile. Even the workspace `cargo check --workspace` failed because `example_hotaru` itself exercises the feature.",
+  "behavior_diff": {
+    "expected": "Writing `_` in place of the function name causes the macro to substitute a unique generated ident (`auto_generated_<8-random-alpha>`), so registration runs against a private name the user does not need to think about. Documented intent: `endpoint!(APP.url(\"/\"), middleware = [...], _ <HTTP> { ... })` should be valid.",
+    "actual": "At `hotaru_trans/src/url/parse.rs:29` (`parse_trans`), `:137` (`parse_semi_trans`), and `:217` (`parse_attr`), the dispatch was `match match_punct_consume(tokens, \"_\") { true => generated_name, false => expect_any_ident(...) }`. Because `_` is consumed by Rust's lexer as `TokenTree::Ident(\"_\")`, the punct match never fired; control fell into `expect_any_ident`, which succeeded on the very same `_` token and produced the literal ident `_` as `fn_name`. Downstream `UrlFunc::generate_function` / `wrapper_function` / `__wrapper_<fn_name>` then emitted `fn _<HTTP>(req: ...)`, `__wrapper__`, `__register__` etc. — all of which rustc rejects with `expected identifier, found reserved identifier \\`_\\``."
+  },
+  "reproduction": {
+    "language": "rust",
+    "code": "// 0.8.0 / 0.8.1 — taken from example_hotaru/src/main.rs:56-60\nuse hotaru::prelude::*;\nuse hotaru_trans::endpoint;\n\nendpoint! {\n    APP.url(\"/\"),\n    middleware = [LoggerMiddleware],\n    _ <HTTP> {\n        // body...\n    }\n}\n\n// rustc:\n//   error: expected identifier, found reserved identifier `_`\n//     --> src/main.rs:56:5\n//   error: in expressions, `_` can only be used on the left-hand side of an assignment\n//     --> src/main.rs:56:5\n// (both diagnostics point at the macro invocation, not at any framework source)"
+  },
+  "status": {
+    "state": "fixed",
+    "fix": "Swapped `match_punct_consume(..., \"_\")` for `match_ident_consume(..., \"_\")` at all three sites in `hotaru_trans/src/url/parse.rs` (lines 29, 137, 217). `match_ident_consume` already matches on `TokenTree::Ident(ident)` with `ident.to_string() == \"_\"`, which is exactly how the Rust lexer represents the underscore wildcard. The auto-generated-name branch now fires for `_` and the macro emits `fn auto_generated_<rand>(req: ...)` plus matching `__wrapper_auto_generated_<rand>` / `__register_auto_generated_<rand>`, all of which are valid Rust identifiers.",
+    "verification": [
+      "cargo check -p hotaru_trans",
+      "cargo check --workspace (example_hotaru/src/main.rs:60 now compiles cleanly)",
+      "grep -n 'match_punct_consume.*\"_\"' hotaru_trans/src/url/parse.rs (no matches)"
+    ]
+  }
+}
