@@ -49,6 +49,19 @@ pub fn decode_url_owned(input: &str) -> String {
         .into_owned()
 }
 
+/// Decodes an `application/x-www-form-urlencoded` value: substitutes `+` with
+/// space and percent-decodes `%XX` sequences. Use this for HTML form bodies
+/// and URL query strings — browsers emit `+` for spaces in those contexts.
+pub fn decode_form_url_owned(input: &str) -> String {
+    let mut bytes = input.as_bytes().to_vec();
+    for b in bytes.iter_mut() {
+        if *b == b'+' {
+            *b = b' ';
+        }
+    }
+    percent_decode(&bytes).decode_utf8_lossy().into_owned()
+}
+
 /// Decodes a URL-encoded string in place by updating the provided `String`.
 ///
 /// # Arguments

@@ -31,6 +31,8 @@ pub use hotaru_http::meta::*;
 pub use hotaru_http::request::HttpRequest;
 pub use hotaru_http::response::HttpResponse;
 pub use hotaru_http::safety::HttpSafety;
+pub use hotaru_http::start_line::*;
+pub use hotaru_http::send_request;
 
 // Re-export request and response templates
 pub use crate::request_templates;

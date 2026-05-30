@@ -102,7 +102,12 @@ impl UrlExpr {
     }
 
     fn check_url_literal_format(lit: &Literal) -> Result<(), TokenStream> {
-        parse_check_url(&lit.to_string())
+        // `Literal::to_string()` returns the source repr (e.g. `"/x"`, `r"/x"`,
+        // `r#"/x"#`); the URL parser wants the unescaped value, so peel off
+        // the surrounding quotes before handing it over.
+        let raw = lit.to_string();
+        let stripped = strip_str_literal_quotes(&raw).unwrap_or(raw.as_str());
+        parse_check_url(stripped)
             .map_err(|e| {
                 generate_compile_error(
                     Span::call_site(),
@@ -150,9 +155,29 @@ impl UrlExpr {
                     TokenTree::Literal(Literal::string("failed to register URL")),
                 ]); 
                 g 
-            })), 
+            })),
         ]);
         tokens
     }
 }
 
+/// Strip the surrounding delimiters from a Rust string-literal source repr.
+/// Handles `"…"`, `r"…"`, and `r#…"…"#…` raw forms. Returns `None` if the
+/// input doesn't look like a string literal.
+fn strip_str_literal_quotes(src: &str) -> Option<&str> {
+    if let Some(rest) = src.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+        return Some(rest);
+    }
+    if let Some(rest) = src.strip_prefix('r') {
+        let hashes = rest.bytes().take_while(|b| *b == b'#').count();
+        let after_open = rest.get(hashes..)?.strip_prefix('"')?;
+        let close_marker = {
+            let mut s = String::with_capacity(1 + hashes);
+            s.push('"');
+            for _ in 0..hashes { s.push('#'); }
+            s
+        };
+        return after_open.strip_suffix(&close_marker);
+    }
+    None
+}

@@ -1,4 +1,4 @@
-﻿use hotaru_lib::url_encoding::{decode_url_owned, encode_url_owned};
+﻿use hotaru_lib::url_encoding::{decode_form_url_owned, encode_url_owned};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
@@ -23,7 +23,10 @@ impl UrlEncodedForm {
         for pair in form_data.split('&') {
             let parts: Vec<&str> = pair.split('=').collect();
             if parts.len() == 2 {
-                form_map.insert(decode_url_owned(parts[0]), decode_url_owned(parts[1]));
+                form_map.insert(
+                    decode_form_url_owned(parts[0]),
+                    decode_form_url_owned(parts[1]),
+                );
             }
         }
         return UrlEncodedForm { data: form_map };
@@ -509,5 +512,56 @@ impl Default for MultiFormFieldFile {
             content_type: None,
             data: Vec::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `+` in a form body must decode back to a literal space — this is what
+    /// every browser sends for `<form method="POST">`.
+    #[test]
+    fn parse_plus_decodes_to_space() {
+        let form = UrlEncodedForm::parse(b"greeting=Hello+world".to_vec());
+        assert_eq!(form.get("greeting").map(String::as_str), Some("Hello world"));
+    }
+
+    /// `%20` must still decode to a space (the other accepted form-encoding
+    /// for spaces).
+    #[test]
+    fn parse_percent_twenty_decodes_to_space() {
+        let form = UrlEncodedForm::parse(b"greeting=Hello%20world".to_vec());
+        assert_eq!(form.get("greeting").map(String::as_str), Some("Hello world"));
+    }
+
+    /// A literal `+` typed by the user is sent on the wire as `%2B` and must
+    /// decode back to `+`, not to a space.
+    #[test]
+    fn parse_percent_2b_decodes_to_literal_plus() {
+        let form = UrlEncodedForm::parse(b"math=1%2B1".to_vec());
+        assert_eq!(form.get("math").map(String::as_str), Some("1+1"));
+    }
+
+    /// Keys are form-encoded too — `+` in the key should become a space.
+    #[test]
+    fn parse_decodes_plus_in_key() {
+        let form = UrlEncodedForm::parse(b"first+name=Ada".to_vec());
+        assert_eq!(form.get("first name").map(String::as_str), Some("Ada"));
+    }
+
+    #[test]
+    fn parse_multiple_pairs() {
+        let form = UrlEncodedForm::parse(b"a=Hello+world&b=foo%20bar&c=1%2B2".to_vec());
+        assert_eq!(form.get("a").map(String::as_str), Some("Hello world"));
+        assert_eq!(form.get("b").map(String::as_str), Some("foo bar"));
+        assert_eq!(form.get("c").map(String::as_str), Some("1+2"));
+    }
+
+    #[test]
+    fn parse_non_ascii_percent_encoded() {
+        // UTF-8 "héllo" — é is 0xC3 0xA9
+        let form = UrlEncodedForm::parse(b"name=h%C3%A9llo".to_vec());
+        assert_eq!(form.get("name").map(String::as_str), Some("héllo"));
     }
 }

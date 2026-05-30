@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_tls"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "TLS transport for the Hotaru framework"
@@ -10,7 +10,7 @@ categories = ["network-programming", "web-programming::http-server"]
 keywords = ["hotaru", "tls"]
 
 [dependencies]
-hotaru_core = { version = "0.8.0", path = "../hotaru_core" }
+hotaru_core = { version = "0.8.2", path = "../hotaru_core" }
 tokio = { version = "1.28", features = ["full"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }

@@ -3,7 +3,8 @@ pub use crate::Url;
 pub use crate::Value;
 pub use crate::object;
 pub use crate::{AnyPath, AnyUrl, LitUrl, RegUrl, TrailingSlash};
-pub use crate::{Client, RunMode, Server, TcpTransport};
+pub use crate::{Client, RunMode, Server, TcpTransport, TimeoutSetting};
+pub use crate::{Inbound, Outbound};
 pub use crate::{
     ProtocolHandlerBuilder as ProtocolBuilder, ProtocolRegistryBuilder as HandlerBuilder,
     ProtocolRegistryKind,

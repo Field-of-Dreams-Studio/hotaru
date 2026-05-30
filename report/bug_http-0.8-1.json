@@ -1,0 +1,29 @@
+{
+  "type": "bug",
+  "report": {
+    "id": "0.8-http-1",
+    "title": "`application/x-www-form-urlencoded` parser drops spaces: `+` is never substituted back to a space",
+    "summary": "`UrlEncodedForm::parse` in `hotaru_http/src/util/form.rs` and the query-string parser in `RequestPath::from_string` (`hotaru_http/src/message/http_value.rs`) treat `+` as a literal `+`. Per the WHATWG URL spec and the `application/x-www-form-urlencoded` form-submission rules, a `+` on the wire must decode to a space — browsers emit `+` for every space in `<form method=\"POST\">` bodies and in URL query strings. The body parser also percent-decoded `%XX` but skipped the plus-to-space step; the query parser did no decoding at all."
+  },
+  "existing_version": {
+    "hotaru_http": "0.8.2",
+    "hotaru_lib": "0.8.0"
+  },
+  "impact": "Any HTML form field containing a space is silently corrupted: a user typing `Hello world` is stored, echoed, or persisted as `Hello+world`, and the original space is unrecoverable downstream (database writes, template rendering, search indexing). Query strings are worse — neither `+` nor `%XX` was decoded, so `?q=Hello+world` and `?q=Hello%20world` both surfaced to handlers as their raw on-the-wire bytes. Affects every endpoint reached via `req.form().get(...)` or `req.query(...)`.",
+  "behavior_diff": {
+    "expected": "For a POST body `greeting=Hello+world&math=1%2B1`, `form.get(\"greeting\") == Some(\"Hello world\")` and `form.get(\"math\") == Some(\"1+1\")`. For `GET /search?q=Hello+world`, `req.query(\"q\") == Some(\"Hello world\")`.",
+    "actual": "Body parser returned `Some(\"Hello+world\")` and `Some(\"1+1\")` (the `%2B` happened to look correct only because `+` was also left untouched — a literal `+` typed by the user and a `+` representing a space were indistinguishable). Query parser returned the raw on-the-wire string, e.g. `Some(\"Hello+world\")` or `Some(\"Hello%20world\")`, with no decoding performed."
+  },
+  "reproduction": {
+    "language": "rust",
+    "code": "use hotaru_http::util::form::UrlEncodedForm;\n\n// As emitted by Chrome / Firefox / Safari for a single-field <form method=\"POST\">\n// where the user typed \"Hello world\":\nlet form = UrlEncodedForm::parse(b\"greeting=Hello+world\".to_vec());\nassert_eq!(form.get(\"greeting\").map(String::as_str), Some(\"Hello world\"));\n// Pre-fix: returned Some(\"Hello+world\") — the space is permanently lost.\n\n// Query string round-trip:\n//   GET /search?q=Hello+world\n//   req.query(\"q\") pre-fix → Some(\"Hello+world\")\n//   req.query(\"q\") post-fix → Some(\"Hello world\")"
+  },
+  "status": {
+    "state": "fixed",
+    "fix": "Three coordinated changes: (a) `hotaru_lib/src/url_encoding.rs` adds `decode_form_url_owned()` — substitutes `+` to space first, then percent-decodes, so `%2B` correctly survives as a literal `+`; (b) `hotaru_http/src/util/form.rs` — `UrlEncodedForm::parse` now decodes both key and value with `decode_form_url_owned`; (c) `hotaru_http/src/message/http_value.rs` — `RequestPath::from_string` now form-decodes query-string keys and values (previously it did no decoding at all). The encode side already percent-encoded spaces as `%20`, which is valid in both URL and form contexts, so no change was needed there.",
+    "verification": [
+      "cargo build -p hotaru_http -p hotaru_lib",
+      "cargo test -p hotaru_http --lib util::form::tests — 6 new tests cover: `+` → space, `%20` → space, `%2B` → literal `+`, `+` in key, mixed multi-pair body, and non-ASCII UTF-8 (`%C3%A9` → `é`). All pass."
+    ]
+  }
+}

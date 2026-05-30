@@ -17,8 +17,7 @@ members = [
     # "multi_protocol_example",
     "example_hotaru",
     # "example_hotaru_2",
-    # "hyper_hotaru_example",
-    # "hotaru_bench",
+    # "hyper_hotaru_example", 
     # "hotaru_style_guide",
     # "tutorial_examples" 
 ] 

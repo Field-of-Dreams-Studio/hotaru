@@ -3,7 +3,7 @@ pub mod prelude;
 
 pub use hotaru_core::app::client::Client;
 pub use hotaru_core::app::server::Server; 
-pub use hotaru_core::app::common::RunMode;
+pub use hotaru_core::app::common::{RunMode, TimeoutSetting};
 pub use hotaru_core::url::PathPattern;
 pub use hotaru_core::url::UrlRoot as Url;
 pub use hotaru_core::url::{FrameNode, WalkCursor, WalkFrame};
@@ -23,12 +23,13 @@ pub use hotaru_core::object;
 
 pub use hotaru_core::connection::ConnStream;
 pub use hotaru_core::connection::error::{ConnectionError, Result};
+pub use hotaru_core::connection::{Inbound, Outbound};
 pub use hotaru_core::protocol::{
     BoxProtocolError, DefaultProtocolError, EmptyError, Message, Protocol, ProtocolError,
     ProtocolRole, RequestContext, Stream,
 };
 pub use hotaru_core::connection::{
-    TcpAccepter, TcpConnector, TcpConnectorAddr, TcpMeta, TcpTransport,
+    TcpAccepter, TcpConnector, TcpConnectorAddr, TcpInbound, TcpMeta, TcpOutbound, TcpTransport,
 };
 
 pub use hotaru_http::request::request_templates;

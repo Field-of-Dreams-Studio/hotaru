@@ -17,6 +17,9 @@ pub mod context;
 /// [Message Model] HttpRequest, HttpResponse, HttpBody, HttpMeta, HttpStartLine, types
 pub mod message;
 
+/// [One-shot request] `send_request(&outbound, request, safety)` over any `Outbound`
+pub mod send_request;
+
 /// [Security] HttpSafety
 pub mod security;
 
@@ -37,6 +40,7 @@ pub use protocol::{HTTPS, Http1TlsProtocol};
 pub use hotaru_tls::{TlsClientConfig, TlsConfig, TlsOutbound, TlsOutboundTarget, TlsTransport};
 
 pub use protocol::HttpError;
+pub use send_request::send_request;
 
 // ============================================================================
 // Backward-compatible re-exports for external crates (e.g. hotaru, htmstd, h2per)
@@ -86,6 +90,11 @@ pub mod response {
 pub mod safety {
     //! Re-exported from `security::safety`
     pub use crate::security::safety::*;
+}
+
+pub mod start_line {
+    //! Re-exported from `message::start_line`
+    pub use crate::message::start_line::*;
 }
 
 pub mod traits {

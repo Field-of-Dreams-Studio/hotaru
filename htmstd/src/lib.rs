@@ -1,6 +1,8 @@
 pub mod cors;
+pub mod log;
 pub mod session;
 
+pub use log::print_log::PrintLog;
 pub use session::CookieSession;
 pub use session::Session;
 

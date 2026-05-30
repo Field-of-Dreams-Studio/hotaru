@@ -137,6 +137,9 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
 
 impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
     /// Builds a server runtime from the configured server-side builder state.
+    /// 
+    /// Panics - server runtimes require a protocol registry, so this must be set
+    /// via the builder methods before calling `build()`. 
     pub fn build(self) -> Arc<super::super::server::Server<TS>> {
         let registry = self
             .registry
@@ -173,6 +176,9 @@ impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
 
 impl<TS: TransportSpec> AppBuilder<ClientRole, TS> {
     /// Builds a client runtime from the configured client-side builder state.
+    /// 
+    /// Panics - client runtimes require a target and protocol registry, so these must be set
+    /// via the builder methods before calling `build()`. 
     pub fn build(self) -> Arc<Client<TS>> {
         let registry = self
             .registry

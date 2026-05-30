@@ -1,0 +1,29 @@
+{
+  "type": "bug",
+  "report": {
+    "id": "0.8-trans-1",
+    "title": "`endpoint!` / `outpoint!` URL literal check rejects every `<**path>` catch-all",
+    "summary": "The compile-time URL format check in `hotaru_trans` calls `parse_check_url` with the source representation of the string literal (quotes included) instead of its unescaped value, so the trailing `\"` lands in the final segment and the parser reports `AnyPathMixedWithOtherContent`. Every `<**path>` usage in `endpoint!`, `outpoint!`, and their semi-trans / attr forms is rejected at macro expansion time even though the underlying runtime parser would accept it."
+  },
+  "existing_version": {
+    "hotaru_trans": "0.8.1"
+  },
+  "impact": "Blocks any route that uses a multi-segment catch-all. `APP.url(\"/static/<**path>\")`, `#[url(\"/files/<**path:rest>\")]`, and `#[endpoint(\"/static/<**path>\")]` all fail to compile with `Invalid URL literal format: <**path> must be the only content within its segment at index N`. No workaround within the macro — users have to comment out the route and rebuild it as multiple `<str:…>` levels, which is not equivalent because single-segment patterns will not match `/static/css/main.css`.",
+  "behavior_diff": {
+    "expected": "Macro-time URL format check sees the same string the runtime sees (e.g. `/static/<**path>`, 16 chars), and the catch-all is accepted as the sole content of its segment.",
+    "actual": "`Literal::to_string()` returns the source representation (`\"/static/<**path>\"`, 18 chars including the quotes). The final segment is parsed as `<**path>\"`, which fails the \"AnyPath must be the only content of its segment\" check at `hotaru_core/src/url/parser.rs`."
+  },
+  "reproduction": {
+    "language": "rust",
+    "code": "use hotaru::http::*;\nuse hotaru::prelude::*;\n\nLServer!(\n    APP = Server::new()\n        .binding(\"127.0.0.1:3021\")\n        .single_protocol(ProtocolBuilder::new(HTTP::server(HttpSafety::default())))\n        .build()\n);\n\nendpoint! {\n    APP.url(\"/static/<**path>\"),\n    pub static_file<HTTP> { text_response(format!(\"static path: {}\", req.path())) }\n}\n// error: Invalid URL literal format: <**path> must be the only content within its segment at index 7"
+  },
+  "status": {
+    "state": "fixed",
+    "fix": "`hotaru_trans/src/url/urlexpr.rs` — `check_url_literal_format` now passes the unescaped value to `parse_check_url`. Added a `strip_str_literal_quotes` helper that peels `\"…\"`, `r\"…\"`, and `r#\"…\"#` (any hash count) before parsing.",
+    "verification": [
+      "cargo build --workspace",
+      "cargo test --workspace --lib --bins --tests",
+      "Downstream sandbox: `endpoint! { APP.url(\"/static/<**path>\"), … }` compiles and `curl /static/css/main.css` + `curl /static/deep/nested/file.txt` both route to the handler with HTTP 200"
+    ]
+  }
+}

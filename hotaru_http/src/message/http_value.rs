@@ -1852,7 +1852,10 @@ impl RequestPath {
         for arg in args_str.split('&') {
             let arg_parts: Vec<&str> = arg.split('=').collect();
             if arg_parts.len() == 2 {
-                arguments.insert(arg_parts[0].to_string(), arg_parts[1].to_string());
+                arguments.insert(
+                    decode_form_url_owned(arg_parts[0]),
+                    decode_form_url_owned(arg_parts[1]),
+                );
             }
         }
         Self { path, arguments }
