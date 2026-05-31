@@ -3,83 +3,108 @@
 [![Crates.io](https://img.shields.io/crates/v/htmstd)](https://crates.io/crates/htmstd)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Standard middleware collection for the Hotaru web framework, providing common functionality like CORS, sessions, and authentication.
+Standard middleware collection for the Hotaru 0.8.x framework: CORS, cookie-based sessions, request logging.
 
-## Middleware
+## Install
 
-### CORS (Cross-Origin Resource Sharing)
-
-Configure CORS policies for your application:
-
-```rust
-use htmstd::cors::AppCorsSettings;
-
-let app = App::new()
-    .set_config(
-        AppCorsSettings::new()
-            .allow_origin("https://example.com")
-            .allow_methods(vec!["GET", "POST"])
-    )
-    .build();
+```toml
+[dependencies]
+hotaru = "0.8.2"
+htmstd  = "0.8.2"
 ```
 
-### Cookie-Based Sessions
+## Available middleware
 
-Secure session management using encrypted cookies:
+Re-exported at the crate root:
+
+- `htmstd::Cors` — CORS preflight + response-header injection. Reads `AppCorsSettings` from per-endpoint or per-protocol config.
+- `htmstd::CookieSession`, `htmstd::Session` — encrypted cookie-backed sessions.
+- `htmstd::PrintLog` — minimal request logger.
+- `htmstd::cors_settings::AppCorsSettings` — CORS policy struct.
+
+## Attaching middleware
+
+Middleware attaches to a `ProtocolBuilder` via `.append_middleware::<M>()`. Sessions example:
 
 ```rust
-use htmstd::session::CookieSession;
+use hotaru::prelude::*;
+use hotaru::http::*;
+use htmstd::CookieSession;
 
-let app = App::new()
-    .append_middleware::<CookieSession>()
-    .build();
+LServer!(
+    APP = Server::new()
+        .binding("127.0.0.1:3003")
+        .single_protocol(
+            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+                .append_middleware::<CookieSession>(),
+        )
+        .build()
+);
 ```
 
-Access session data in handlers:
+Reading session data from a handler:
 
 ```rust
 endpoint! {
     APP.url("/login"),
-    pub login<HTTP> {
-        let mut session = ctx.get_session();
+    pub fn login<HTTP>(req) {
+        let mut session = req.get_session();
         session.set("user_id", "12345");
         text_response("Logged in")
     }
 }
 ```
 
-## Safety Configuration
+## CORS
 
-Configure HTTP safety limits per endpoint or globally:
+Configure CORS per protocol (global) by appending the `Cors` middleware and supplying an `AppCorsSettings` in `config`:
 
 ```rust
-use hotaru_core::http::HttpSafety;
-use hotaru_core::http::HttpMethod;
+use hotaru::prelude::*;
+use hotaru::http::*;
+use htmstd::{Cors, cors_settings::AppCorsSettings};
+
+endpoint! {
+    APP.url("/api/data"),
+    config = [
+        AppCorsSettings::default()
+            // refine as needed; see AppCorsSettings fields
+    ],
+    middleware = [Cors],
+    pub fn data<HTTP>(req) {
+        text_response("ok")
+    }
+}
+```
+
+## HTTP safety per endpoint
+
+`HttpSafety` lives in `hotaru::http::HttpSafety` (formerly `hotaru_core::http::*` in 0.7-era code). Configure per endpoint:
+
+```rust
+use hotaru::http::{HttpSafety, HttpMethod};
 
 endpoint! {
     APP.url("/api/upload"),
-    config=[HttpSafety::new()
-        .with_max_body_size(50 * 1024 * 1024)  // 50MB
-        .with_allowed_methods(vec![HttpMethod::POST])
+    config = [
+        HttpSafety::new()
+            .with_max_body_size(50 * 1024 * 1024) // 50 MB
+            .with_allowed_methods(vec![HttpMethod::POST])
     ],
-    pub upload<HTTP> {
-        // Handle file upload
+    pub fn upload<HTTP>(req) {
+        // ...
     }
 }
 ```
 
 ## Examples
 
-For complete examples, see:
-- [Session Example](https://github.com/Field-of-Dreams-Studio/sfx)
-- [CORS Example](https://github.com/Field-of-Dreams-Studio/hotaru-example)
+For complete examples, see `example_hotaru` in the workspace.
 
 ## License
 
-MIT License
+MIT
 
 ## Part of Hotaru Framework
 
-This is the standard middleware library for the [Hotaru web framework](https://crates.io/crates/hotaru).
-
-Learn more: https://fds.rs
+Standard middleware library for the [Hotaru web framework](https://crates.io/crates/hotaru). Learn more: https://hotaru.rs
