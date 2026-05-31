@@ -36,6 +36,7 @@
 //! assert_eq!(content, Some("br".to_string()));
 //! ```
 
+#[cfg(feature = "compression")]
 use hotaru_lib::compression;
 
 /// Represents HTTP transfer coding types as defined in HTTP standards.
@@ -197,10 +198,22 @@ impl ContentCoding {
 
     pub fn decode_compressed(encoding: &ContentCoding, data: &[u8]) -> std::io::Result<Vec<u8>> {
         match encoding {
+            #[cfg(feature = "compression")]
             ContentCoding::Gzip => compression::decompress_gzip(data),
+            #[cfg(feature = "compression")]
             ContentCoding::Deflate => compression::decompress_deflate(data),
+            #[cfg(feature = "compression")]
             ContentCoding::Brotli => compression::decompress_brotli(data),
+            #[cfg(feature = "compression")]
             ContentCoding::Zstd => compression::decompress_zstd(data),
+            #[cfg(not(feature = "compression"))]
+            ContentCoding::Gzip
+            | ContentCoding::Deflate
+            | ContentCoding::Brotli
+            | ContentCoding::Zstd => Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "compression feature not enabled",
+            )),
             ContentCoding::Compress => Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
                 "compress encoding not supported",
@@ -211,10 +224,22 @@ impl ContentCoding {
 
     pub fn encode_compressed(encoding: &ContentCoding, data: &[u8]) -> std::io::Result<Vec<u8>> {
         match encoding {
+            #[cfg(feature = "compression")]
             ContentCoding::Gzip => compression::compress_gzip(data),
+            #[cfg(feature = "compression")]
             ContentCoding::Deflate => compression::compress_deflate(data),
+            #[cfg(feature = "compression")]
             ContentCoding::Brotli => compression::compress_brotli(data),
+            #[cfg(feature = "compression")]
             ContentCoding::Zstd => compression::compress_zstd(data, 1),
+            #[cfg(not(feature = "compression"))]
+            ContentCoding::Gzip
+            | ContentCoding::Deflate
+            | ContentCoding::Brotli
+            | ContentCoding::Zstd => Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "compression feature not enabled",
+            )),
             ContentCoding::Compress => Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
                 "compress encoding not supported",

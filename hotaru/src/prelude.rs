@@ -24,9 +24,11 @@ pub use crate::{LClient, LPattern, LServer, LUrl};
 
 // Template rendering (protocol-agnostic)
 pub use crate::AsyncMiddleware;
+#[cfg(feature = "http")]
 pub use crate::ahttpm::akari_json;
+#[cfg(feature = "http")]
 pub use crate::ahttpm::akari_render;
-pub use crate::{Locals, LocalsClone, Params, ParamsClone}; // Always keep this in prelude 
+pub use crate::{Locals, LocalsClone, Params, ParamsClone}; // Always keep this in prelude
 
 pub use std::sync::Arc;
 pub use std::thread::sleep;

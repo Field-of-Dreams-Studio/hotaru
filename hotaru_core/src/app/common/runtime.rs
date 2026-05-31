@@ -54,4 +54,13 @@ impl RuntimeConfig {
     pub fn get_static<T: Clone + Send + Sync + 'static>(&self, key: &str) -> Option<T> {
         self.statics.get::<T>(key).cloned()
     }
+
+    // /// Merge 2 config into one by. The first config will preserve in case of conflict. 
+    // pub fn merge(&mut self, other: Self) {
+    //     // Merge mode: preserve self.mode
+    //     // Merge config: preserve self.config
+    //     // Merge statics: preserve self.statics
+    //     self.config.combine(other.config);
+    //     self.statics.combine(other.statics);
+    // } 
 }

@@ -19,4 +19,4 @@ Most users should depend on the umbrella `hotaru` crate; this crate is the seam 
 
 ## Version
 
-`0.8.0`. Depends on `hotaru_core = 0.8.0`, `hotaru_lib = 0.8.0`.
+`0.8.2`. Depends on `hotaru_core = 0.8.2`, `hotaru_lib = 0.8.2`.

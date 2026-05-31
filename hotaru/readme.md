@@ -2,7 +2,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.1-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.2-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
@@ -78,27 +78,53 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.8.1"
+hotaru = "0.8.2"
 tokio = { version = "1", features = ["full"] }
 ```
 
 ### Optional Features
 
-Hotaru supports the following optional features:
+Default features: `trans`, `http`. Cargo's additive feature unification means sub-features pull in their prerequisites automatically — you never have to enable a base feature by hand.
 
-- **`debug`**: Enable debug logging for development and troubleshooting
-- **`https`**: HTTPS support — pulls in `hotaru_tls` and surfaces `HTTPS` / `TlsTransport` / `TlsOutboundTarget` / `TlsClientConfig`
-- **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation
+**Protocol stack**
 
-  **Note**: When enabling `external-ctor`, you must also add `ctor` to your dependencies:
+- **`http`** *(default-on)*: HTTP/1.1 stack (`hotaru_http` + `ahttpm`). Opt out with `default-features = false` for protocol-only builds (e.g. gRPC-only deployments) — `hotaru::http::*`, `HTTP`, `HttpContext`, `HttpRequest`, `HttpResponse`, etc. then disappear from the crate surface.
+- **`https`**: TLS/HTTPS support — surfaces `HTTPS`, `TlsTransport`, `TlsOutboundTarget`, `TlsClientConfig`. Implies `http`.
+- **`http_compression`**: HTTP body codecs for `Content-Encoding` (gzip / deflate / brotli / zstd). Off by default because `brotli` + `zstd` together add ~7 s to a clean build. Implies `http`. Without this feature, `ContentCoding::decode_compressed` / `encode_compressed` return `io::ErrorKind::Unsupported` for compressed bodies.
+
+**Endpoint macro flavor** — pick one (see Core Concepts):
+
+- **`trans`** *(default)* — bang macro with hotaru-blocks body
+- **`semi-trans`** — stacked attributes above an `fn`
+- **`attr`** — single attribute with args
+
+**Misc**
+
+- **`debug`**: Enable debug logging for development and troubleshooting.
+- **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation. When enabling, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.8.1", features = ["external-ctor"] }
-  ctor = "0.4.0"  # Required when external-ctor feature is enabled
+  hotaru = { version = "0.8.2", features = ["external-ctor"] }
+  ctor = "0.4.0"
   tokio = { version = "1", features = ["full"] }
   ```
 
-  By default, Hotaru uses a built-in constructor implementation that doesn't require any external dependencies.
+**Example — HTTPS server with body compression:**
+
+```toml
+[dependencies]
+hotaru = { version = "0.8.2", features = ["https", "http_compression"] }
+tokio = { version = "1", features = ["full"] }
+```
+
+**Example — gRPC-only (no HTTP):**
+
+```toml
+[dependencies]
+hotaru = { version = "0.8.2", default-features = false, features = ["trans"] }
+hotaru_grpc = "..."
+tokio = { version = "1", features = ["full"] }
+```
 
 ## Binary Commands
 
@@ -171,7 +197,7 @@ pub fn get_user<HTTP>() {
 
 - Endpoints and middleware auto-register at startup — no manual `router.register()`.
 - `trans` form: brace syntax `{}` with doc comments inside the block; angle-bracket body defaults to `req`. Optional fn-style `pub fn name(req: HTTP) { ... }` is also accepted.
-- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.1", default-features = false, features = ["semi-trans"] }`. Cargo feature unification would otherwise keep `trans` on alongside it.
+- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.2", default-features = false, features = ["semi-trans", "http"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` since `default-features = false` also drops the default HTTP stack.
 - See `macro_ra.md` for syntax details. Analyzer support is planned.
 
 ### Middleware
@@ -245,26 +271,25 @@ Hotaru is built on a modular architecture:
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
-## Changelog 
+## Changelog
 
-### 0.8.1 (Current)
-- **`WalkCursor` + `UrlRoot::walk_cursor` (unstable)**: resumable URL-tree traversal cursor. Drains every node whose path-pattern matches a given path, in priority order (literal → regex → `*` → `**`). Foundation for fan-out protocols (MQTT publish → matching subscriptions, broadcast hooks); existing `walk` / `walk_str` are unchanged.
-- **`EmptyError`**: zero-payload template error type implementing every bound `RequestContext::Error` requires (`ProtocolError`, `From<std::io::Error>`, `Send + Sync + 'static`). Use it when prototyping a new `RequestContext` impl, in tests, or in protocols with no meaningful error payload.
-- **`RequestContext::Error: From<std::io::Error>`**: this bound is now part of the trait itself rather than every `Client::*` method's where-clause. The client path touches transport-level I/O which surfaces `std::io::Error`, so every protocol's error type has to absorb it. **Breaking** for hand-written `RequestContext` impls whose `Error` type doesn't already convert from `io::Error` — add a `From<std::io::Error>` impl or use `EmptyError`.
-- **`Protocol::acquire_channel`**: client-side mirror of `open_channel`. Default flow dials fresh per request; multiplexing protocols (HTTP/2, MQTT) can slot a connection pool behind this method without changing the signature. Internally backed by the instance-cached `Arc<TS::Outbound>` on `Client`.
+### 0.8.2 (Current)
+- **`http` (default-on) + `http_compression` (default-off) features**: HTTP and codecs are now optional; `default-features = false` drops HTTP entirely, `https`/`http_compression` imply `http`.
+- **HTTP re-exports moved to `hotaru::http`** (`use hotaru::http::*;`); clean builds ~35 % faster (20.5 s → 13.3 s) from dropping `tracing` and gating heavy codecs.
+- **Workspace + dep alignment**: five core crates pinned to 0.8.2; `regex` bumped 1.5.6 → 1.12.
+- **`hotaru_core` access-point table no longer poisons**: `AccessPointTable` switched to `parking_lot::RwLock` via the existing `PRwLock` alias.
+- **`hotaru_trans` `..` middleware inheritance honors the URL's app ident**: was hardcoded to `APP`, breaking multi-app setups.
+- **`hotaru_trans` anonymous-fn `_` form actually works**: `_` was matched as `Punct` (it's an `Ident`), so the auto-name branch never fired.
 
-### 0.8.0
-- **Client / outpoint runtime**: new `Client<TS>` for outbound traffic, mirroring `Server<TS>`. Includes `Client::request_fn`, `Client::call_fn`, `Client::call_url` for one-shot and persistent outpoint invocation.
-- **`outpoint!` macro**: client-side counterpart to `endpoint!`. The user body becomes the outermost middleware; the `send;` marker triggers the registered chain (terminating in `<P as Protocol>::send(ctx).await`).
-- **`run!` and `call!` macros**: invocation-style sugar — `run!(APP<HTTP>::name, request)` -> `APP.request_fn::<HTTP>("name", request)`; `call!(APP<HTTP>::name)` -> `APP.call_fn::<HTTP>("name")` (plus `: "/path"` form for `call!`).
-- **Protocol trait reshape**: channel-based `open_channel` / `handle(channel, runtime, root)` / `send(ctx) -> ctx`, plus a per-protocol `install_channel(&mut ctx, channel)` bridge. `type Context: RequestContext<Channel = Self::Channel>` pins channel-type alignment.
-- **RequestContext trait**: `Default` supertrait; declares `type Channel: Channel` as a type anchor only (channel lives as a private field on each concrete context — no trait-exposed accessor). Adds `inject_request` / `into_response`. `type Error: ProtocolError` is the single source of truth for chain errors.
+### 0.8.x
+- **Client / outpoint runtime**: new `Client<TS>` for outbound traffic, mirroring `Server<TS>`. Paired with the `outpoint!` macro (client-side counterpart to `endpoint!`) and `run!` / `call!` invocation-style sugar for one-shot and persistent outbound calls.
+- **Protocol trait reshape**: channel-based `open_channel` / `handle` / `send`, plus per-protocol `install_channel` bridge. `type Context: RequestContext<Channel = Self::Channel>` pins channel-type alignment. New `Channel` trait + `ProtocolFlow` give per-exchange close semantics (HTTP/1 closes the connection; multiplexed protocols may close only the stream).
+- **RequestContext rework**: `Default` supertrait; `type Channel` as a type anchor; `inject_request` / `into_response` added. `type Error: ProtocolError` is the single source of truth for chain errors, and now also requires `From<std::io::Error>` (since the client path surfaces transport-level I/O). Use the new `EmptyError` for prototypes / no-payload protocols.
 - **Result-typed execution chain**: middleware, final handlers, `ExecutionChain::run`, and `UrlNode::run` all return `Result<C, <C as RequestContext>::Error>` — no boxing at the chain boundary.
-- **Named access points**: every registered endpoint/outpoint has an explicit name. `ProtocolEntry::register(name, path, step_names, binding, config)` is the single canonical funnel; `AccessPointTable` per protocol entry refreshes Node-variant entries on rebind. `Server::url(url, name, ...)` / `Client::url(url, name, ...)` are URL-first.
-- **Instance-based transports**: `TransportSpec::Inbound` / `Outbound` replace the old `Accepter` / `Connector` shape. `TcpInbound::bind(target)` and `TcpOutbound::build(target)` materialize once per `Server`/`Client`.
+- **Named access points**: every registered endpoint/outpoint has an explicit name. `ProtocolEntry::register(name, path, step_names, binding, config)` is the single canonical funnel; `Server::url(url, name, ...)` / `Client::url(url, name, ...)` are URL-first.
+- **Instance-based transports**: `TransportSpec::Inbound` / `Outbound` replace the old `Accepter` / `Connector` shape. `TcpInbound::bind(target)` and `TcpOutbound::build(target)` materialize once per `Server` / `Client`.
 - **HTTPS feature**: new `https` cargo feature on the umbrella `hotaru` crate forwards to `hotaru_http/tls`, surfacing `HTTPS`, `TlsTransport`, `TlsOutboundTarget`, `TlsClientConfig`. `HTTPS = Http1Protocol<TlsStream, TlsTransport>`.
-- **`Channel` trait + `ProtocolFlow`**: per-exchange close semantics (HTTP/1 closes the connection; multiplexed protocols may close only the stream). `Channel: Clone` is the framework's sharing contract; protocols are free to back the handle with `Arc<...>` internally.
-- New `LServer!`, `LClient!`, `LUrl!`, `LPattern!` macros for simplified lazy static declarations (replaces the old `LApp!`). Defaults to `TcpTransport`; HTTPS clients with `Client<TlsTransport>` currently need a direct `Lazy::new(...)` declaration until the `LClient!` type-parameter passthrough lands.
+- **`LServer!` / `LClient!` / `LUrl!` / `LPattern!` macros**: replace the old `LApp!` for simplified lazy-static declarations. Default to `TcpTransport`.
 
 ### 0.7.x
 - Multi-protocol support (HTTP, WebSocket, custom TCP)

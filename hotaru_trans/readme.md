@@ -38,4 +38,4 @@ Proc-macro crate for the [Hotaru](../hotaru) web framework. Provides the macros 
 
 ## Version
 
-`0.8.1`. Depends on `hotaru_core = 0.8.0`, `hotaru_lib = 0.8.0`.
+`0.8.2`. Depends on `hotaru_core = 0.8.2`, `hotaru_lib = 0.8.2`.

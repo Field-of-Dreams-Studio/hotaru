@@ -146,7 +146,7 @@ impl<TS: TransportSpec> Client<TS> {
                 Ok(Arc::new(TS::Outbound::build(self.target.clone()).await?))
             })
             .await
-    }
+    } 
 
     /// Opens one outbound wire to this client's configured target.
     pub async fn connect(self: &Arc<Self>) -> std::io::Result<TS::Wire> {

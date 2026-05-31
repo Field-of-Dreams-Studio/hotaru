@@ -18,7 +18,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru_lib = { version = "0.7.3", features = ["url_encoding", "compression"] }
+hotaru_lib = { version = "0.8.2", features = ["url_encoding", "compression"] }
 ```
 
 ## Feature Flags

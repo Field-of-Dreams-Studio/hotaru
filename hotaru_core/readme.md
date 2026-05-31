@@ -30,7 +30,7 @@ This is the core framework library. For application development, use the [hotaru
 
 ```toml
 [dependencies]
-hotaru_core = "0.7.5"
+hotaru_core = "0.8.2"
 ```
 
 ## Documentation

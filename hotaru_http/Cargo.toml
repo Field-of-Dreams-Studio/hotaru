@@ -12,7 +12,7 @@ categories = ["network-programming", "web-programming::http-server"]
 [dependencies]
 # Hotaru dependencies
 hotaru_core = { path = "../hotaru_core", version = "0.8.2" }
-hotaru_lib = { path = "../hotaru_lib", version = "0.8.2", features = ["url_encoding", "compression"] }
+hotaru_lib = { path = "../hotaru_lib", version = "0.8.2", features = ["url_encoding"] }
 hotaru_tls = { path = "../hotaru_tls", version = "0.8.1", optional = true }
 
 akari = { version = "0.2.7", features = ["full"] }
@@ -26,6 +26,7 @@ tokio = { version = "1.28", features = ["full"] }
 [features]
 default = []
 tls = ["dep:hotaru_tls"]
+compression = ["hotaru_lib/compression"]
 
 [dev-dependencies]
 tokio-test = "0.4"
