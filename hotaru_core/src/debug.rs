@@ -21,7 +21,7 @@
 //! Then import and use the macros:
 //! ```rust
 //! use hotaru_core::{debug_log, debug_error};
-//!
+//! # let err = "unreachable";
 //! debug_log!("Server started on port {}", 8080);
 //! debug_error!("Connection failed: {}", err);
 //! ```
@@ -34,6 +34,7 @@
 /// # Examples
 /// ```rust
 /// use hotaru_core::debug_log;
+/// # let count = 0;
 /// debug_log!("Connection established");
 /// debug_log!("Processing {} requests", count);
 /// ```
