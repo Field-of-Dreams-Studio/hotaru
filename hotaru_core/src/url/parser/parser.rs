@@ -229,7 +229,7 @@ pub fn tokens_to_patterns(
             if seg_only_any && seg_regex.is_empty() {
                 patterns.push(PathPattern::Any);
             } else {
-                patterns.push(PathPattern::Regex(seg_regex));
+                patterns.push(PathPattern::regex_path(seg_regex));
             }
             names.push(seg_name);
         } else if !seg_literal.is_empty() {
@@ -523,7 +523,7 @@ mod tests {
             pats,
             vec![
                 PathPattern::Literal("".into()),
-                PathPattern::Regex("[^/]+".into())
+                PathPattern::regex_path("[^/]+"),
             ]
         );
         assert_eq!(names, vec![None, None]);
@@ -537,7 +537,7 @@ mod tests {
             pats,
             vec![
                 PathPattern::Literal("".into()),
-                PathPattern::Regex("[^/]+".into()),
+                PathPattern::regex_path("[^/]+"),
                 PathPattern::Literal("".into()),
             ]
         );

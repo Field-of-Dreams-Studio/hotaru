@@ -2,7 +2,10 @@ use core::marker::PhantomData;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    alias::PRwLock, connection::TransportSpec, protocol::RequestContext, url::PathPattern,
+    alias::PRwLock,
+    connection::TransportSpec,
+    protocol::RequestContext,
+    url::{PathPattern, RegexSegment},
 };
 
 use super::{PartialState, UrlNode};
@@ -46,8 +49,12 @@ pub struct LiteralChild<C: RequestContext, TS: TransportSpec = crate::connection
 }
 
 /// Regex child entry kept in insertion order for fallback scanning.
+///
+/// Holds the compiled `RegexSegment` (shared with the originating
+/// `PathPattern::Regex` via `Arc`), so matching against incoming segments
+/// never recompiles the regex.
 pub struct RegexChild<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
-    pattern: String,
+    seg: RegexSegment,
     node: Arc<UrlNode<C, TS>>,
     _ts: PhantomData<TS>,
 }
@@ -188,9 +195,9 @@ impl<C: RequestContext, TS: TransportSpec> ChildrenInner<C, TS> {
     pub fn insert(&mut self, child: Arc<UrlNode<C, TS>>) {
         match &child.path {
             PathPattern::Literal(segment) => self.literals.insert(segment.clone(), child),
-            PathPattern::Regex(pattern) => {
-                self.regex.retain(|entry| entry.pattern() != pattern);
-                self.regex.push(RegexChild::new(pattern.clone(), child));
+            PathPattern::Regex(seg) => {
+                self.regex.retain(|entry| entry.pattern() != seg.src());
+                self.regex.push(RegexChild::new(seg.clone(), child));
             }
             PathPattern::Any => self.any = Some(child),
             PathPattern::AnyPath => self.any_path = Some(child),
@@ -201,8 +208,9 @@ impl<C: RequestContext, TS: TransportSpec> ChildrenInner<C, TS> {
     pub fn remove(&mut self, pattern: &PathPattern) -> Option<Arc<UrlNode<C, TS>>> {
         match pattern {
             PathPattern::Literal(segment) => self.literals.remove(segment),
-            PathPattern::Regex(regex) => {
-                if let Some(pos) = self.regex.iter().position(|entry| entry.pattern() == regex) {
+            PathPattern::Regex(seg) => {
+                if let Some(pos) = self.regex.iter().position(|entry| entry.pattern() == seg.src())
+                {
                     Some(self.regex.remove(pos).node())
                 } else {
                     None
@@ -217,10 +225,10 @@ impl<C: RequestContext, TS: TransportSpec> ChildrenInner<C, TS> {
     pub fn find(&self, pattern: &PathPattern) -> Option<Arc<UrlNode<C, TS>>> {
         match pattern {
             PathPattern::Literal(segment) => self.literals.get(segment),
-            PathPattern::Regex(regex) => self
+            PathPattern::Regex(seg) => self
                 .regex
                 .iter()
-                .find(|entry| entry.pattern() == regex)
+                .find(|entry| entry.pattern() == seg.src())
                 .map(|entry| entry.node()),
             PathPattern::Any => self.any.clone(),
             PathPattern::AnyPath => self.any_path.clone(),
@@ -421,25 +429,24 @@ impl<C: RequestContext, TS: TransportSpec> Clone for LiteralChild<C, TS> {
 }
 
 impl<C: RequestContext, TS: TransportSpec> RegexChild<C, TS> {
-    /// Creates a regex child entry.
-    pub fn new(pattern: String, node: Arc<UrlNode<C, TS>>) -> Self {
+    /// Creates a regex child entry from a compiled `RegexSegment`.
+    pub fn new(seg: RegexSegment, node: Arc<UrlNode<C, TS>>) -> Self {
         Self {
-            pattern,
+            seg,
             node,
             _ts: PhantomData,
         }
     }
 
-    /// Returns whether this regex child matches the segment.
+    /// Returns whether this regex child matches the segment. Reuses the
+    /// cached compiled regex; no recompilation per call.
     pub fn matches(&self, segment: &str) -> bool {
-        regex::Regex::new(&self.pattern)
-            .map(|re| re.is_match(segment))
-            .unwrap_or(false)
+        self.seg.is_match(segment)
     }
 
-    /// Returns the stored regex pattern.
+    /// Returns the stored regex pattern source.
     pub fn pattern(&self) -> &str {
-        &self.pattern
+        self.seg.src()
     }
 
     /// Returns the node attached to this regex child.
@@ -451,7 +458,7 @@ impl<C: RequestContext, TS: TransportSpec> RegexChild<C, TS> {
 impl<C: RequestContext, TS: TransportSpec> Clone for RegexChild<C, TS> {
     fn clone(&self) -> Self {
         Self {
-            pattern: self.pattern.clone(),
+            seg: self.seg.clone(),
             node: self.node.clone(),
             _ts: PhantomData,
         }
@@ -544,10 +551,10 @@ mod tests {
     #[test]
     fn children_insert_regex_and_find() {
         let mut children = Children::<TestContext, TcpTransport>::new();
-        let node = test_node(PathPattern::Regex("^user[0-9]+$".into()));
+        let node = test_node(PathPattern::regex_path("^user[0-9]+$"));
         children.insert(node.clone());
         let found = children
-            .find(&PathPattern::Regex("^user[0-9]+$".into()))
+            .find(&PathPattern::regex_path("^user[0-9]+$"))
             .unwrap();
         assert!(Arc::ptr_eq(&found, &node));
     }
@@ -574,7 +581,7 @@ mod tests {
     fn children_match_prefers_literal_over_others() {
         let mut children = Children::<TestContext, TcpTransport>::new();
         let literal = test_node(PathPattern::Literal("user42".into()));
-        let regex = test_node(PathPattern::Regex("^user[0-9]+$".into()));
+        let regex = test_node(PathPattern::regex_path("^user[0-9]+$"));
         let any = test_node(PathPattern::Any);
         let any_path = test_node(PathPattern::AnyPath);
         children.insert(regex);
@@ -589,7 +596,7 @@ mod tests {
     #[test]
     fn children_match_uses_regex_when_no_literal() {
         let mut children = Children::<TestContext, TcpTransport>::new();
-        let regex = test_node(PathPattern::Regex("^user[0-9]+$".into()));
+        let regex = test_node(PathPattern::regex_path("^user[0-9]+$"));
         children.insert(regex.clone());
 
         let found = children.match_segment("user42").unwrap();
@@ -635,15 +642,15 @@ mod tests {
     #[test]
     fn children_remove_regex() {
         let mut children = Children::<TestContext, TcpTransport>::new();
-        let node = test_node(PathPattern::Regex("^user[0-9]+$".into()));
+        let node = test_node(PathPattern::regex_path("^user[0-9]+$"));
         children.insert(node.clone());
         let removed = children
-            .remove(&PathPattern::Regex("^user[0-9]+$".into()))
+            .remove(&PathPattern::regex_path("^user[0-9]+$"))
             .unwrap();
         assert!(Arc::ptr_eq(&removed, &node));
         assert!(
             children
-                .find(&PathPattern::Regex("^user[0-9]+$".into()))
+                .find(&PathPattern::regex_path("^user[0-9]+$"))
                 .is_none()
         );
     }
@@ -663,7 +670,7 @@ mod tests {
         let mut children = Children::<TestContext, TcpTransport>::new();
         children.insert(test_node(PathPattern::Literal("a".into())));
         children.insert(test_node(PathPattern::Literal("b".into())));
-        children.insert(test_node(PathPattern::Regex("^user[0-9]+$".into())));
+        children.insert(test_node(PathPattern::regex_path("^user[0-9]+$")));
         children.insert(test_node(PathPattern::Any));
         children.insert(test_node(PathPattern::AnyPath));
 
@@ -674,7 +681,7 @@ mod tests {
     fn children_display_string_lists_patterns() {
         let mut children = Children::<TestContext, TcpTransport>::new();
         children.insert(test_node(PathPattern::Literal("home".into())));
-        children.insert(test_node(PathPattern::Regex("^user[0-9]+$".into())));
+        children.insert(test_node(PathPattern::regex_path("^user[0-9]+$")));
         let display = children.display_string();
         assert!(display.contains("Literal: home"));
         assert!(display.contains("Regex: ^user[0-9]+$"));
@@ -693,7 +700,7 @@ mod tests {
     #[test]
     fn children_match_regex_returns_first_matching_child() {
         let mut children = Children::<TestContext, TcpTransport>::new();
-        let regex = test_node(PathPattern::Regex("^user[0-9]+$".into()));
+        let regex = test_node(PathPattern::regex_path("^user[0-9]+$"));
         children.insert(regex.clone());
 
         let found = children.match_regex("user42").unwrap();
@@ -732,8 +739,8 @@ mod tests {
     #[test]
     fn children_match_regex_with_idx_skips_previous_matches() {
         let children = Children::<TestContext, TcpTransport>::new();
-        let first = test_node(PathPattern::Regex("^user.*$".into()));
-        let second = test_node(PathPattern::Regex("^user42$".into()));
+        let first = test_node(PathPattern::regex_path("^user.*$"));
+        let second = test_node(PathPattern::regex_path("^user42$"));
         children.insert(first);
         children.insert(second.clone());
 
@@ -756,8 +763,8 @@ mod tests {
     #[test]
     fn children_match_step_resumes_after_regex() {
         let children = Children::<TestContext, TcpTransport>::new();
-        let first = test_node(PathPattern::Regex("^user.*$".into()));
-        let second = test_node(PathPattern::Regex("^user42$".into()));
+        let first = test_node(PathPattern::regex_path("^user.*$"));
+        let second = test_node(PathPattern::regex_path("^user42$"));
         children.insert(first.clone());
         children.insert(second.clone());
 
