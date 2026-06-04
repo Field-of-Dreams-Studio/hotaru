@@ -1,4 +1,5 @@
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+use core::marker::PhantomData;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     alias::PRwLock, connection::TransportSpec, protocol::RequestContext, url::PathPattern,

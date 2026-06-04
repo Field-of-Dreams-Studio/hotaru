@@ -100,8 +100,8 @@ impl PartialEq for PathPattern {
     }
 }
 
-impl std::fmt::Display for PathPattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for PathPattern {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             PathPattern::Literal(path) => write!(f, "Literal: {}", path),
             PathPattern::Regex(path) => write!(f, "Regex: {}", path),

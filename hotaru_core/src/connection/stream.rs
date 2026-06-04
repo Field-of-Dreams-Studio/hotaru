@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use core::net::SocketAddr;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 /// Per-connection metadata produced when a wire stream is split.

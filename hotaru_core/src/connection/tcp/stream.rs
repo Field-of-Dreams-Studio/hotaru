@@ -1,6 +1,6 @@
 //! TCP wire metadata and `ConnStream` implementation.
 
-use std::net::SocketAddr;
+use core::net::SocketAddr;
 use tokio::io::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 

@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 
 use super::PathPattern;
 use super::parser::PatternError; 
@@ -38,7 +38,7 @@ impl fmt::Display for UrlError {
     }
 }
 
-impl std::error::Error for UrlError {}
+impl core::error::Error for UrlError {}
 
 impl From<PatternError> for UrlError {
     fn from(error: PatternError) -> Self {

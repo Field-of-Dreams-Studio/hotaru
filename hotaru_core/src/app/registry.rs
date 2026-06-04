@@ -19,8 +19,9 @@
 //! wrapper should shrink to just the enum + `from`/`into` + the two
 //! dispatchers + `default_connection_timeout`.
 
-use std::time::Duration;
-use std::{any::TypeId, sync::Arc};
+use core::any::TypeId;
+use core::time::Duration;
+use std::sync::Arc;
 
 use tokio::io::BufReader;
 

@@ -9,7 +9,7 @@ pub type BoxProtocolError = Box<dyn ProtocolError>;
 /// `can_continue` is the policy hook: when a chain returns `Err(boxed)`, the
 /// protocol's `handle`/`send` decides whether the channel survives. The
 /// framework never interprets this flag itself.
-pub trait ProtocolError: std::error::Error + Send + Sync + 'static {
+pub trait ProtocolError: core::error::Error + Send + Sync + 'static {
     fn can_continue(&self) -> bool {
         false
     }
@@ -22,10 +22,10 @@ pub trait ProtocolError: std::error::Error + Send + Sync + 'static {
     }
 }
 
-// Blanket helper so plain `std::error::Error` types can be wrapped trivially
+// Blanket helper so plain `core::error::Error` types can be wrapped trivially
 // when a protocol does not need richer behaviour.
 impl<T> ProtocolError for T where
-    T: std::error::Error + Send + Sync + 'static + DefaultProtocolError
+    T: core::error::Error + Send + Sync + 'static + DefaultProtocolError
 {
 }
 
@@ -47,18 +47,18 @@ impl DefaultProtocolError for std::io::Error {}
 /// beyond "something went wrong."
 ///
 /// Satisfies all bounds required by `RequestContext::Error`:
-/// `std::error::Error + Send + Sync + 'static + ProtocolError +
+/// `core::error::Error + Send + Sync + 'static + ProtocolError +
 /// From<std::io::Error>`.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct EmptyError;
 
-impl std::fmt::Display for EmptyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for EmptyError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("empty error")
     }
 }
 
-impl std::error::Error for EmptyError {}
+impl core::error::Error for EmptyError {}
 
 impl DefaultProtocolError for EmptyError {}
 

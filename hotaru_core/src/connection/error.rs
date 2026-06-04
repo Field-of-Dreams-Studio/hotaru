@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 use std::io;
 
 #[derive(Debug)]
@@ -52,7 +52,7 @@ impl fmt::Display for ConnectionError {
     }
 }
 
-impl std::error::Error for ConnectionError {}
+impl core::error::Error for ConnectionError {}
 
 impl From<io::Error> for ConnectionError {
     fn from(err: io::Error) -> Self {

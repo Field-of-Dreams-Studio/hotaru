@@ -1,4 +1,4 @@
-use std::any::TypeId;
+use core::any::TypeId;
 
 /// Connection status enum used by protocols to signal state changes
 ///

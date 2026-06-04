@@ -2,9 +2,9 @@ use crate::extensions::{ParamValue, ParamsClone};
 use crate::{debug_log, debug_trace};
 use crate::connection::{RequestContext, TransportSpec};
 use crate::url::parser::parse;
-use std::future::Future;
-use std::pin::Pin;
-use std::slice::Iter;
+use core::future::Future;
+use core::pin::Pin;
+use core::slice::Iter;
 use std::sync::Arc;
 use crate::alias::PRwLock; 
 // pub static ROOT_URL: OnceLock<Url> = OnceLock::new();
@@ -109,8 +109,8 @@ pub enum Ancestor<C: RequestContext, TS: TransportSpec = crate::connection::tcp:
     Some(Arc<Url<C, TS>>),
 }
 
-impl<C: RequestContext, TS: TransportSpec> std::fmt::Display for Url<C, TS> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<C: RequestContext, TS: TransportSpec> core::fmt::Display for Url<C, TS> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut func_str = String::new();
         // Look for whether the fuction is None or not
         if self.binding.read().has_handler() {

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use core::time::Duration;
 
 /// Controls how long a timeout is, or whether it is active at all.
 #[derive(Clone, Copy, Debug)]

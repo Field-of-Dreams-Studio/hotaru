@@ -1,7 +1,7 @@
 //! TCP primitive accepter and connector implementations.
 
 use async_trait::async_trait;
-use std::net::SocketAddr;
+use core::net::SocketAddr;
 use tokio::net::TcpStream;
 
 use crate::connection::{Accepter, Connector};

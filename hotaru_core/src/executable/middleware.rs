@@ -1,11 +1,11 @@
-use std::future::Future;
-use std::pin::Pin;
+use core::future::Future;
+use core::pin::Pin;
 use std::sync::Arc;
 
 // use crate::debug_log;
 
 use crate::protocol::RequestContext;
-use std::any::Any;
+use core::any::Any;
 
 /// A boxed future returning `C`.
 pub type BoxFuture<C> = Pin<Box<

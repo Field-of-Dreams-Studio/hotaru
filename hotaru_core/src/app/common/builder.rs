@@ -1,4 +1,5 @@
-use std::{marker::PhantomData, sync::Arc};
+use core::marker::PhantomData;
+use std::sync::Arc;
 
 use crate::{
     app::{
