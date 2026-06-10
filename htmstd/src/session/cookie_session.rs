@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
 use akari::Value;
 use hotaru_core::executable::middleware::AsyncMiddleware;
-use hotaru_http::cookie::Cookie;
+use hotaru_core::{debug_log, debug_warn};
+use hotaru_http::cookie::{Cookie, SameSite};
 use hotaru_core::protocol::{Protocol, RequestContext};
 use hotaru_http::traits::HTTP;
 use hotaru_trans::middleware;
@@ -10,6 +12,28 @@ use hotaru_trans::middleware;
 use hotaru_lib::ende::aes;
 
 use crate::session::session_counter;
+
+/// Process-wide fallback session secret, generated once on first use when
+/// no secret `String` is registered in the runtime config.
+///
+/// A random secret keeps session cookies unforgeable even when the app
+/// forgot to configure one, but it lives only as long as the process:
+/// sessions are invalidated on restart and cannot be shared between
+/// instances behind a load balancer. Register a real secret in production.
+static FALLBACK_SECRET: OnceLock<String> = OnceLock::new();
+
+fn fallback_secret() -> String {
+    FALLBACK_SECRET
+        .get_or_init(|| {
+            debug_warn!(
+                "CookieSession: no session secret configured; \
+                 using a random per-process secret. Sessions will not \
+                 survive restarts or be shared across instances."
+            );
+            hotaru_lib::random::random_string(64)
+        })
+        .clone()
+}
 
 pub struct CSessionRW(HashMap<String, Value>, bool);
 
@@ -75,7 +99,7 @@ middleware!(
         let serect_key = req
             .runtime()
             .and_then(|rt| rt.get_config::<String>())
-            .unwrap_or("super_secret_key".to_string());
+            .unwrap_or_else(fallback_secret);
         let password = format!("{}{}", serect_key, session_id);
 
         let session_raw = req.get_cookie("session_cont").map(|c| c.get_value().to_owned()).unwrap_or("No Cookie Cont".to_owned());
@@ -98,11 +122,11 @@ middleware!(
             },
         );
 
-        println!("CookieSession: Setting session in params");
+        debug_log!("CookieSession: Setting session in params");
         req.params.set(session);
-        println!("CookieSession: About to call next middleware");
+        debug_log!("CookieSession: About to call next middleware");
         let mut req = next(req).await?; // Continue middleware chain
-        println!("CookieSession: Returned from middleware chain");
+        debug_log!("CookieSession: Returned from middleware chain");
 
         let (session, is_modified) = req
             .params
@@ -113,16 +137,26 @@ middleware!(
         // println!("Cookie Session: {}", session);
 
         if is_modified|new_id_generated {
-            println!("Session modified, saving to cookies... {} ", session);
+            debug_log!("Session modified, saving to cookies... {} ", session);
             req.response = req
                 .response
-                .add_cookie("session_id", Cookie::new(session_id.to_string()).path("/"))
+                .add_cookie(
+                    "session_id",
+                    Cookie::new(session_id.to_string())
+                        .path("/")
+                        .http_only(true)
+                        .secure(true)
+                        .same_site(SameSite::Lax),
+                )
                 .add_cookie(
                     "session_cont",
                     Cookie::new(
                         aes::encrypt(&session.into_json(), &password).unwrap_or("".to_string()),
                     )
-                    .path("/"),
+                    .path("/")
+                    .http_only(true)
+                    .secure(true)
+                    .same_site(SameSite::Lax),
                 ); // Set cookie with session ID
         }
 
