@@ -73,19 +73,24 @@ const UNSET_ADDR: SocketAddr =
 
 impl<TS: TransportSpec> HttpContext<TS> {
     /// Creates a new server context with socket addresses.
+    ///
+    /// `safety` is the per-connection baseline supplied by the protocol;
+    /// per-endpoint overrides overlay on top of it in `request_check` /
+    /// `parse_body`.
     pub fn new_server(
         runtime: Arc<RuntimeConfig>,
         endpoint: Arc<UrlNode<HttpContext<TS>, TS>>,
         request: HttpRequest,
         remote_addr: Option<SocketAddr>,
         local_addr: Option<SocketAddr>,
+        safety: HttpSafety,
     ) -> Self {
         Self {
             request,
             response: HttpResponse::default(),
             executable: Executable::Request { runtime, endpoint },
             host: None,
-            safety: HttpSafety::default(),
+            safety,
             remote_addr,
             local_addr,
             params: Default::default(),
@@ -94,13 +99,17 @@ impl<TS: TransportSpec> HttpContext<TS> {
         }
     }
 
-    /// Creates a new client context
+    /// Creates a new client context.
+    ///
+    /// An empty `host` is normalized to `None` so downstream Host auto-fill
+    /// never emits a `Host:` header with an empty value (which nginx and
+    /// other strict servers reject with 400).
     pub fn new_client(host: String, safety: HttpSafety) -> Self {
         Self {
             request: HttpRequest::default(),
             response: HttpResponse::default(),
             executable: Executable::<TS>::Response,
-            host: Some(host),
+            host: if host.is_empty() { None } else { Some(host) },
             safety,
             remote_addr: None,
             local_addr: None,
@@ -269,10 +278,12 @@ impl<TS: TransportSpec> HttpContext<TS> {
         &mut self,
         endpoint: &Arc<UrlNode<HttpContext<TS>, TS>>,
     ) -> Result<(), HttpError> {
-        let config = endpoint.get_params::<HttpSafety>().unwrap_or_default();
-        // println!(
-        //     "Checking request: {:?} {}{} ",config,self.request.meta.method(),config.check_method(&self.request.meta.method())
-        // );
+        // Start from the protocol baseline (`self.safety`); overlay any
+        // per-endpoint override on top.
+        let mut config = self.safety.clone();
+        if let Some(ep) = endpoint.get_params::<HttpSafety>() {
+            config.update(&ep);
+        }
         if !config.check_body_size(self.request.meta.get_content_length().unwrap_or(0)) {
             return Err(HttpError::PayloadTooLarge);
         }
@@ -311,17 +322,19 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// The automatic parsing is not recommended, as it can lead to performance issues and security vulnerabilities.
     /// If you didn't parse body, the body will be `HttpBody::Unparsed`.
     pub async fn parse_body(&mut self) {
-        let safety_settings = if let Some(endpoint) = self.endpoint() {
-            let mut settings = endpoint.get_params::<HttpSafety>().unwrap_or_default();
-            settings.update(&endpoint.get_params::<HttpSafety>().unwrap_or_default());
-            settings
-        } else {
-            self.safety.clone()
-        };
+        // Start from the protocol baseline (`self.safety`); overlay any
+        // per-endpoint override on top. (The prior implementation fetched
+        // `endpoint.get_params::<HttpSafety>()` twice — the second call was
+        // a no-op clone, and the baseline was ignored entirely.)
+        let mut settings = self.safety.clone();
+        if let Some(endpoint) = self.endpoint() {
+            if let Some(ep) = endpoint.get_params::<HttpSafety>() {
+                settings.update(&ep);
+            }
+        }
 
-        // Take the body out, replacing it with the default temporarily
         let body = std::mem::take(&mut self.request.body);
-        self.request.body = body.parse_buffer(&safety_settings);
+        self.request.body = body.parse_buffer(&settings);
     }
 
     /// Returns the body of the request as a reference to `HttpBody`.
@@ -570,8 +583,8 @@ impl<TS: TransportSpec> HttpContext<TS> {
 
     pub fn request(&mut self, mut request: HttpRequest) {
         if request.meta.get_host().is_none() {
-            if let Some(ref host) = self.host {
-                request.meta.set_host(Some(host.clone()));
+            if let Some(host) = self.host.as_deref().filter(|h| !h.is_empty()) {
+                request.meta.set_host(Some(host.to_string()));
             }
         };
         self.request = request;

@@ -11,14 +11,15 @@ categories = ["network-programming", "web-programming::http-server"]
 keywords = ["hotaru"]
 
 [dependencies]
-akari = { version = "0.2.6", features = ["full"] }
+akari = { version = "=0.2.8-rc1", default-features = false, features = ["dynamic", "extension", "object_macro"] }
 tokio = { version = "1.28", features = ["full"] }
-parking_lot = "0.12" 
-av = "0.1" 
+parking_lot = "0.12"
+av = "0.1"
 
 hotaru_lib = { version = "0.8.2", path = "../hotaru_lib" , features = ["url_encoding"] }
+# Unicode features are pulled in by the `full` / `lite` features below — keep
+# this list to perf-only flags so the unicode footprint stays opt-in.
 regex = { version = "1.12", default-features = false, features = [
-    "unicode",
     "perf-dfa",
     "perf-onepass",
     "perf-backtrack",
@@ -28,8 +29,7 @@ regex = { version = "1.12", default-features = false, features = [
 futures = "0.3"
 futures-core = "0.3"
 futures-util = "0.3"
-tokio-util = { version = "0.7", features = ["codec"] } 
-once_cell = "1.17" 
+tokio-util = { version = "0.7", features = ["codec"] }
 async-trait = "0.1.88"
 
 [dev-dependencies]
@@ -39,7 +39,9 @@ rand = "0.8"
 quickcheck = "1.0"
 env_logger = "0.10"
 
-[features] 
-default = [] 
+[features]
+default = ["full"]
+full = ["regex/unicode", "akari/full"]        # normal devices
+lite = ["regex/unicode-perl", "akari/no_std"] # small devices
 
-dev-log = [] # Feature for debugging hotaru 
+dev-log = [] # Feature for debugging hotaru

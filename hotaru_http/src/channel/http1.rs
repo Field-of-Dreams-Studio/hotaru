@@ -28,17 +28,15 @@ use crate::security::safety::HttpSafety;
 
 /// HTTP/1 channel for the Protocol trait.
 ///
-/// Exposes shared I/O handles that can be used by the protocol-level
-/// `handle` implementation. All I/O logic lives in the channel methods.
-///
-/// `meta` is the connection metadata captured at `ConnStream::split` time;
-/// it is the canonical source for `local_addr` / `remote_addr` and any
-/// transport-specific extension data (ALPN, peer cert, proxy headers).
+/// Carries the per-connection safety baseline (`Arc<HttpSafety>`) injected
+/// at `open_channel` / `acquire_channel` time, so per-request I/O does not
+/// hit `RuntimeConfig`.
 pub struct Http1Channel<W: ConnStream> {
     reader: Arc<Mutex<BufReader<W::ReadHalf>>>,
     writer: Arc<Mutex<W::WriteHalf>>,
     meta: Arc<W::Meta>,
     open: Arc<AtomicBool>,
+    safety: Arc<HttpSafety>,
 }
 
 impl<W: ConnStream> Clone for Http1Channel<W> {
@@ -48,6 +46,7 @@ impl<W: ConnStream> Clone for Http1Channel<W> {
             writer: self.writer.clone(),
             meta: self.meta.clone(),
             open: self.open.clone(),
+            safety: self.safety.clone(),
         }
     }
 }
@@ -129,17 +128,30 @@ impl<W: ConnStream> HttpChannel for Http1Channel<W> {
 }
 
 impl<W: ConnStream> Http1Channel<W> {
-    /// Creates a new HTTP/1 channel from a split wire and its meta.
+    /// Creates a new HTTP/1 channel from a split wire, its meta, and the
+    /// per-connection safety baseline.
     pub fn new(
         reader: BufReader<W::ReadHalf>,
         writer: W::WriteHalf,
         meta: W::Meta,
+        safety: Arc<HttpSafety>,
     ) -> Self {
         Self {
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
             meta: Arc::new(meta),
             open: Arc::new(AtomicBool::new(true)),
+            safety,
         }
+    }
+
+    /// Borrows the per-connection safety baseline.
+    pub fn safety(&self) -> &HttpSafety {
+        &self.safety
+    }
+
+    /// Cheap `Arc` clone of the per-connection safety baseline.
+    pub fn safety_arc(&self) -> Arc<HttpSafety> {
+        self.safety.clone()
     }
 }

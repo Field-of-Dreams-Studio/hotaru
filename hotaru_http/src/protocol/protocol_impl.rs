@@ -58,16 +58,15 @@ pub type HTTPS = Http1TlsProtocol;
 
 /// HTTP/1.1 protocol handler.
 ///
-/// Implements the Protocol trait for HTTP/1.1, handling both
-/// server and client roles.
-///
-/// Generic over the concrete wire stream type so the same logic can be used
-/// for TCP and TLS transports without duplicating protocol code.
+/// Generic over the concrete wire stream type so the same logic serves TCP
+/// and TLS transports. Owns the per-instance `HttpSafety` baseline as an
+/// `Arc` so per-connection clones are an atomic bump.
 pub struct Http1Protocol<
     W: ConnStream = TcpStream,
     TS: TransportSpec<Wire = W> = DefaultHttpTransport,
 > {
     role: ProtocolRole,
+    safety: Arc<HttpSafety>,
     _wire: PhantomData<fn() -> W>,
     _ts: PhantomData<fn() -> TS>,
 }
@@ -76,6 +75,7 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Clone for Http1Protocol<W, TS> 
     fn clone(&self) -> Self {
         Self {
             role: self.role,
+            safety: self.safety.clone(),
             _wire: PhantomData,
             _ts: PhantomData,
         }
@@ -83,27 +83,29 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Clone for Http1Protocol<W, TS> 
 }
 
 impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
-    /// Creates a new HTTP/1.1 protocol handler for server role.
-    ///
-    /// The `_safety` parameter is accepted for API compatibility; the live
-    /// `HttpSafety` used per request comes from `RuntimeConfig`.
-    pub fn server(_safety: HttpSafety) -> Self {
+    /// Server role with `safety` as the per-connection baseline.
+    pub fn server(safety: HttpSafety) -> Self {
         Self {
             role: ProtocolRole::Server,
+            safety: Arc::new(safety),
             _wire: PhantomData,
             _ts: PhantomData,
         }
     }
 
-    /// Creates a new HTTP/1.1 protocol handler for client role.
-    ///
-    /// See [`server`](Self::server) regarding `_safety`.
-    pub fn client(_safety: HttpSafety) -> Self {
+    /// Client role with `safety` as the per-connection baseline.
+    pub fn client(safety: HttpSafety) -> Self {
         Self {
             role: ProtocolRole::Client,
+            safety: Arc::new(safety),
             _wire: PhantomData,
             _ts: PhantomData,
         }
+    }
+
+    /// Borrows this protocol's safety baseline.
+    pub fn safety(&self) -> &HttpSafety {
+        &self.safety
     }
 }
 
@@ -146,7 +148,8 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         writer: <<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf,
         meta: <<Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
     ) -> Self::Channel {
-        Http1Channel::new(reader, writer, meta)
+        let safety = self.safety.clone();
+        Http1Channel::new(reader, writer, meta, safety)
     }
 
     async fn handle(
@@ -154,10 +157,9 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         runtime: Arc<RuntimeConfig>,
         root: Arc<UrlRoot<Self::Context, Self::TS>>,
     ) -> Result<ProtocolFlow, <Self::Context as RequestContext>::Error> {
-        let safety = runtime.get_config::<HttpSafety>().unwrap_or_default();
-
-        // 1. Parse one request.
-        let request = channel.parse_request(&safety).await?;
+        // 1. Parse one request using the channel-stored safety baseline
+        //    (no per-request HashMap lookup against RuntimeConfig).
+        let request = channel.parse_request(channel.safety()).await?;
         let keep_alive = is_keep_alive(&request);
 
         // 2. Walk URL tree.
@@ -172,12 +174,15 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         };
 
         // 3. Build context, run chain. Addresses come from the channel's meta.
+        //    Seed ctx.safety from the protocol baseline so endpoint overrides
+        //    overlay on top of it instead of falling back to defaults.
         let mut ctx = HttpContext::new_server(
             runtime.clone(),
             endpoint.clone(),
             request,
             channel.remote_addr(),
             channel.local_addr(),
+            channel.safety().clone(),
         );
         ctx.install_channel(channel.clone());
 
@@ -205,7 +210,7 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         let wire = outbound.connect().await?;
         let (read, write, meta) = wire.split();
         let reader = BufReader::new(read);
-        Ok(self.clone().open_channel(reader, write, meta))
+        Ok(Http1Channel::new(reader, write, meta, self.safety.clone()))
     }
 
     async fn send(
@@ -219,8 +224,8 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         let safety = ctx.safety.clone();
 
         if ctx.request.meta.get_host().is_none() {
-            if let Some(host) = ctx.host.clone() {
-                ctx.request.meta.set_host(Some(host));
+            if let Some(host) = ctx.host.as_deref().filter(|h| !h.is_empty()) {
+                ctx.request.meta.set_host(Some(host.to_string()));
             }
         }
 

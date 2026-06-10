@@ -23,6 +23,8 @@
 //! The caller is responsible for setting the `Host` header on `request` —
 //! the helper does not know the hostname (only the `Outbound` does).
 
+use std::sync::Arc;
+
 use hotaru_core::connection::{ConnStream, Outbound};
 use hotaru_core::protocol::Channel;
 use tokio::io::BufReader;
@@ -51,11 +53,12 @@ where
 {
     let wire = outbound.connect().await.map_err(HttpError::Io)?;
     let (read, write, meta) = wire.split();
-    let channel = Http1Channel::<O::Wire>::new(BufReader::new(read), write, meta);
+    let channel =
+        Http1Channel::<O::Wire>::new(BufReader::new(read), write, meta, Arc::new(safety));
 
     let result = async {
         channel.send_request(request).await?;
-        channel.parse_response(&safety).await
+        channel.parse_response(channel.safety()).await
     }
     .await;
 
