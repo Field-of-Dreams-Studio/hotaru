@@ -1,3 +1,5 @@
+use super::parser::PatternError;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RawToken {
     // Plain URL literals (outside <...> or free-form content inside).
@@ -119,7 +121,7 @@ fn count_pipes(chars: &[char], mut i: usize) -> usize {
 //
 // This function only performs tokenization (string chopping + escape handling). It does not validate
 // the grammar beyond simple classification of idents/types.
-pub fn tokenize(input: &str) -> Vec<RawToken> {
+pub fn tokenize(input: &str) -> Result<Vec<RawToken>, PatternError> {
     let chars: Vec<char> = input.chars().collect();
     let mut i = 0usize;
     let mut out = Vec::new();
@@ -361,7 +363,7 @@ pub fn tokenize(input: &str) -> Vec<RawToken> {
         RawToken::push_literal(&mut lit_buf, &mut out);
     }
 
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -373,7 +375,7 @@ mod tests {
         // <||\d+||:name> =>
         // AngleStart, Pipe, Pipe, Literal(\d+), Pipe, Pipe, Colon, Ident(name), AngleClose
         let input = "<||\\d+||:name>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             Pipe,
@@ -391,7 +393,7 @@ mod tests {
     #[test]
     fn root_url() {
         let input = "/";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![Slash];
         assert_eq!(tokens, expected);
     }
@@ -399,7 +401,7 @@ mod tests {
     #[test]
     fn any_ident() {
         let input = "<id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![AngleStart, super::RawToken::Ident("id".into()), AngleClose];
         assert_eq!(tokens, expected);
     }
@@ -407,7 +409,7 @@ mod tests {
     #[test]
     fn type_without_name() {
         let input = "<int>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![AngleStart, super::RawToken::Type(TypeKind::Int), AngleClose];
         assert_eq!(tokens, expected);
     }
@@ -415,7 +417,7 @@ mod tests {
     #[test]
     fn special_type_and_name_int() {
         let input = "<int:id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Int),
@@ -429,7 +431,7 @@ mod tests {
     #[test]
     fn special_type_and_name_uint() {
         let input = "<uint:id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::UInt),
@@ -443,7 +445,7 @@ mod tests {
     #[test]
     fn special_type_decimal() {
         let input = "<decimal:price>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Decimal),
@@ -457,7 +459,7 @@ mod tests {
     #[test]
     fn special_type_str() {
         let input = "<str:slug>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Str),
@@ -471,7 +473,7 @@ mod tests {
     #[test]
     fn uuid_type_with_name() {
         let input = "<uuid:order_id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Uuid),
@@ -485,7 +487,7 @@ mod tests {
     #[test]
     fn any_path() {
         let input = "<**path>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Path),
@@ -497,7 +499,7 @@ mod tests {
     #[test]
     fn outside_literals_and_angle_with_slash_separators() {
         let input = "/users/<id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             Slash,
             Literal("users".into()),
@@ -512,7 +514,7 @@ mod tests {
     #[test]
     fn trailing_slash() {
         let input = "/users/<id>/";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             Slash,
             Literal("users".into()),
@@ -527,17 +529,17 @@ mod tests {
 
     #[test]
     fn root_only_slash_and_double_slash() {
-        let tokens = tokenize("/");
+        let tokens = tokenize("/").unwrap();
         assert_eq!(tokens, vec![Slash]);
 
-        let tokens = tokenize("//");
+        let tokens = tokenize("//").unwrap();
         assert_eq!(tokens, vec![Slash, Slash]);
     }
 
     #[test]
     fn escape_angles_with_backslash() {
         let input = "foo\\<bar\\>baz";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![Literal("foo<bar>baz".into())];
         assert_eq!(tokens, expected);
     }
@@ -545,7 +547,7 @@ mod tests {
     #[test]
     fn triple_pipe_regex_with_internal_pipe() {
         let input = "<|||a|b|||:name>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             Pipe,
@@ -565,7 +567,7 @@ mod tests {
     #[test]
     fn freeform_regex_without_block_allows_single_pipes() {
         let input = "<a|b:c>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             Ident("a".into()),

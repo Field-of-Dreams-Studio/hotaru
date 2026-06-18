@@ -4,6 +4,7 @@ pub mod session_counter;
 
 pub use self::cookie_session::CSessionRW;
 pub use self::cookie_session::CookieSession;
+pub use self::cookie_session::SessionSecret;
 
 pub use self::session::Session;
 pub use self::session::SessionCont;

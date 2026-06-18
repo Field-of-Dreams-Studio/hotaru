@@ -61,6 +61,42 @@ pub trait Protocol: Clone + Send + Sync + 'static {
         Some(Duration::from_secs(30))
     }
 
+    /// Tokenize a URL pattern into the framework's token stream.
+    ///
+    /// Default impl uses [`crate::url::tokenize`]. Protocols with a
+    /// non-HTTP URL syntax (MQTT topic filters, gRPC method paths, etc.)
+    /// override this to plug in a custom lexer while still emitting
+    /// `Vec<RawToken>` for the shared `tokens_to_patterns` stage.
+    fn tokenize_url(
+        input: &str,
+    ) -> Result<Vec<crate::url::RawToken>, crate::url::PatternError>
+    where
+        Self: Sized,
+    {
+        crate::url::tokenize(input)
+    }
+
+    /// Split an incoming URL/topic literal into segments for the walker.
+    ///
+    /// Counterpart to [`Protocol::tokenize_url`]: that one handles the
+    /// pattern side at registration; this one handles the literal side
+    /// at request dispatch.
+    ///
+    /// The default impl is intentionally minimal — it returns the whole
+    /// literal as a single segment. The framework does not assume any
+    /// particular separator convention; each protocol declares its own.
+    ///
+    /// Note for overriders: an empty returned `Vec` makes
+    /// [`crate::url::UrlRoot::walk`] consult the root-endpoint slot (the
+    /// segmentless slot used by MQTT and any protocol with a meaningful
+    /// empty address). A non-empty `Vec` walks the tree.
+    fn lit_parser<'a>(input: &'a str) -> Vec<&'a str>
+    where
+        Self: Sized,
+    {
+        vec![input]
+    }
+
     /// Detects if this protocol can handle the connection.
     fn detect(initial_bytes: &[u8]) -> bool
     where

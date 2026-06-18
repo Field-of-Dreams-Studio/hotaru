@@ -149,7 +149,8 @@ impl<TS: TransportSpec> Server<TS> {
         if executable.has_no_middlewares() {
             executable.set_middlewares(self.registry.get_protocol_middlewares::<P>());
         }
-        let (path, step_names) = crate::url::parser::parse(url.as_ref())?;
+        let tokens = P::tokenize_url(url.as_ref())?;
+        let (path, step_names) = crate::url::tokens_to_patterns(&tokens)?;
         self.registry.register::<P, _>(name, path, step_names.into(), executable, config)?;
         Ok(())
     }

@@ -11,6 +11,7 @@ pub use self::node::{
     Children, ChildrenInner, FrameNode, LiteralChild, RegexChild, StepName, UrlNode, WalkCursor,
     WalkFrame,
 };
+pub use self::parser::{PatternError, RawToken, TypeKind, tokenize, tokens_to_patterns};
 pub use self::pattern::{PathPattern, RegexSegment, path_pattern_creator::*};
 pub use self::root::UrlRegistration;
 pub use self::root::UrlRoot;

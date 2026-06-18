@@ -14,13 +14,13 @@ use hotaru_lib::ende::aes;
 use crate::session::session_counter;
 
 /// Process-wide fallback session secret, generated once on first use when
-/// no secret `String` is registered in the runtime config.
+/// no usable [`SessionSecret`] is registered in the runtime config.
 ///
 /// A random secret keeps session cookies unforgeable even when the app
 /// forgot to configure one, but it lives only as long as the process:
 /// sessions are invalidated on restart and cannot be shared between
 /// instances behind a load balancer. Register a real secret in production.
-static FALLBACK_SECRET: OnceLock<String> = OnceLock::new();
+static FALLBACK_SECRET: OnceLock<SessionSecret> = OnceLock::new();
 
 fn fallback_secret() -> String {
     FALLBACK_SECRET
@@ -30,9 +30,45 @@ fn fallback_secret() -> String {
                  using a random per-process secret. Sessions will not \
                  survive restarts or be shared across instances."
             );
-            hotaru_lib::random::random_string(64)
+            SessionSecret::generate()
         })
+        .0
         .clone()
+        .expect("SessionSecret::generate always holds a secret")
+}
+
+/// Minimum secret length in bytes. The key derivation (HKDF) does no
+/// brute-force stretching, so the secret itself must carry the entropy.
+const MIN_SECRET_BYTES: usize = 32;
+
+/// Newtype for the cookie-session secret. Register with
+/// `set_config(SessionSecret::new(..))` so an unrelated `String` config
+/// can never silently become key material.
+#[derive(Clone)]
+pub struct SessionSecret(Option<String>);
+
+impl SessionSecret {
+    /// Secrets shorter than 32 bytes are refused: the value is dropped and
+    /// the random per-process fallback is used instead. Use 32+ random
+    /// bytes, not a passphrase — length is only a proxy for entropy.
+    pub fn new<T: Into<String>>(secret: T) -> Self {
+        let secret = secret.into();
+        if secret.len() < MIN_SECRET_BYTES {
+            debug_warn!(
+                "SessionSecret: secret shorter than {} bytes refused; \
+                 the random per-process fallback will be used.",
+                MIN_SECRET_BYTES
+            );
+            SessionSecret(None)
+        } else {
+            SessionSecret(Some(secret))
+        }
+    }
+
+    /// A fresh random secret (64 printable ASCII chars, ~419 bits).
+    pub fn generate() -> Self {
+        SessionSecret(Some(hotaru_lib::random::random_string(64)))
+    }
 }
 
 pub struct CSessionRW(HashMap<String, Value>, bool);
@@ -98,7 +134,8 @@ middleware!(
 
         let serect_key = req
             .runtime()
-            .and_then(|rt| rt.get_config::<String>())
+            .and_then(|rt| rt.get_config::<SessionSecret>())
+            .and_then(|s| s.0)
             .unwrap_or_else(fallback_secret);
         let password = format!("{}{}", serect_key, session_id);
 
@@ -137,7 +174,8 @@ middleware!(
         // println!("Cookie Session: {}", session);
 
         if is_modified|new_id_generated {
-            debug_log!("Session modified, saving to cookies... {} ", session);
+            // Never log `session` itself: it holds decrypted user data.
+            debug_log!("CookieSession: session modified, saving to cookies (id={})", session_id);
             req.response = req
                 .response
                 .add_cookie(
@@ -163,3 +201,25 @@ middleware!(
         Ok(req)
     }
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn short_secret_refused() {
+        assert!(SessionSecret::new("too short").0.is_none());
+        assert!(SessionSecret::new("a".repeat(MIN_SECRET_BYTES - 1)).0.is_none());
+    }
+
+    #[test]
+    fn long_secret_accepted() {
+        assert!(SessionSecret::new("a".repeat(MIN_SECRET_BYTES)).0.is_some());
+    }
+
+    #[test]
+    fn generated_secret_is_long_enough() {
+        let secret = SessionSecret::generate();
+        assert!(secret.0.expect("generated").len() >= MIN_SECRET_BYTES);
+    }
+}

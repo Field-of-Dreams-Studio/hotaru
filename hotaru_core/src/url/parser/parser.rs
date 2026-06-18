@@ -441,7 +441,7 @@ mod tests {
 
     #[test]
     fn ok_literal_and_named_any_segments() {
-        let tokens = tokenize("/users/<id>/details");
+        let tokens = tokenize("/users/<id>/details").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn root_url() {
-        let tokens = tokenize("/");
+        let tokens = tokenize("/").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         // "/" is a separator between two empty segments
         assert_eq!(
@@ -491,7 +491,7 @@ mod tests {
 
     #[test]
     fn ok_anypath_catch_all() {
-        let tokens = tokenize("/files/<**path:rest>");
+        let tokens = tokenize("/files/<**path:rest>").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -506,7 +506,7 @@ mod tests {
 
     #[test]
     fn ok_name_only_any() {
-        let tokens = tokenize("/<slug>");
+        let tokens = tokenize("/<slug>").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -517,7 +517,7 @@ mod tests {
 
     #[test]
     fn ok_str_any_without_name() {
-        let tokens = tokenize("/<str>");
+        let tokens = tokenize("/<str>").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -531,7 +531,7 @@ mod tests {
 
     #[test]
     fn any_str_with_trailing_slash() {
-        let tokens = tokenize("/<str>/");
+        let tokens = tokenize("/<str>/").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -546,14 +546,14 @@ mod tests {
 
     #[test]
     fn error_unterminated_angle() {
-        let tokens = tokenize("/<int");
+        let tokens = tokenize("/<int").unwrap();
         let err = tokens_to_patterns(&tokens).unwrap_err();
         matches!(err, PatternError::ExpectedAngleClose { .. });
     }
 
     #[test]
     fn error_anypath_mixed_with_literal() {
-        let tokens = tokenize("/files\\<**path>");
+        let tokens = tokenize("/files\\<**path>").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -567,7 +567,7 @@ mod tests {
 
     #[test]
     fn error_colon_without_name() {
-        let tokens = tokenize("/<int:>");
+        let tokens = tokenize("/<int:>").unwrap();
         let err = tokens_to_patterns(&tokens).unwrap_err();
         matches!(err, PatternError::ExpectedIdentAfterColon { .. });
     }

@@ -130,6 +130,19 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         self.role
     }
 
+    fn lit_parser<'a>(input: &'a str) -> Vec<&'a str> {
+        // Mirrors UrlRoot::walk_str: empty input goes to the root
+        // endpoint slot (returned via an empty segment vec), everything
+        // else splits on '/' preserving empties so "/foo" walks as
+        // ["", "foo"] and matches the leading Literal("") that the
+        // pattern parser emits for a leading '/'.
+        if input.is_empty() {
+            Vec::new()
+        } else {
+            input.split('/').collect()
+        }
+    }
+
     fn detect(initial_bytes: &[u8]) -> bool {
         initial_bytes.starts_with(b"GET ")
             || initial_bytes.starts_with(b"POST ")
@@ -283,5 +296,33 @@ mod tests {
     fn test_not_found_response() {
         let resp = not_found_response();
         assert_eq!(resp.meta.start_line.status_code(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn pattern_and_literal_sides_align() {
+        use hotaru_core::url::tokens_to_patterns;
+
+        let tokens = HTTP::tokenize_url("/users/<int:id>").unwrap();
+        let (patterns, _names) = tokens_to_patterns(&tokens).unwrap();
+        let segments = HTTP::lit_parser("/users/42");
+
+        assert_eq!(patterns.len(), segments.len(), "leading-slash arity mismatch");
+        for (pat, seg) in patterns.iter().zip(segments.iter()) {
+            assert!(pat.matches(seg), "pattern {:?} did not match segment {:?}", pat, seg);
+        }
+    }
+
+    #[test]
+    fn root_slash_aligns() {
+        use hotaru_core::url::tokens_to_patterns;
+
+        let tokens = HTTP::tokenize_url("/").unwrap();
+        let (patterns, _) = tokens_to_patterns(&tokens).unwrap();
+        let segments = HTTP::lit_parser("/");
+
+        assert_eq!(patterns.len(), segments.len());
+        for (pat, seg) in patterns.iter().zip(segments.iter()) {
+            assert!(pat.matches(seg));
+        }
     }
 }
