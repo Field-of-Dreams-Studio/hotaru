@@ -1,14 +1,11 @@
-use proc_macro::{Delimiter, TokenStream, TokenTree};
-use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{ToTokens, quote};
+use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
+use quote::quote;
 use syn::{
-    Block, Expr, FnArg, Ident, ItemFn, LitInt, LitStr, Pat, PatIdent, Result as SynResult,
-    ReturnType, Token, Type, braced, bracketed,
+    Expr, Ident, LitStr, Result as SynResult, Token, braced, bracketed,
     parse::{Parse, ParseStream},
-    parse_macro_input, parse_quote,
+    parse_macro_input,
     punctuated::Punctuated,
-    spanned::Spanned,
-    token::Comma,
 };
 
 // #[proc_macro_attribute]
@@ -311,9 +308,10 @@ fn generate_code(expr: &ValueExpr) -> TokenStream2 {
             });
 
             quote! {{
-                let mut map = ::std::collections::HashMap::new();
+                let mut map: ::std::collections::HashMap<::std::string::String, Value> =
+                    ::std::collections::HashMap::new();
                 #(#entries)*
-                Value::Dict(map)
+                Value::new(map)
             }}
         }
         ValueExpr::List(list) => {

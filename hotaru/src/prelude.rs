@@ -1,3 +1,7 @@
+//! Curated prelude — `use hotaru::prelude::*;` brings in `Server`,
+//! `Client`, the `endpoint!` / `outpoint!` / `middleware!` macros, the
+//! lazy-static `S*` aliases, and the core protocol traits.
+
 pub use crate::PathPattern;
 pub use crate::Url;
 pub use crate::Value;
@@ -35,7 +39,15 @@ pub use std::thread::sleep;
 pub use std::time::Duration;
 pub use tokio;
 
+/// Lazy-static `Arc<Server<TS>>` — pair with `LServer!` to declare
+/// a process-wide server.
 pub type SServer<TS = TcpTransport> = Lazy<Arc<Server<TS>>>;
+/// Lazy-static `Arc<Client<TS>>` — pair with `LClient!` to declare
+/// a process-wide outbound client.
 pub type SClient<TS = TcpTransport> = Lazy<Arc<Client<TS>>>;
+/// Lazy-static `Arc<Url<C>>` — pair with `LUrl!` to declare a
+/// process-wide registered URL node.
 pub type SUrl<C> = Lazy<Arc<Url<C>>>;
+/// Lazy-static `PathPattern` — pair with `LPattern!` to declare a
+/// process-wide compiled URL pattern.
 pub type SPattern = Lazy<PathPattern>;

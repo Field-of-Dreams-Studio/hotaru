@@ -273,7 +273,10 @@ Hotaru is built on a modular architecture:
 
 ## Changelog
 
-### 0.8.2 (Current)
+### 0.8.3 (Current)
+- **Per-protocol URL parsing on `Protocol` trait**: new `tokenize_url` (pattern side, default = the framework lexer) and `lit_parser` (literal side, minimal default — HTTP overrides with `/`-split that mirrors `UrlRoot::walk_str` empty-input semantics). `lexer::tokenize` is now fallible (`Result<Vec<RawToken>, PatternError>`); `RawToken`, `TypeKind`, `tokenize`, `tokens_to_patterns` are re-exported from `hotaru_core::url`. `url::parser::parse` signature unchanged.
+
+### 0.8.2
 - **`http` (default-on) + `http_compression` (default-off) features**: HTTP and codecs are now optional; `default-features = false` drops HTTP entirely, `https`/`http_compression` imply `http`.
 - **HTTP re-exports moved to `hotaru::http`** (`use hotaru::http::*;`); clean builds ~35 % faster (20.5 s → 13.3 s) from dropping `tracing` and gating heavy codecs.
 - **Workspace + dep alignment**: five core crates pinned to 0.8.2; `regex` bumped 1.5.6 → 1.12.

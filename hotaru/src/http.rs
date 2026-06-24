@@ -20,7 +20,8 @@ pub use hotaru_http::{
 // Request / response / context
 pub use hotaru_http::context::{Executable, HttpContext};
 pub use hotaru_http::context::HttpReqCtx;
-// HttpResCtx was for client-side in old Starberry - use HttpContext for both now
+/// Response-context alias kept for source compatibility with old
+/// Starberry-era code. Use [`HttpContext`] directly in new code.
 pub type HttpResCtx = HttpContext;
 pub use hotaru_http::request::HttpRequest;
 pub use hotaru_http::response::HttpResponse;

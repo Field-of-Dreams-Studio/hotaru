@@ -1,5 +1,16 @@
+//! Hotaru — the umbrella crate. Re-exports the public surface of
+//! `hotaru_core`, `hotaru_http`, `hotaru_trans` and friends behind a
+//! single import root. Most users want [`prelude`]; HTTP users also
+//! want [`http`].
+
+/// HTTP-specific re-exports — request/response types, the `HTTP`
+/// protocol alias, and (with the `https` feature) the TLS variants.
 #[cfg(feature = "http")]
 pub mod http;
+
+/// Curated re-exports for typical user code: `Server`, `Client`,
+/// `endpoint!` / `outpoint!` macros, the `Lazy`-wrapped `S*` aliases,
+/// and the core protocol traits.
 pub mod prelude;
 
 pub use hotaru_core::app::client::Client;
