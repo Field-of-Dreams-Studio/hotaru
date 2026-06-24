@@ -1,6 +1,6 @@
 [package]
 name = "htmstd"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"] 
 description = "Standard middleware library for the Hotaru web framework"
