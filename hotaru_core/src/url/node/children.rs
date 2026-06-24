@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
-use std::{collections::HashMap, sync::Arc};
+use alloc::sync::Arc;
+use akari::hash::HashMap;
 
 use crate::{
     alias::PRwLock,
@@ -379,7 +380,7 @@ impl<C: RequestContext, TS: TransportSpec> LiteralChild<C, TS> {
     /// Creates an empty literal child cache.
     pub fn new() -> Self {
         Self {
-            inner: HashMap::new(),
+            inner: HashMap::default(),
             _ts: PhantomData,
         }
     }
@@ -467,7 +468,8 @@ impl<C: RequestContext, TS: TransportSpec> Clone for RegexChild<C, TS> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::Arc};
+    use alloc::sync::Arc;
+    use akari::hash::HashMap;
 
     use crate::{
         connection::tcp::TcpTransport,
@@ -515,7 +517,7 @@ mod tests {
             binding: Arc::new(binding),
             params: ParamsClone::default(),
             names: StepName {
-                inner: HashMap::new(),
+                inner: HashMap::default(),
             },
         })
     }

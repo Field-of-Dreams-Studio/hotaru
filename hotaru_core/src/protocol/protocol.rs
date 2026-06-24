@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use core::{error::Error, time::Duration};
-use std::sync::Arc;
+use alloc::sync::Arc;
 use tokio::io::BufReader;
 
 use crate::{app::common::RuntimeConfig, protocol::ProtocolFlow};

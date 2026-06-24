@@ -5,7 +5,7 @@
 //! [`WalkCursor::find_next`] calls. Built on [`Children::match_step`];
 //! existing walk paths are untouched.
 
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use crate::{
     connection::TransportSpec,

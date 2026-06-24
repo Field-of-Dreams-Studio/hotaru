@@ -21,7 +21,7 @@
 
 use core::any::TypeId;
 use core::time::Duration;
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use tokio::io::BufReader;
 

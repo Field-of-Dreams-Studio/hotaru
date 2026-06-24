@@ -1,5 +1,5 @@
 use core::any::TypeId;
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 

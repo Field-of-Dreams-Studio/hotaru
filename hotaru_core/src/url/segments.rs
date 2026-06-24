@@ -5,7 +5,7 @@ use crate::url::parser::parse;
 use core::future::Future;
 use core::pin::Pin;
 use core::slice::Iter;
-use std::sync::Arc;
+use alloc::sync::Arc;
 use crate::alias::PRwLock; 
 // pub static ROOT_URL: OnceLock<Url> = OnceLock::new();
 use crate::executable::{middleware::*, ExecutableBinding};

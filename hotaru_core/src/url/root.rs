@@ -1,5 +1,5 @@
 use core::{future::Future, pin::Pin, slice::Iter};
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use akari::extensions::ParamsClone;
 
@@ -341,7 +341,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> Default for UrlRoot<
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use alloc::sync::Arc;
 
     use akari::extensions::ParamsClone;
 

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use akari::hash::HashMap;
 
 pub struct StepName {
     pub inner: HashMap<String, usize>,
@@ -15,7 +15,7 @@ impl StepName {
     /// ```
     pub fn new() -> Self {
         Self {
-            inner: HashMap::new(),
+            inner: HashMap::default(),
         }
     }
 
@@ -140,7 +140,7 @@ impl From<HashMap<String, usize>> for StepName {
 
 impl From<Vec<Option<String>>> for StepName {
     fn from(names: Vec<Option<String>>) -> Self {
-        let mut inner = HashMap::new();
+        let mut inner = HashMap::default();
         for (index, name) in names.into_iter().enumerate() {
             if let Some(name) = name {
                 inner.insert(name, index);

@@ -1,5 +1,7 @@
 use core::{any::Any, future::Future, pin::Pin, time::Duration};
-use std::sync::{Arc, RwLock};
+use alloc::sync::Arc;
+
+use crate::alias::PRwLock;
 
 use akari::extensions::{Locals, Params, ParamsClone};
 use tokio::io::BufReader;
@@ -125,8 +127,8 @@ where
         reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
         writer: <TS::Wire as ConnStream>::WriteHalf,
         meta: <TS::Wire as ConnStream>::Meta,
-        _params: RwLock<Params>,
-        _locals: RwLock<Locals>,
+        _params: PRwLock<Params>,
+        _locals: PRwLock<Locals>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
         self.serve(runtime, reader, writer, meta)
     }
@@ -164,8 +166,8 @@ where
         reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
         writer: <TS::Wire as ConnStream>::WriteHalf,
         meta: <TS::Wire as ConnStream>::Meta,
-        _params: RwLock<Params>,
-        _locals: RwLock<Locals>,
+        _params: PRwLock<Params>,
+        _locals: PRwLock<Locals>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
         self.request(runtime, reader, writer, meta)
     } 

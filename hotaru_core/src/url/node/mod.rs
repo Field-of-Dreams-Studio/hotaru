@@ -1,5 +1,5 @@
 use core::{future::Future, pin::Pin, slice::Iter};
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use crate::{
     connection::TransportSpec,
@@ -311,7 +311,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use alloc::sync::Arc;
 
     use crate::{
         connection::tcp::TcpTransport,

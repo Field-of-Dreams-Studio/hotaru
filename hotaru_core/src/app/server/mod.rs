@@ -2,7 +2,7 @@ use akari::extensions::ParamsClone;
 use core::any::TypeId;
 use core::panic;
 use core::time::Duration;
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use crate::executable::ExecutableBinding;
 use crate::{debug_error, debug_log, debug_warn};

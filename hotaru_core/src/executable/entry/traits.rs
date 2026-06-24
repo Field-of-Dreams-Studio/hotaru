@@ -1,11 +1,13 @@
 use core::{any::Any, future::Future, pin::Pin, time::Duration};
-use std::sync::{Arc, RwLock};
+use alloc::sync::Arc;
 
 use akari::extensions::{Locals, Params};
 use tokio::io::BufReader;
 
 use crate::{
-    app::common::RuntimeConfig, connection::{ConnStream, TransportSpec} 
+    alias::PRwLock,
+    app::common::RuntimeConfig,
+    connection::{ConnStream, TransportSpec},
 };
 
 /// Neutral protocol-entry boundary shared by server and client execution.
@@ -35,8 +37,8 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
         reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
         writer: <TS::Wire as ConnStream>::WriteHalf,
         meta: <TS::Wire as ConnStream>::Meta,
-        params: RwLock<Params>,
-        locals: RwLock<Locals>,
+        params: PRwLock<Params>,
+        locals: PRwLock<Locals>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
 
     fn request(
@@ -53,8 +55,8 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
         reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
         writer: <TS::Wire as ConnStream>::WriteHalf,
         meta: <TS::Wire as ConnStream>::Meta,
-        params: RwLock<Params>,
-        locals: RwLock<Locals>,
+        params: PRwLock<Params>,
+        locals: PRwLock<Locals>,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>>; 
 
     /// Returns the protocol's default connection-timeout policy.

@@ -13,10 +13,13 @@ keywords = ["hotaru"]
 [dependencies]
 akari = { version = "0.2.8", default-features = false, features = ["dynamic", "extension", "object_macro"] }
 tokio = { version = "1.28", features = ["full"] }
-parking_lot = "0.12"
+# Sync backends — exactly one of `std-sync` (parking_lot) or `embedded` (spin)
+# must be enabled. Default features include `std-sync`.
+parking_lot = { version = "0.12", optional = true }
+spin = { version = "0.12", default-features = false, features = ["mutex", "spin_mutex", "rwlock"], optional = true }
 av = "0.1"
 
-hotaru_lib = { version = "0.8.2", path = "../hotaru_lib" , features = ["url_encoding"] }
+hotaru_lib = { version = "0.8.2", path = "../hotaru_lib", default-features = false, features = ["url_encoding"] }
 # Unicode features are pulled in by the `full` / `lite` features below — keep
 # this list to perf-only flags so the unicode footprint stays opt-in.
 regex = { version = "1.12", default-features = false, features = [
@@ -40,8 +43,15 @@ quickcheck = "1.0"
 env_logger = "0.10"
 
 [features]
-default = ["full"]
+default = ["full", "std"]
 full = ["regex/unicode", "akari/full"]        # normal devices
 lite = ["regex/unicode-perl", "akari/no_std"] # small devices
+
+# Target-flavour markers — exactly one of `std` / `embedded` must be enabled.
+# Today they gate the sync backend (parking_lot vs spin); future stages will
+# fold more std-vs-no_std switches into the same markers (tokio features,
+# std::io::Error variant, etc.).
+std = ["dep:parking_lot"]                     # std target
+embedded = ["dep:spin"]                       # no_std-friendly target
 
 dev-log = [] # Feature for debugging hotaru
