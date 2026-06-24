@@ -299,6 +299,7 @@ Hotaru is built on a modular architecture:
 ## Changelog
 
 ### 0.8.3 (Current)
+- **Protocol-agnostic `endpoint!` via `EndpointOutcome`**: new `EndpointOutcome<C>` trait in `hotaru_core::protocol` (re-exported from `hotaru::prelude`) decouples endpoint return values from the HTTP `response` field. Generated handlers now return `impl EndpointOutcome<Ctx> + 'static`; the wrapper applies the outcome via `EndpointOutcome::apply_to(__outcome, &mut req)?` instead of writing `req.response` directly. Generic impls for `()` (no-op) and `Result<O, C::Error>` (fallible bodies) live in `hotaru_core`; `impl EndpointOutcome<HttpContext<TS>> for HttpResponse` lives in `hotaru_http`. **Existing HTTP endpoint bodies compile unchanged** — bodies that end in `HttpResponse` still land in `ctx.response`. Inbound-only protocols can now use `()`-returning endpoints with no placeholder response.
 - **Per-protocol URL parsing on `Protocol` trait**: new `tokenize_url` (pattern side, default = the framework lexer) and `lit_parser` (literal side, minimal default — HTTP overrides with `/`-split that mirrors `UrlRoot::walk_str` empty-input semantics). `lexer::tokenize` is now fallible (`Result<Vec<RawToken>, PatternError>`); `RawToken`, `TypeKind`, `tokenize`, `tokens_to_patterns` are re-exported from `hotaru_core::url`. `url::parser::parse` signature unchanged.
 
 ### 0.8.2

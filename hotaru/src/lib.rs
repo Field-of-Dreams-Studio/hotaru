@@ -37,8 +37,8 @@ pub use hotaru_core::connection::ConnStream;
 pub use hotaru_core::connection::error::{ConnectionError, Result};
 pub use hotaru_core::connection::{Inbound, Outbound};
 pub use hotaru_core::protocol::{
-    BoxProtocolError, DefaultProtocolError, EmptyError, Message, Protocol, ProtocolError,
-    ProtocolRole, RequestContext, Stream,
+    BoxProtocolError, DefaultProtocolError, EmptyError, EndpointOutcome, Message, Protocol,
+    ProtocolError, ProtocolRole, RequestContext, Stream,
 };
 pub use hotaru_core::connection::{
     TcpAccepter, TcpConnector, TcpConnectorAddr, TcpInbound, TcpMeta, TcpOutbound, TcpTransport,

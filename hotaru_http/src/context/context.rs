@@ -5,7 +5,9 @@ use hotaru_core::debug_log;
 use hotaru_core::extensions::{Locals, Params};
 use hotaru_core::url::UrlNode;
 use akari::Value;
-use hotaru_core::protocol::{BoxProtocolError, ProtocolError, ProtocolRole, RequestContext};
+use hotaru_core::protocol::{
+    BoxProtocolError, EndpointOutcome, ProtocolError, ProtocolRole, RequestContext,
+};
 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -557,6 +559,15 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
 
     fn into_response(self) -> Self::Response {
         self.response
+    }
+}
+
+/// Endpoint bodies returning `HttpResponse` keep working: the value is stored
+/// into the context's response slot here instead of by the macro wrapper.
+impl<TS: TransportSpec> EndpointOutcome<HttpContext<TS>> for HttpResponse {
+    fn apply_to(self, ctx: &mut HttpContext<TS>) -> Result<(), HttpError> {
+        ctx.response = self;
+        Ok(())
     }
 }
 

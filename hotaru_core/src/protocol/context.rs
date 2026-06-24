@@ -51,3 +51,33 @@ pub trait RequestContext: Default + Send + 'static {
     /// `Client::request_fn` / `Server::request_fn` after the chain finishes.
     fn into_response(self) -> Self::Response;
 }
+
+// ----------------------------------------------------------------------------
+// EndpointOutcome Trait
+// ----------------------------------------------------------------------------
+
+/// Normalizes whatever an `endpoint!` body evaluates to into an effect on the
+/// context. Endpoint's type-directed counterpart to `Protocol::send`:
+/// implementations are per `(context, body-return-type)` pair, so each protocol
+/// decides which endpoint return values it accepts.
+pub trait EndpointOutcome<C: RequestContext> {
+    fn apply_to(self, ctx: &mut C) -> Result<(), C::Error>;
+}
+
+/// Inbound / no-response endpoints: nothing to store.
+impl<C: RequestContext> EndpointOutcome<C> for () {
+    fn apply_to(self, _ctx: &mut C) -> Result<(), C::Error> {
+        Ok(())
+    }
+}
+
+/// Fallible endpoints: short-circuit on `Err`, otherwise apply the inner value.
+impl<C, O> EndpointOutcome<C> for Result<O, C::Error>
+where
+    C: RequestContext,
+    O: EndpointOutcome<C>,
+{
+    fn apply_to(self, ctx: &mut C) -> Result<(), C::Error> {
+        self?.apply_to(ctx)
+    }
+}

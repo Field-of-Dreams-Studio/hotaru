@@ -57,6 +57,9 @@ impl UrlFunc {
         if self.is_pub {
             tokens.extend(vec![TokenTree::Ident(Ident::new("pub", Span::call_site()))]);
         }
+        // async fn <fn_name>(<req>: &mut <P as Protocol>::Context)
+        //     -> impl EndpointOutcome<<P as Protocol>::Context> + 'static
+        // { <fn_cont> }
         tokens.extend(vec![
             TokenTree::Ident(Ident::new("async", Span::call_site())),
             TokenTree::Ident(Ident::new("fn", Span::call_site())),
@@ -64,6 +67,8 @@ impl UrlFunc {
             TokenTree::Group(Group::new(Delimiter::Parenthesis, arguments)),
             TokenTree::Punct(Punct::new('-', Spacing::Joint)),
             TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("impl", Span::call_site())),
+            TokenTree::Ident(Ident::new("EndpointOutcome", Span::call_site())),
             TokenTree::Punct(Punct::new('<', Spacing::Alone)),
             TokenTree::Punct(Punct::new('<', Spacing::Alone)),
             TokenTree::Ident(self.protocol.clone()),
@@ -73,12 +78,10 @@ impl UrlFunc {
             TokenTree::Punct(Punct::new(':', Spacing::Joint)),
             TokenTree::Punct(Punct::new(':', Spacing::Alone)),
             TokenTree::Ident(Ident::new("Context", Span::call_site())),
-            TokenTree::Ident(Ident::new("as", Span::call_site())),
-            TokenTree::Ident(Ident::new("RequestContext", Span::call_site())),
             TokenTree::Punct(Punct::new('>', Spacing::Alone)),
-            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-            TokenTree::Ident(Ident::new("Response", Span::call_site())),
+            TokenTree::Punct(Punct::new('+', Spacing::Alone)),
+            TokenTree::Punct(Punct::new('\'', Spacing::Joint)),
+            TokenTree::Ident(Ident::new("static", Span::call_site())),
             TokenTree::Group(Group::new(Delimiter::Brace, self.fn_cont.clone())),
         ]);
         tokens
@@ -106,21 +109,33 @@ impl UrlFunc {
             TokenTree::Ident(Ident::new("mut", Span::call_site())),
             TokenTree::Ident(self.req_var_name.clone()),
         ]);
+        // let __outcome = <fn_name>(&mut <req>).await;
+        // EndpointOutcome::apply_to(__outcome, &mut <req>)?;
+        // Ok(<req>)
+        let mut apply_args = TokenStream::new();
+        apply_args.extend(vec![
+            TokenTree::Ident(Ident::new("__outcome", Span::call_site())),
+            TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+            TokenTree::Punct(Punct::new('&', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("mut", Span::call_site())),
+            TokenTree::Ident(self.req_var_name.clone()),
+        ]);
         let mut cont = TokenStream::new();
         cont.extend(vec![
             TokenTree::Ident(Ident::new("let", Span::call_site())),
-            TokenTree::Ident(Ident::new("response", Span::call_site())),
+            TokenTree::Ident(Ident::new("__outcome", Span::call_site())),
             TokenTree::Punct(Punct::new('=', Spacing::Alone)),
             TokenTree::Ident(self.fn_name.clone()),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, internal_args)),
             TokenTree::Punct(Punct::new('.', Spacing::Alone)),
             TokenTree::Ident(Ident::new("await", Span::call_site())),
             TokenTree::Punct(Punct::new(';', Spacing::Alone)),
-            TokenTree::Ident(self.req_var_name.clone()),
-            TokenTree::Punct(Punct::new('.', Spacing::Alone)),
-            TokenTree::Ident(Ident::new("response", Span::call_site())),
-            TokenTree::Punct(Punct::new('=', Spacing::Alone)),
-            TokenTree::Ident(Ident::new("response", Span::call_site())),
+            TokenTree::Ident(Ident::new("EndpointOutcome", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("apply_to", Span::call_site())),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, apply_args)),
+            TokenTree::Punct(Punct::new('?', Spacing::Alone)),
             TokenTree::Punct(Punct::new(';', Spacing::Alone)),
             TokenTree::Ident(Ident::new("Ok", Span::call_site())),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, {

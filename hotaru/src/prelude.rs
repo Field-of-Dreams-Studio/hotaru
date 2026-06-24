@@ -16,7 +16,9 @@ pub use crate::{
 pub use once_cell::sync::Lazy;
 
 // Core protocol traits (protocol-agnostic)
-pub use crate::{EmptyError, Protocol, ProtocolError, ProtocolRole, RequestContext};
+pub use crate::{
+    EmptyError, EndpointOutcome, Protocol, ProtocolError, ProtocolRole, RequestContext,
+};
 
 // Macros
 pub use crate::call;
