@@ -1,7 +1,9 @@
 //! TlsStream — unified wire type for TransportSpec.
 
+use rustls::pki_types::CertificateDer;
 use std::net::SocketAddr;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
@@ -14,6 +16,24 @@ use hotaru_core::connection::{ConnMeta, ConnStream};
 pub struct TlsMeta {
     local: Option<SocketAddr>,
     remote: Option<SocketAddr>,
+    /// Peer certificate chain captured at TLS handshake completion.
+    /// `None` for client-side streams and for server-side streams
+    /// configured with `ClientAuth::None`. Leaf cert is first.
+    peer_certificates: Option<Arc<[CertificateDer<'static>]>>,
+}
+
+impl TlsMeta {
+    pub fn new(local: Option<SocketAddr>, remote: Option<SocketAddr>) -> Self {
+        Self {
+            local,
+            remote,
+            peer_certificates: None,
+        }
+    }
+
+    pub fn peer_certificates(&self) -> Option<&[CertificateDer<'static>]> {
+        self.peer_certificates.as_deref()
+    }
 }
 
 impl ConnMeta for TlsMeta {
@@ -85,9 +105,18 @@ impl ConnStream for TlsStream {
     type Meta = TlsMeta;
 
     fn split(self) -> (Self::ReadHalf, Self::WriteHalf, Self::Meta) {
+        let peer_certificates = match &self {
+            TlsStream::Client(_) => None,
+            TlsStream::Server(s) => s
+                .get_ref()
+                .1
+                .peer_certificates()
+                .map(|certs| Arc::from(certs.to_vec().into_boxed_slice())),
+        };
         let meta = TlsMeta {
             local: self.local_addr().ok(),
             remote: self.peer_addr().ok(),
+            peer_certificates,
         };
         let (r, w) = tokio::io::split(self);
         (r, w, meta)
