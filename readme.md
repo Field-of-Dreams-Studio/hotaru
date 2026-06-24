@@ -205,7 +205,7 @@ pub fn get_user<HTTP>() {
 Attach a middleware to a protocol via the `ProtocolBuilder`. Add `htmstd = "0.8"` to your `Cargo.toml` for the bundled middleware library:
 
 ```rust
-use htmstd::session::CookieSession;
+use htmstd::CookieSession;
 
 LServer!(
     APP = Server::new()
@@ -217,6 +217,31 @@ LServer!(
         .build()
 );
 ```
+
+`CookieSession` writes encrypted session cookies. By default, those cookies are
+production-safe (`Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`). If you are
+running a plain-HTTP development environment, configure the cookie safety policy
+explicitly through the app config:
+
+```rust
+use htmstd::{CookieSecurity, CookieSession, CookieSessionSettings};
+
+LServer!(
+    APP = Server::new()
+        .binding("127.0.0.1:3003")
+        .mode(RunMode::Development)
+        .set_config(CookieSessionSettings::new().security(CookieSecurity::Auto))
+        .single_protocol(
+            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+                .append_middleware::<CookieSession>(),
+        )
+        .build()
+);
+```
+
+`CookieSecurity::Auto` follows `RunMode`: `Production`/`Beta` keep `Secure`
+cookies, while `Development`/`Build` allow plain HTTP cookies. For production,
+also configure a stable `SessionSecret` so sessions survive process restarts.
 
 Middleware can also be attached per-endpoint via `middleware = [...]` inside the `endpoint!` block — see `example_hotaru` for the pattern.
 

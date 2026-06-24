@@ -50,8 +50,9 @@ pub async fn send_request<O>(
 ) -> Result<HttpResponse, HttpError>
 where
     O: Outbound,
+    HttpError: From<O::Error>,
 {
-    let wire = outbound.connect().await.map_err(HttpError::Io)?;
+    let wire = outbound.connect().await?;
     let (read, write, meta) = wire.split();
     let channel =
         Http1Channel::<O::Wire>::new(BufReader::new(read), write, meta, Arc::new(safety));

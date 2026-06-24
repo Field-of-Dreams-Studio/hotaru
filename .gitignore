@@ -13,6 +13,7 @@ doc/
 hotaru_core/REFACTOR_NOTES.md
 hotaru_core/RENAME_TRACKER.md
 hotaru_core/TRANSPORT_RUNTIME_PROPOSAL.md
+hotaru_core/endpoint_patch.md
 hotaru_core/OUTPOINT_DESIGN.md
 hotaru_core/OUTPOINT_IMPLEMENTATION_PLAN.md
 hotaru_core/OUTPOINT_TEAM_PLAN.md

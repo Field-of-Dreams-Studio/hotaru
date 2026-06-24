@@ -11,6 +11,7 @@ pub struct TcpTransport;
 
 impl TransportSpec for TcpTransport {
     type Wire = TcpStream;
+    type IoError = std::io::Error;
     type Inbound = TcpInbound;
     type Outbound = TcpOutbound;
 

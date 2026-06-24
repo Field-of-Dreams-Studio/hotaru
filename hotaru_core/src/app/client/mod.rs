@@ -141,16 +141,16 @@ impl<TS: TransportSpec> Client<TS> {
     }
 
     /// Returns the `TS::Outbound` instance, building on first use.
-    pub async fn ensure_outbound(self: &Arc<Self>) -> std::io::Result<&Arc<TS::Outbound>> {
+    pub async fn ensure_outbound(self: &Arc<Self>) -> Result<&Arc<TS::Outbound>, TS::IoError> {
         self.outbound
             .get_or_try_init(|| async {
                 Ok(Arc::new(TS::Outbound::build(self.target.clone()).await?))
             })
             .await
-    } 
+    }
 
     /// Opens one outbound wire to this client's configured target.
-    pub async fn connect(self: &Arc<Self>) -> std::io::Result<TS::Wire> {
+    pub async fn connect(self: &Arc<Self>) -> Result<TS::Wire, TS::IoError> {
         self.ensure_outbound().await?.connect().await
     }
 

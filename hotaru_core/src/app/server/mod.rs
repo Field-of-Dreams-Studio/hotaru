@@ -276,7 +276,7 @@ impl<TS: TransportSpec> Server<TS> {
     }
 
     /// Returns the `TS::Inbound` instance, binding on first use.
-    pub async fn ensure_inbound(&self) -> std::io::Result<&Arc<TS::Inbound>> {
+    pub async fn ensure_inbound(&self) -> Result<&Arc<TS::Inbound>, TS::IoError> {
         self.inbound
             .get_or_try_init(|| async {
                 Ok(Arc::new(TS::Inbound::bind(self.binding.clone()).await?))

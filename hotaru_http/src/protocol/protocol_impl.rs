@@ -114,7 +114,10 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
 // ============================================================================
 
 #[async_trait]
-impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, TS> {
+impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, TS>
+where
+    HttpError: From<<TS as TransportSpec>::IoError>,
+{
     type Wire = W;
     type TS = TS;
     type Channel = Http1Channel<W>;

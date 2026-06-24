@@ -25,11 +25,16 @@ pub trait Outbound: Send + Sync + 'static {
     /// [`Inbound::BindTarget`](crate::connection::Inbound::BindTarget).
     type ConnectTarget: Clone + Send + Sync + 'static;
 
+    /// Error type returned by `build` and `connect`. `TransportSpec`
+    /// pins this to its `IoError` so server and client error surfaces
+    /// share a single type per transport.
+    type Error: core::error::Error + Send + Sync + 'static;
+
     /// Build the outbound runtime bound to a target.
     ///
     /// The target lives on `Self` from this point on; the transport may
     /// pre-establish pools, prepare TLS state, resolve DNS once, etc.
-    async fn build(target: Self::ConnectTarget) -> std::io::Result<Self>
+    async fn build(target: Self::ConnectTarget) -> Result<Self, Self::Error>
     where
         Self: Sized;
 
@@ -39,5 +44,5 @@ pub trait Outbound: Send + Sync + 'static {
     /// from a pool, a logical stream over a multiplexed connection, or
     /// anything else the transport considers a valid "one wire to the
     /// configured target."
-    async fn connect(&self) -> std::io::Result<Self::Wire>;
+    async fn connect(&self) -> Result<Self::Wire, Self::Error>;
 }

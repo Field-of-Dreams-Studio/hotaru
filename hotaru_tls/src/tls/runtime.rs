@@ -36,6 +36,7 @@ pub struct TlsInbound {
 impl Inbound for TlsInbound {
     type Wire = TlsStream;
     type BindTarget = TlsInboundTarget;
+    type Error = std::io::Error;
 
     async fn bind(target: Self::BindTarget) -> std::io::Result<Self> {
         let listener = TcpListener::bind(target.addr).await?;
@@ -88,6 +89,7 @@ impl TlsOutbound {
 impl Outbound for TlsOutbound {
     type Wire = TlsStream;
     type ConnectTarget = TlsOutboundTarget;
+    type Error = std::io::Error;
 
     async fn build(target: Self::ConnectTarget) -> std::io::Result<Self> {
         let connector = TlsConnector::new(target.config)

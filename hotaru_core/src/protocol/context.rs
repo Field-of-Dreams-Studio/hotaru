@@ -21,17 +21,15 @@ pub trait RequestContext: Default + Send + 'static {
     /// The error type produced by middleware, handlers, and the protocol
     /// that owns this context.
     ///
-    /// The `From<std::io::Error>` bound is universal: the client path
-    /// touches transport-level I/O (`Outbound::build`, `Outbound::connect`)
-    /// which surfaces `std::io::Error`, and every protocol's error type
-    /// has to absorb that to propagate cleanly through the chain. Making
-    /// the bound part of the trait keeps it off every Client method's
-    /// where-clause.
+    /// The transport-IO conversion bound (`From<<TS as TransportSpec>::IoError>`)
+    /// lives on `Protocol`, not here — `RequestContext` doesn't know which
+    /// `TransportSpec` it'll be paired with. Standalone uses (middleware,
+    /// tests, dyn-erased handlers) carry just `ProtocolError`.
     ///
     /// If you don't want to define your own error type, use
     /// [`EmptyError`](crate::protocol::EmptyError) — a zero-payload
     /// stand-in that already satisfies every bound.
-    type Error: ProtocolError + From<std::io::Error>;
+    type Error: ProtocolError;
 
     /// Type-system anchor for the channel of the current exchange. No
     /// accessor is exposed on this trait; the matching `Protocol` impl

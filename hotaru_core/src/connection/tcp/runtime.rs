@@ -17,15 +17,16 @@ pub struct TcpInbound {
 impl Inbound for TcpInbound {
     type Wire = TcpStream;
     type BindTarget = String;
+    type Error = std::io::Error;
 
-    async fn bind(target: Self::BindTarget) -> std::io::Result<Self> {
+    async fn bind(target: Self::BindTarget) -> Result<Self, Self::Error> {
         Ok(Self {
             listener: TcpListener::bind(target).await?,
             accepter: TcpAccepter,
         })
     }
 
-    async fn accept(&self) -> std::io::Result<Self::Wire> {
+    async fn accept(&self) -> Result<Self::Wire, Self::Error> {
         let (tcp, _) = self.listener.accept().await?;
         self.accepter.upgrade(tcp).await
     }
@@ -50,15 +51,16 @@ impl TcpOutbound {
 impl Outbound for TcpOutbound {
     type Wire = TcpStream;
     type ConnectTarget = String;
+    type Error = std::io::Error;
 
-    async fn build(target: Self::ConnectTarget) -> std::io::Result<Self> {
+    async fn build(target: Self::ConnectTarget) -> Result<Self, Self::Error> {
         // No work at build time for plain TCP — DNS resolution and socket
         // creation happen per-`connect`. Future TLS / pooled variants can
         // do more here.
         Ok(Self { target })
     }
 
-    async fn connect(&self) -> std::io::Result<Self::Wire> {
+    async fn connect(&self) -> Result<Self::Wire, Self::Error> {
         TcpStream::connect(&self.target).await
     }
 }

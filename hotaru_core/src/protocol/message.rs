@@ -1,3 +1,4 @@
+use core::convert::Infallible;
 use core::error::Error;
 
 // ----------------------------------------------------------------------------
@@ -34,25 +35,30 @@ pub trait Message: Send + Sync + 'static {
         + Sync
         + 'static;
 
+    /// Concrete error returned by `encode`/`decode`. Use `Infallible` if your impl can't fail.
+    type Error: Error + Send + Sync + 'static;
+
     /// Encodes this message into bytes appended to `buf`.
-    fn encode(&self, buf: &mut Self::BytesMut) -> Result<(), Box<dyn Error + Send + Sync>>;
+    fn encode(&self, buf: &mut Self::BytesMut) -> Result<(), Self::Error>;
 
     /// Attempts to decode a message from `buf`.
     /// Returns `Ok(Some(message))` if a full message was parsed (and consumed
     /// from `buf`), `Ok(None)` if more bytes are needed.
-    fn decode(buf: &mut Self::BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>>
+    fn decode(buf: &mut Self::BytesMut) -> Result<Option<Self>, Self::Error>
     where
         Self: Sized;
 }
 
-/// A simple impl for protocols that don't need a message type.             
+/// A simple impl for protocols that don't need a message type.
 impl Message for () {
     type BytesMut = Vec<u8>;
-    fn encode(&self, _buf: &mut Self::BytesMut) -> Result<(), Box<dyn Error + Send + Sync>> {
+    type Error = Infallible;
+
+    fn encode(&self, _buf: &mut Self::BytesMut) -> Result<(), Self::Error> {
         Ok(())
     }
 
-    fn decode(_buf: &mut Self::BytesMut) -> Result<Option<Self>, Box<dyn Error + Send + Sync>> {
+    fn decode(_buf: &mut Self::BytesMut) -> Result<Option<Self>, Self::Error> {
         Ok(Some(()))
-    } 
-}    
+    }
+}

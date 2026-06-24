@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use core::{error::Error, time::Duration};
+use core::time::Duration;
 use alloc::sync::Arc;
 use tokio::io::BufReader;
 
@@ -26,8 +26,18 @@ pub type CtxError<P> = <<P as Protocol>::Context as RequestContext>::Error;
 ///
 /// Protocols must be Clone because each connection gets its own instance
 /// to maintain per-connection state (like keep-alive, request count, etc.).
+///
+/// The where-clause ties the context's error type to the transport's IO
+/// error, replacing the previous global `From<std::io::Error>` bound on
+/// `RequestContext::Error`. Custom transports define their own `IoError`;
+/// the context impl provides `From<TS::IoError>` (or `From<std::io::Error>`
+/// when the transport is the default TCP one).
 #[async_trait]
-pub trait Protocol: Clone + Send + Sync + 'static {
+pub trait Protocol: Clone + Send + Sync + 'static
+where
+    <Self::Context as RequestContext>::Error:
+        From<<Self::TS as TransportSpec>::IoError>,
+{
     /// The protocol's wire-level connection stream type.
     type Wire: ConnStream;
 

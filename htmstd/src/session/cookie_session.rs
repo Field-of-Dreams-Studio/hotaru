@@ -11,6 +11,7 @@ use hotaru_trans::middleware;
 
 use hotaru_lib::ende::aes;
 
+use crate::session::cookie_session_settings::CookieSessionSettings;
 use crate::session::session_counter;
 
 /// Process-wide fallback session secret, generated once on first use when
@@ -119,6 +120,23 @@ middleware!(
 
         // println!("{:?}", req.get_cookies());
         let mut new_id_generated = false;
+        let runtime = req.runtime();
+        let cookie_settings = runtime
+            .as_ref()
+            .and_then(|rt| rt.get_config::<CookieSessionSettings>())
+            .unwrap_or_default();
+        let run_mode = runtime
+            .as_ref()
+            .map(|rt| rt.mode())
+            .unwrap_or_default();
+        let secure_cookie = cookie_settings.resolve_secure(run_mode.clone());
+
+        if !secure_cookie && cookie_settings.same_site == SameSite::None {
+            debug_warn!(
+                "CookieSession: SameSite=None without Secure is rejected by modern browsers; \
+                 use CookieSecurity::Secure/Auto in production."
+            );
+        }
 
         let session_id: u64 = match req
             .get_cookie_or_default("session_id")
@@ -132,12 +150,11 @@ middleware!(
                 }
             };
 
-        let serect_key = req
-            .runtime()
+        let secret_key = runtime
             .and_then(|rt| rt.get_config::<SessionSecret>())
             .and_then(|s| s.0)
             .unwrap_or_else(fallback_secret);
-        let password = format!("{}{}", serect_key, session_id);
+        let password = format!("{}{}", secret_key, session_id);
 
         let session_raw = req.get_cookie("session_cont").map(|c| c.get_value().to_owned()).unwrap_or("No Cookie Cont".to_owned());
 
@@ -173,28 +190,26 @@ middleware!(
 
         // println!("Cookie Session: {}", session);
 
-        if is_modified|new_id_generated {
+        if is_modified || new_id_generated {
             // Never log `session` itself: it holds decrypted user data.
             debug_log!("CookieSession: session modified, saving to cookies (id={})", session_id);
             req.response = req
                 .response
                 .add_cookie(
                     "session_id",
-                    Cookie::new(session_id.to_string())
-                        .path("/")
-                        .http_only(true)
-                        .secure(true)
-                        .same_site(SameSite::Lax),
+                    cookie_settings.apply_to_cookie(
+                        Cookie::new(session_id.to_string()),
+                        run_mode.clone(),
+                    ),
                 )
                 .add_cookie(
                     "session_cont",
-                    Cookie::new(
-                        aes::encrypt(&session.into_json(), &password).unwrap_or("".to_string()),
-                    )
-                    .path("/")
-                    .http_only(true)
-                    .secure(true)
-                    .same_site(SameSite::Lax),
+                    cookie_settings.apply_to_cookie(
+                        Cookie::new(
+                            aes::encrypt(&session.into_json(), &password).unwrap_or("".to_string()),
+                        ),
+                        run_mode,
+                    ),
                 ); // Set cookie with session ID
         }
 
