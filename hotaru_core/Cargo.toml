@@ -11,7 +11,7 @@ categories = ["network-programming", "web-programming::http-server"]
 keywords = ["hotaru"]
 
 [dependencies]
-akari = { version = "=0.2.8-rc1", default-features = false, features = ["dynamic", "extension", "object_macro"] }
+akari = { version = "0.2.8", default-features = false, features = ["dynamic", "extension", "object_macro"] }
 tokio = { version = "1.28", features = ["full"] }
 parking_lot = "0.12"
 av = "0.1"
