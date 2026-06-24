@@ -3,9 +3,9 @@ use std::sync::OnceLock;
 
 use akari::Value;
 use hotaru_core::executable::middleware::AsyncMiddleware;
+use hotaru_core::protocol::{Protocol, RequestContext};
 use hotaru_core::{debug_log, debug_warn};
 use hotaru_http::cookie::{Cookie, SameSite};
-use hotaru_core::protocol::{Protocol, RequestContext};
 use hotaru_http::traits::HTTP;
 use hotaru_trans::middleware;
 
@@ -209,7 +209,11 @@ mod tests {
     #[test]
     fn short_secret_refused() {
         assert!(SessionSecret::new("too short").0.is_none());
-        assert!(SessionSecret::new("a".repeat(MIN_SECRET_BYTES - 1)).0.is_none());
+        assert!(
+            SessionSecret::new("a".repeat(MIN_SECRET_BYTES - 1))
+                .0
+                .is_none()
+        );
     }
 
     #[test]

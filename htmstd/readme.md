@@ -20,6 +20,7 @@ Re-exported at the crate root:
 - `htmstd::Cors` — CORS preflight + response-header injection. Reads `AppCorsSettings` from per-endpoint or per-protocol config.
 - `htmstd::CookieSession`, `htmstd::Session` — encrypted cookie-backed sessions.
 - `htmstd::PrintLog` — minimal request logger.
+- `htmstd::PreferredLanguageMiddleware`, `htmstd::PreferredLanguage` — parses `Accept-Language` and stores typed language preferences in request params.
 - `htmstd::cors_settings::AppCorsSettings` — CORS policy struct.
 
 ## Attaching middleware
@@ -54,6 +55,40 @@ endpoint! {
     }
 }
 ```
+
+## Preferred language
+
+Attach `PreferredLanguageMiddleware` before handlers that need language-aware rendering:
+
+```rust
+use hotaru::prelude::*;
+use hotaru::http::*;
+use htmstd::{PreferredLanguageMiddleware, PreferredLanguageRequestExt};
+
+LServer!(
+    APP = Server::new()
+        .binding("127.0.0.1:3003")
+        .single_protocol(
+            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+                .append_middleware::<PreferredLanguageMiddleware>(),
+        )
+        .build()
+);
+
+endpoint! {
+    APP.url("/hello"),
+    pub fn hello<HTTP>(req) {
+        let lang = req
+            .preferred_language()
+            .and_then(|pref| pref.best_match(["en", "zh-CN", "ja"].iter().copied()))
+            .unwrap_or("en");
+
+        text_response(format!("selected language: {lang}"))
+    }
+}
+```
+
+Without the extension trait, downstream code can also read `req.params.get::<PreferredLanguage>()` directly.
 
 ## CORS
 

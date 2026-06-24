@@ -1,8 +1,8 @@
 use hotaru_core::executable::middleware::AsyncMiddleware;
 use hotaru_core::protocol::{Protocol, RequestContext};
-use hotaru_http::traits::HTTP;
 use hotaru_http::http_value::{HttpMethod, StatusCode};
 use hotaru_http::response::response_templates;
+use hotaru_http::traits::HTTP;
 use hotaru_trans::middleware;
 
 use super::cors_settings::*;
