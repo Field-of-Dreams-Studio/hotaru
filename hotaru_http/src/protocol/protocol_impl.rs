@@ -7,7 +7,6 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use hotaru_core::{
     app::common::RuntimeConfig,
     connection::{ConnStream, Outbound, TransportSpec},
@@ -113,7 +112,6 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
 // Protocol trait implementation
 // ============================================================================
 
-#[async_trait]
 impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, TS>
 where
     HttpError: From<<TS as TransportSpec>::IoError>,

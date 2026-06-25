@@ -1,6 +1,5 @@
 //! TLS inbound and outbound runtime objects.
 
-use async_trait::async_trait;
 use hotaru_core::connection::{Accepter, Connector, Inbound, Outbound};
 use tokio::net::TcpListener;
 
@@ -32,7 +31,6 @@ pub struct TlsInbound {
     accepter: TlsAccepter,
 }
 
-#[async_trait]
 impl Inbound for TlsInbound {
     type Wire = TlsStream;
     type BindTarget = TlsInboundTarget;
@@ -85,7 +83,6 @@ impl TlsOutbound {
     }
 }
 
-#[async_trait]
 impl Outbound for TlsOutbound {
     type Wire = TlsStream;
     type ConnectTarget = TlsOutboundTarget;

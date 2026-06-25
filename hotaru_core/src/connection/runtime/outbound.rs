@@ -8,12 +8,11 @@
 //!
 //! [`Inbound`]: crate::connection::Inbound
 
-use async_trait::async_trait;
+use core::future::Future;
 
 use crate::connection::ConnStream;
 
 /// Outbound runtime that opens final wire streams.
-#[async_trait]
 pub trait Outbound: Send + Sync + 'static {
     /// Wire stream produced by this outbound runtime.
     type Wire: ConnStream;
@@ -34,7 +33,9 @@ pub trait Outbound: Send + Sync + 'static {
     ///
     /// The target lives on `Self` from this point on; the transport may
     /// pre-establish pools, prepare TLS state, resolve DNS once, etc.
-    async fn build(target: Self::ConnectTarget) -> Result<Self, Self::Error>
+    fn build(
+        target: Self::ConnectTarget,
+    ) -> impl Future<Output = Result<Self, Self::Error>> + Send
     where
         Self: Sized;
 
@@ -44,5 +45,5 @@ pub trait Outbound: Send + Sync + 'static {
     /// from a pool, a logical stream over a multiplexed connection, or
     /// anything else the transport considers a valid "one wire to the
     /// configured target."
-    async fn connect(&self) -> Result<Self::Wire, Self::Error>;
+    fn connect(&self) -> impl Future<Output = Result<Self::Wire, Self::Error>> + Send;
 }

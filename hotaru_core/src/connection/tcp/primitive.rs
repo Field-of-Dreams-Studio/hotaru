@@ -1,6 +1,5 @@
 //! TCP primitive accepter and connector implementations.
 
-use async_trait::async_trait;
 use core::net::SocketAddr;
 use tokio::net::TcpStream;
 
@@ -10,7 +9,6 @@ use crate::connection::{Accepter, Connector};
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TcpAccepter;
 
-#[async_trait]
 impl Accepter for TcpAccepter {
     type Raw = TcpStream;
     type Stream = TcpStream;
@@ -24,7 +22,6 @@ impl Accepter for TcpAccepter {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TcpConnector;
 
-#[async_trait]
 impl Connector for TcpConnector {
     type Stream = TcpStream;
     type Target = String;
@@ -38,7 +35,6 @@ impl Connector for TcpConnector {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TcpConnectorAddr;
 
-#[async_trait]
 impl Connector for TcpConnectorAddr {
     type Stream = TcpStream;
     type Target = SocketAddr;

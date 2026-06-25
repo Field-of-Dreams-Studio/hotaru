@@ -1,6 +1,5 @@
 //! TCP inbound and outbound runtime objects.
 
-use async_trait::async_trait;
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::connection::{Accepter, Inbound, Outbound};
@@ -13,7 +12,6 @@ pub struct TcpInbound {
     accepter: TcpAccepter,
 }
 
-#[async_trait]
 impl Inbound for TcpInbound {
     type Wire = TcpStream;
     type BindTarget = String;
@@ -47,7 +45,6 @@ impl TcpOutbound {
     }
 }
 
-#[async_trait]
 impl Outbound for TcpOutbound {
     type Wire = TcpStream;
     type ConnectTarget = String;

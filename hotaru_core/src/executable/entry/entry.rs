@@ -85,7 +85,7 @@ impl<P, TS> ProtocolEntryTrait<TS> for ProtocolEntry<P, TS>
 where
     P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static,
     TS: TransportSpec,
-{ 
+{
     fn test(&self, buf: &[u8]) -> bool {
         P::detect(buf)
     }

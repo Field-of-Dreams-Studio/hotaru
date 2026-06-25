@@ -1,6 +1,5 @@
 //! TLS client-side connector.
 
-use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 
@@ -50,7 +49,6 @@ impl TlsConnector {
     }
 }
 
-#[async_trait]
 impl Connector for TlsConnector {
     type Stream = TlsStream;
     type Target = (String, u16); // (hostname, port)

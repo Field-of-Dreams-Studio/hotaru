@@ -1,4 +1,4 @@
-use async_trait::async_trait;
+use core::future::Future;
 use core::time::Duration;
 use alloc::sync::Arc;
 use tokio::io::BufReader;
@@ -32,7 +32,6 @@ pub type CtxError<P> = <<P as Protocol>::Context as RequestContext>::Error;
 /// `RequestContext::Error`. Custom transports define their own `IoError`;
 /// the context impl provides `From<TS::IoError>` (or `From<std::io::Error>`
 /// when the transport is the default TCP one).
-#[async_trait]
 pub trait Protocol: Clone + Send + Sync + 'static
 where
     <Self::Context as RequestContext>::Error:
@@ -130,11 +129,11 @@ where
     /// - Reader and Writer wrapped in Channel 
     /// - Runtime 
     /// - Root URL 
-    async fn handle(
+    fn handle(
         channel: &Self::Channel,
         runtime: Arc<RuntimeConfig>,
         root: Arc<UrlRoot<Self::Context, Self::TS>>,
-    ) -> Result<ProtocolFlow, CtxError<Self>>; 
+    ) -> impl Future<Output = Result<ProtocolFlow, CtxError<Self>>> + Send;
 
     /// Client-side: produce a `Self::Channel` for one outbound exchange.
     /// The impl owns whatever sits behind it — a fresh dial through
@@ -147,16 +146,18 @@ where
     /// instance from `Client::ensure_outbound`, handed in as an owned
     /// `Arc` so pool-bearing impls can stash it as a cache key without
     /// further allocation.
-    async fn acquire_channel(
+    fn acquire_channel(
         &self,
         runtime: &Arc<RuntimeConfig>,
         outbound: Arc<<Self::TS as TransportSpec>::Outbound>,
-    ) -> Result<Self::Channel, CtxError<Self>>;
+    ) -> impl Future<Output = Result<Self::Channel, CtxError<Self>>> + Send;
 
     /// Outpoint final handler: send the request in `ctx`, read the response
     /// back into `ctx`, return ctx. Impl reads channel + request + any
     /// safety config from ctx via same-crate accessors on the concrete type.
-    async fn send(ctx: Self::Context) -> Result<Self::Context, CtxError<Self>>;
+    fn send(
+        ctx: Self::Context,
+    ) -> impl Future<Output = Result<Self::Context, CtxError<Self>>> + Send;
 
     /// Install a channel into a freshly-built context. Impl writes the
     /// channel into Context's private slot via its same-crate accessor.

@@ -5,9 +5,9 @@
 //! version (HTTP/1.1, HTTP/2, HTTP/3) implements this trait so that the
 //! protocol-level `handle` / `send` logic can be written generically.
 
+use std::future::Future;
 use std::net::SocketAddr;
 
-use async_trait::async_trait;
 use hotaru_core::protocol::Channel;
 
 use crate::message::request::HttpRequest;
@@ -27,26 +27,33 @@ use crate::security::safety::HttpSafety;
 /// (in-process channels, Unix sockets, QUIC during address migration) may
 /// not have a meaningful `SocketAddr`.
 ///
-/// The trait is decorated with `#[async_trait]` for consistency with
-/// [`hotaru_core::protocol::Protocol`] and so that generic code over
-/// `H: HttpChannel` can use the returned futures in `Send`-required async
-/// contexts (e.g. `tokio::spawn`) without extra associated-type-bound syntax.
-#[async_trait]
 pub trait HttpChannel: Channel {
     /// Parse one HTTP request from the channel's reader.
     ///
     /// On EOF / malformed input, implementations should flip the channel
     /// closed and return an [`HttpError::Io`] with `UnexpectedEof`.
-    async fn parse_request(&self, safety: &HttpSafety) -> Result<HttpRequest, HttpError>;
+    fn parse_request(
+        &self,
+        safety: &HttpSafety,
+    ) -> impl Future<Output = Result<HttpRequest, HttpError>> + Send;
 
     /// Send an HTTP response on the channel's writer.
-    async fn send_response(&self, response: HttpResponse) -> Result<(), HttpError>;
+    fn send_response(
+        &self,
+        response: HttpResponse,
+    ) -> impl Future<Output = Result<(), HttpError>> + Send;
 
     /// Send an HTTP request on the channel's writer (client-side).
-    async fn send_request(&self, request: HttpRequest) -> Result<(), HttpError>;
+    fn send_request(
+        &self,
+        request: HttpRequest,
+    ) -> impl Future<Output = Result<(), HttpError>> + Send;
 
     /// Parse one HTTP response from the channel's reader (client-side).
-    async fn parse_response(&self, safety: &HttpSafety) -> Result<HttpResponse, HttpError>;
+    fn parse_response(
+        &self,
+        safety: &HttpSafety,
+    ) -> impl Future<Output = Result<HttpResponse, HttpError>> + Send;
 
     /// Local socket address of the underlying connection, if any.
     fn local_addr(&self) -> Option<SocketAddr>;

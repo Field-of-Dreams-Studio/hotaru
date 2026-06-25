@@ -1,11 +1,10 @@
 //! Server-side runtime that accepts inbound wire streams.
 
-use async_trait::async_trait;
+use core::future::Future;
 
 use crate::connection::ConnStream;
 
 /// Bound inbound runtime that accepts final wire streams.
-#[async_trait]
 pub trait Inbound: Send + Sync + 'static {
     /// Wire stream produced by this runtime.
     type Wire: ConnStream;
@@ -19,10 +18,12 @@ pub trait Inbound: Send + Sync + 'static {
     type Error: core::error::Error + Send + Sync + 'static;
 
     /// Bind and construct the inbound runtime.
-    async fn bind(target: Self::BindTarget) -> Result<Self, Self::Error>
+    fn bind(
+        target: Self::BindTarget,
+    ) -> impl Future<Output = Result<Self, Self::Error>> + Send
     where
         Self: Sized;
 
     /// Wait for one inbound wire.
-    async fn accept(&self) -> Result<Self::Wire, Self::Error>;
+    fn accept(&self) -> impl Future<Output = Result<Self::Wire, Self::Error>> + Send;
 }

@@ -1,6 +1,5 @@
 //! TLS server-side accepter.
 
-use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsAcceptor as RustlsAcceptor;
@@ -62,7 +61,6 @@ impl TlsAccepter {
     }
 }
 
-#[async_trait]
 impl Accepter for TlsAccepter {
     type Raw = TcpStream;
     type Stream = TlsStream;
