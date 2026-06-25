@@ -17,6 +17,9 @@ tokio = { version = "1.28", features = ["full"] }
 # must be enabled. Default features include `std-sync`.
 parking_lot = { version = "0.12", optional = true }
 spin = { version = "0.12", default-features = false, features = ["mutex", "spin_mutex", "rwlock"], optional = true }
+# Async IO backend for the `embedded` feature; the blanket `HotaruRead` /
+# `HotaruWrite` / `HotaruBufRead` impls in `connection::io` bridge to it.
+embedded-io-async = { version = "0.6", default-features = false, optional = true }
 av = "0.1"
 
 hotaru_lib = { version = "0.8.2", path = "../hotaru_lib", default-features = false, features = ["url_encoding"] }
@@ -50,7 +53,7 @@ lite = ["regex/unicode-perl", "akari/no_std"] # small devices
 # Today they gate the sync backend (parking_lot vs spin); future stages will
 # fold more std-vs-no_std switches into the same markers (tokio features,
 # std::io::Error variant, etc.).
-std = ["dep:parking_lot"]                     # std target
-embedded = ["dep:spin"]                       # no_std-friendly target
+std = ["dep:parking_lot"]                                  # std target
+embedded = ["dep:spin", "dep:embedded-io-async"]           # no_std-friendly target
 
 dev-log = [] # Feature for debugging hotaru

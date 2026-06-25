@@ -520,6 +520,25 @@ impl<TS: TransportSpec> HttpContext<TS> {
         self.response.body = body;
         self
     }
+
+    /// Take the request out of this HTTP context for protocol transmission.
+    ///
+    /// If the request does not already carry a Host value, use the context's
+    /// configured host when it is non-empty.
+    pub(crate) fn take_request(&mut self) -> HttpRequest {
+        if self.request.meta.get_host().is_none() {
+            if let Some(host) = self.host.as_deref().filter(|h| !h.is_empty()) {
+                self.request.meta.set_host(Some(host.to_string()));
+            }
+        }
+
+        std::mem::take(&mut self.request)
+    }
+
+    /// Store a protocol response into this HTTP context.
+    pub(crate) fn set_response(&mut self, response: HttpResponse) {
+        self.response = response;
+    }
 }
 
 impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
@@ -599,6 +618,62 @@ impl<TS: TransportSpec> HttpContext<TS> {
             }
         };
         self.request = request;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::message::http_value::StatusCode;
+    use crate::message::response::response_templates;
+
+    type TestHttpContext = HttpContext<crate::connection::tcp::TcpTransport>;
+
+    fn client_context(host: &str) -> TestHttpContext {
+        TestHttpContext::new_client(host.to_string(), HttpSafety::default())
+    }
+
+    #[test]
+    fn take_request_sets_missing_host_from_context() {
+        let mut ctx = client_context("example.com");
+
+        let mut request = ctx.take_request();
+
+        assert_eq!(request.meta.get_host(), Some("example.com".to_string()));
+    }
+
+    #[test]
+    fn take_request_preserves_existing_request_host() {
+        let mut ctx = client_context("context.example");
+        let mut request = HttpRequest::default();
+        request.meta.set_host(Some("request.example".to_string()));
+        ctx.request = request;
+
+        let mut request = ctx.take_request();
+
+        assert_eq!(request.meta.get_host(), Some("request.example".to_string()));
+    }
+
+    #[test]
+    fn take_request_ignores_empty_context_host() {
+        let mut ctx = client_context("");
+
+        let mut request = ctx.take_request();
+
+        assert_eq!(request.meta.get_host(), None);
+    }
+
+    #[test]
+    fn set_response_stores_response() {
+        let mut ctx = client_context("");
+        let response = response_templates::normal_response(StatusCode::CREATED, "created");
+
+        ctx.set_response(response);
+
+        assert_eq!(
+            ctx.response.meta.start_line.status_code(),
+            StatusCode::CREATED
+        );
     }
 }
 

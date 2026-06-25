@@ -1,5 +1,6 @@
 pub mod connection;
 pub mod error;
+pub mod io;
 pub mod primitive;
 pub mod runtime;
 pub mod stream;
@@ -8,6 +9,7 @@ pub mod test;
 pub mod transport_spec;
 
 pub use self::error::Result;
+pub use self::io::{HotaruBufRead, HotaruRead, HotaruWrite};
 pub use self::primitive::{Accepter, Connector};
 pub use self::runtime::{Inbound, Outbound};
 pub use self::stream::{ConnMeta, ConnStream};

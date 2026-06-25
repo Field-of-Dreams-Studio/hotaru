@@ -237,17 +237,14 @@ where
 
         let safety = ctx.safety.clone();
 
-        if ctx.request.meta.get_host().is_none() {
-            if let Some(host) = ctx.host.as_deref().filter(|h| !h.is_empty()) {
-                ctx.request.meta.set_host(Some(host.to_string()));
-            }
-        }
-
-        let request = std::mem::take(&mut ctx.request);
+        let request = ctx.take_request();
         channel.send_request(request).await?;
-        ctx.response = channel.parse_response(&safety).await?;
 
-        if !is_response_keep_alive(&ctx.response) {
+        let response = channel.parse_response(&safety).await?;
+        let keep_alive = is_response_keep_alive(&response);
+        ctx.set_response(response);
+
+        if !keep_alive {
             channel.close();
         }
         Ok(ctx)
