@@ -1,11 +1,9 @@
 use core::any::TypeId;
 use alloc::sync::Arc;
 
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, TransportSpec},
+    connection::{ConnStream, HotaruBufRead, HotaruRead, HotaruWrite, TransportSpec},
     debug_log,
     executable::{
         ExecutableBinding,
@@ -49,7 +47,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
 
     pub async fn serve(&self, runtime: Arc<RuntimeConfig>, conn: TS::Wire) {
         let (read_half, mut writer, meta) = conn.split();
-        let mut reader = BufReader::new(read_half);
+        let mut reader = read_half.into_buf();
         let selected = {
             let buf = reader.fill_buf().await.unwrap_or(&[]);
             let _n = buf.len();
@@ -62,7 +60,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         };
 
         if let Some(handler) = selected {
-            handler.serve(runtime, reader, writer, meta).await;
+            handler.serve(runtime, reader, writer.into_buf_write(), meta).await;
         } else {
             let _ = writer.shutdown().await;
         }
@@ -70,7 +68,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
 
     pub async fn request(&self, runtime: Arc<RuntimeConfig>, conn: TS::Wire) {
         let (read_half, mut writer, meta) = conn.split();
-        let mut reader = BufReader::new(read_half);
+        let mut reader = read_half.into_buf();
         let selected = {
             let buf = reader.fill_buf().await.unwrap_or(&[]);
             let _n = buf.len();
@@ -83,7 +81,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         };
 
         if let Some(handler) = selected {
-            handler.request(runtime, reader, writer, meta).await;
+            handler.request(runtime, reader, writer.into_buf_write(), meta).await;
         } else {
             let _ = writer.shutdown().await;
         }

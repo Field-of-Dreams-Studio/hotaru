@@ -36,11 +36,11 @@ impl ConnStream for TcpStream {
         (read, write, meta)
     }
 
-    fn peer_addr(&self) -> std::io::Result<SocketAddr> {
-        self.peer_addr()
+    fn peer_addr(&self) -> Option<SocketAddr> {
+        TcpStream::peer_addr(self).ok()
     }
 
-    fn local_addr(&self) -> std::io::Result<SocketAddr> {
-        self.local_addr()
+    fn local_addr(&self) -> Option<SocketAddr> {
+        TcpStream::local_addr(self).ok()
     }
 }

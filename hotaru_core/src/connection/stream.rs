@@ -1,5 +1,6 @@
 use core::net::SocketAddr;
-use tokio::io::{AsyncRead, AsyncWrite};
+
+use crate::connection::{HotaruRead, HotaruWrite};
 
 /// Per-connection metadata produced when a wire stream is split.
 ///
@@ -18,14 +19,20 @@ pub trait ConnMeta: Send + Sync + 'static {
 }
 
 /// Stream abstraction for protocol-specific transports.
-pub trait ConnStream: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static {
+///
+/// Framework-owned supertraits only. Under `std`, the tokio blanket gives
+/// every `tokio::io::AsyncRead`/`AsyncWrite` type these impls for free, so
+/// existing tokio-based transports (`TcpStream`, `TlsStream`) satisfy the
+/// bound without code changes. Under `embedded`, the embedded-io-async
+/// blanket plays the same role.
+pub trait ConnStream: HotaruRead + HotaruWrite + Unpin + Send + Sync + 'static {
     /// Read half type produced by `split`.
-    type ReadHalf: AsyncRead + Unpin + Send + 'static;
+    type ReadHalf: HotaruRead + Unpin + Send + 'static;
 
     /// Write half type produced by `split`.
     ///
-    /// Note: `shutdown()` is available via `AsyncWriteExt` since `WriteHalf: AsyncWrite`.
-    type WriteHalf: AsyncWrite + Unpin + Send + 'static;
+    /// Note: `shutdown()` is available via `HotaruWrite`.
+    type WriteHalf: HotaruWrite + Unpin + Send + 'static;
 
     /// Connection metadata produced by `split`.
     type Meta: ConnMeta;
@@ -33,9 +40,9 @@ pub trait ConnStream: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static {
     /// Split the stream into read and write halves.
     fn split(self) -> (Self::ReadHalf, Self::WriteHalf, Self::Meta);
 
-    /// Returns the remote peer's socket address.
-    fn peer_addr(&self) -> std::io::Result<SocketAddr>;
+    /// Returns the remote peer's socket address when available.
+    fn peer_addr(&self) -> Option<SocketAddr>;
 
-    /// Returns the local socket address.
-    fn local_addr(&self) -> std::io::Result<SocketAddr>;
+    /// Returns the local socket address when available.
+    fn local_addr(&self) -> Option<SocketAddr>;
 }

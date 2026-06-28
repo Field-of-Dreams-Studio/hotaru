@@ -131,19 +131,19 @@ impl ConnStream for TcpOrTlsStream {
 
     fn split(self) -> (Self::ReadHalf, Self::WriteHalf, Self::Meta) {
         let meta = FlexMeta {
-            local: self.local_addr().ok(),
-            remote: self.peer_addr().ok(),
+            local: TcpOrTlsStream::local_addr(&self).ok(),
+            remote: TcpOrTlsStream::peer_addr(&self).ok(),
         };
         let (r, w) = io::split(self);
         (r, w, meta)
     }
 
-    fn peer_addr(&self) -> std::io::Result<SocketAddr> {
-        self.peer_addr()
+    fn peer_addr(&self) -> Option<SocketAddr> {
+        TcpOrTlsStream::peer_addr(self).ok()
     }
 
-    fn local_addr(&self) -> std::io::Result<SocketAddr> {
-        self.local_addr()
+    fn local_addr(&self) -> Option<SocketAddr> {
+        TcpOrTlsStream::local_addr(self).ok()
     }
 }
 

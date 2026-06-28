@@ -13,7 +13,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use tokio::io::{AsyncBufRead, AsyncWrite};
+use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
 
 use crate::channel::Http1Channel;
 use crate::message::body::HttpBody;
@@ -226,7 +226,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
         reader: &mut R,
     ) -> Result<HttpRequest, ConnectionError>
     where
-        R: AsyncBufRead + Unpin,
+        R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
     {
         Ok(HttpRequest::parse_lazy(
             reader,
@@ -239,7 +239,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// Sends the response
     pub async fn send_response<W>(response: HttpResponse, writer: &mut W)
     where
-        W: AsyncWrite + Unpin,
+        W: HotaruWrite<Error = std::io::Error> + Unpin + Send,
     {
         let _ = response.send(writer).await;
     }

@@ -1,14 +1,13 @@
 use std::fmt::Write;
 
-use tokio::io::{AsyncBufRead, AsyncWrite, AsyncWriteExt};
-
+use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
 use hotaru_core::connection::error::ConnectionError;
 
 use crate::message::body::HttpBody;
 use crate::message::meta::HttpMeta;
 use crate::security::safety::HttpSafety;
 
-pub async fn parse_lazy<R: AsyncBufRead + Unpin>(
+pub async fn parse_lazy<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
     stream: &mut R,
     config: &HttpSafety,
     is_request: bool,
@@ -22,7 +21,7 @@ pub async fn parse_lazy<R: AsyncBufRead + Unpin>(
     Ok((meta, body))
 }
 
-pub async fn send<W: AsyncWrite + Unpin>(
+pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(
     mut meta: HttpMeta,
     body: HttpBody,
     writer: &mut W,

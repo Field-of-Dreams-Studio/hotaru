@@ -9,11 +9,10 @@ use std::sync::Arc;
 
 use hotaru_core::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, Outbound, TransportSpec},
+    connection::{ConnStream, HotaruRead, HotaruWrite, Outbound, TransportSpec},
     protocol::{Channel, CtxError, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext},
     url::UrlRoot,
 };
-use tokio::io::BufReader;
 use tokio::net::TcpStream;
 
 use crate::{
@@ -115,6 +114,8 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
 impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, TS>
 where
     HttpError: From<<TS as TransportSpec>::IoError>,
+    W::ReadHalf: HotaruRead<Error = std::io::Error>,
+    W::WriteHalf: HotaruWrite<Error = std::io::Error>,
 {
     type Wire = W;
     type TS = TS;
@@ -158,8 +159,8 @@ where
 
     fn open_channel(
         self,
-        reader: BufReader<<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf>,
-        writer: <<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf,
+        reader: <<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf as HotaruRead>::Buffered,
+        writer: <<<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf as HotaruWrite>::Buffered,
         meta: <<Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
     ) -> Self::Channel {
         let safety = self.safety.clone();
@@ -223,8 +224,9 @@ where
         // `self.pool` field without changing this signature.
         let wire = outbound.connect().await?;
         let (read, write, meta) = wire.split();
-        let reader = BufReader::new(read);
-        Ok(Http1Channel::new(reader, write, meta, self.safety.clone()))
+        let reader = read.into_buf();
+        let writer = write.into_buf_write();
+        Ok(Http1Channel::new(reader, writer, meta, self.safety.clone()))
     }
 
     async fn send(

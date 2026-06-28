@@ -12,9 +12,8 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use hotaru_core::connection::{ConnMeta, ConnStream};
+use hotaru_core::connection::{ConnMeta, ConnStream, HotaruRead, HotaruWrite};
 use hotaru_core::protocol::Channel;
-use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::sync::Mutex;
 
 use crate::channel::http_channel::HttpChannel;
@@ -31,8 +30,8 @@ use crate::security::safety::HttpSafety;
 /// at `open_channel` / `acquire_channel` time, so per-request I/O does not
 /// hit `RuntimeConfig`.
 pub struct Http1Channel<W: ConnStream> {
-    reader: Arc<Mutex<BufReader<W::ReadHalf>>>,
-    writer: Arc<Mutex<W::WriteHalf>>,
+    reader: Arc<Mutex<<W::ReadHalf as HotaruRead>::Buffered>>,
+    writer: Arc<Mutex<<W::WriteHalf as HotaruWrite>::Buffered>>,
     meta: Arc<W::Meta>,
     open: Arc<AtomicBool>,
     safety: Arc<HttpSafety>,
@@ -60,7 +59,12 @@ impl<W: ConnStream> Channel for Http1Channel<W> {
     }
 }
 
-impl<W: ConnStream> HttpChannel for Http1Channel<W> {
+impl<W> HttpChannel for Http1Channel<W>
+where
+    W: ConnStream,
+    W::ReadHalf: HotaruRead<Error = std::io::Error>,
+    W::WriteHalf: HotaruWrite<Error = std::io::Error>,
+{
     async fn parse_request(&self, safety: &HttpSafety) -> Result<HttpRequest, HttpError> {
         let mut reader = self.reader.lock().await;
         let request = HttpRequest::parse_lazy(&mut *reader, safety, false).await;
@@ -125,12 +129,17 @@ impl<W: ConnStream> HttpChannel for Http1Channel<W> {
     }
 }
 
-impl<W: ConnStream> Http1Channel<W> {
+impl<W> Http1Channel<W>
+where
+    W: ConnStream,
+    W::ReadHalf: HotaruRead<Error = std::io::Error>,
+    W::WriteHalf: HotaruWrite<Error = std::io::Error>,
+{
     /// Creates a new HTTP/1 channel from a split wire, its meta, and the
     /// per-connection safety baseline.
     pub fn new(
-        reader: BufReader<W::ReadHalf>,
-        writer: W::WriteHalf,
+        reader: <W::ReadHalf as HotaruRead>::Buffered,
+        writer: <W::WriteHalf as HotaruWrite>::Buffered,
         meta: W::Meta,
         safety: Arc<HttpSafety>,
     ) -> Self {

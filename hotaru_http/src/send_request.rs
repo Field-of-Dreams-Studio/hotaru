@@ -25,9 +25,8 @@
 
 use std::sync::Arc;
 
-use hotaru_core::connection::{ConnStream, Outbound};
+use hotaru_core::connection::{ConnStream, HotaruRead, HotaruWrite, Outbound};
 use hotaru_core::protocol::Channel;
-use tokio::io::BufReader;
 
 use crate::channel::Http1Channel;
 use crate::channel::HttpChannel;
@@ -51,11 +50,13 @@ pub async fn send_request<O>(
 where
     O: Outbound,
     HttpError: From<O::Error>,
+    <O::Wire as ConnStream>::ReadHalf: HotaruRead<Error = std::io::Error>,
+    <O::Wire as ConnStream>::WriteHalf: HotaruWrite<Error = std::io::Error>,
 {
     let wire = outbound.connect().await?;
     let (read, write, meta) = wire.split();
     let channel =
-        Http1Channel::<O::Wire>::new(BufReader::new(read), write, meta, Arc::new(safety));
+        Http1Channel::<O::Wire>::new(read.into_buf(), write.into_buf_write(), meta, Arc::new(safety));
 
     let result = async {
         channel.send_request(request).await?;

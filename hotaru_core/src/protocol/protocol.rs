@@ -1,10 +1,9 @@
 use core::future::Future;
 use core::time::Duration;
 use alloc::sync::Arc;
-use tokio::io::BufReader;
 
 use crate::{app::common::RuntimeConfig, protocol::ProtocolFlow};
-use crate::connection::TransportSpec;
+use crate::connection::{HotaruRead, HotaruWrite, TransportSpec};
 use crate::connection::stream::ConnStream;
 use crate::protocol::ProtocolRole;
 use crate::url::UrlRoot;
@@ -114,8 +113,8 @@ where
     /// Construct a channel handle from a freshly split wire.
     fn open_channel(
         self,
-        reader: BufReader<<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf>,
-        writer: <<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf,
+        reader: <<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf as HotaruRead>::Buffered,
+        writer: <<<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf as HotaruWrite>::Buffered,
         meta: <<Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
     ) -> Self::Channel;
 

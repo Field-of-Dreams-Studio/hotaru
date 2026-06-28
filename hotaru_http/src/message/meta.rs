@@ -8,7 +8,7 @@ use crate::message::http_value::*;
 use crate::message::start_line::HttpStartLine;
 use std::collections::{HashMap, HashSet};
 use std::str;
-use tokio::io::{AsyncBufRead, AsyncBufReadExt};
+use hotaru_core::connection::HotaruBufRead;
 
 /// RequestHeader is a struct that represents the headers of an HTTP request.
 #[derive(Debug, Clone)]
@@ -541,7 +541,7 @@ impl HttpMeta {
         }
     }
 
-    pub async fn from_stream<R: AsyncBufRead + Unpin>(
+    pub async fn from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,
@@ -572,7 +572,7 @@ impl HttpMeta {
         Ok(HttpMeta::new(start_line, header))
     }
 
-    async fn header_lines_raw_from_stream<R: AsyncBufRead + Unpin>(
+    async fn header_lines_raw_from_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,
@@ -727,7 +727,7 @@ impl HttpMeta {
     }
 
     // Expose the specific methods that call the shared implementation
-    pub async fn from_request_stream<R: AsyncBufRead + Unpin>(
+    pub async fn from_request_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,
@@ -735,7 +735,7 @@ impl HttpMeta {
         Self::from_stream(buf_reader, config, print_raw, true).await
     }
 
-    pub async fn append_from_request_stream<R: AsyncBufRead + Unpin>(
+    pub async fn append_from_request_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         &mut self,
         buf_reader: &mut R,
         config: &HttpSafety,
@@ -764,7 +764,7 @@ impl HttpMeta {
         Ok(())
     }
 
-    pub async fn from_response_stream<R: AsyncBufRead + Unpin>(
+    pub async fn from_response_stream<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
         config: &HttpSafety,
         print_raw: bool,

@@ -12,6 +12,10 @@ keywords = ["hotaru"]
 
 [dependencies]
 akari = { version = "0.2.8", default-features = false, features = ["dynamic", "extension", "object_macro"] }
+# Async runtime — still a hard (mandatory) dep today; the framework's spawn /
+# OnceCell / select uses are unconditional. The `tokio` feature gates only the
+# `connection::io` tokio<->Hotaru blanket impls. Making tokio truly optional is
+# a later stage.
 tokio = { version = "1.28", features = ["full"] }
 # Sync backends — exactly one of `std-sync` (parking_lot) or `embedded` (spin)
 # must be enabled. Default features include `std-sync`.
@@ -45,15 +49,22 @@ quickcheck = "1.0"
 env_logger = "0.10"
 
 [features]
-default = ["full", "std"]
+default = ["full", "std", "tokio"]
 full = ["regex/unicode", "akari/full"]        # normal devices
 lite = ["regex/unicode-perl", "akari/no_std"] # small devices
 
 # Target-flavour markers — exactly one of `std` / `embedded` must be enabled.
 # Today they gate the sync backend (parking_lot vs spin); future stages will
-# fold more std-vs-no_std switches into the same markers (tokio features,
-# std::io::Error variant, etc.).
+# fold more std-vs-no_std switches into the same markers (runtime feature
+# gates, error variants, etc.).
 std = ["dep:parking_lot"]                                  # std target
 embedded = ["dep:spin", "dep:embedded-io-async"]           # no_std-friendly target
+
+# Async-runtime marker. Enabling `tokio` turns on the tokio<->Hotaru blanket
+# impls in `connection::io::rw` and auto-enables `std`. The tokio crate itself
+# stays a mandatory dependency for now; this feature only gates the blanket
+# impls. Mutually exclusive with `embedded` by transitive conflict
+# (`tokio` -> `std`, and `std` + `embedded` already conflict).
+tokio = ["std"]
 
 dev-log = [] # Feature for debugging hotaru

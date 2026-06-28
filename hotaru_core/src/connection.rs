@@ -9,7 +9,12 @@ pub mod test;
 pub mod transport_spec;
 
 pub use self::error::Result;
-pub use self::io::{HotaruBufRead, HotaruRead, HotaruWrite};
+pub use self::io::buf_reader::HotaruBufReader;
+pub use self::io::buf_writer::HotaruBufWriter;
+pub use self::io::{
+    BufferedReadHalf, BufferedWriteHalf, HotaruBufRead, HotaruBufWrite, HotaruIOError, HotaruRead,
+    HotaruWrite,
+};
 pub use self::primitive::{Accepter, Connector};
 pub use self::runtime::{Inbound, Outbound};
 pub use self::stream::{ConnMeta, ConnStream};
@@ -17,4 +22,3 @@ pub use self::tcp::{
     TcpAccepter, TcpConnector, TcpConnectorAddr, TcpInbound, TcpMeta, TcpOutbound, TcpTransport,
 };
 pub use self::transport_spec::TransportSpec;
-

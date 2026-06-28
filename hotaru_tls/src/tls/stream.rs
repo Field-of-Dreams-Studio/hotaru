@@ -114,25 +114,25 @@ impl ConnStream for TlsStream {
                 .map(|certs| Arc::from(certs.to_vec().into_boxed_slice())),
         };
         let meta = TlsMeta {
-            local: self.local_addr().ok(),
-            remote: self.peer_addr().ok(),
+            local: self.local_addr(),
+            remote: self.peer_addr(),
             peer_certificates,
         };
         let (r, w) = tokio::io::split(self);
         (r, w, meta)
     }
 
-    fn peer_addr(&self) -> std::io::Result<SocketAddr> {
+    fn peer_addr(&self) -> Option<SocketAddr> {
         match self {
             TlsStream::Client(s) => s.get_ref().0.peer_addr(),
             TlsStream::Server(s) => s.get_ref().0.peer_addr(),
-        }
+        }.ok()
     }
 
-    fn local_addr(&self) -> std::io::Result<SocketAddr> {
+    fn local_addr(&self) -> Option<SocketAddr> {
         match self {
             TlsStream::Client(s) => s.get_ref().0.local_addr(),
             TlsStream::Server(s) => s.get_ref().0.local_addr(),
-        }
+        }.ok()
     }
 }

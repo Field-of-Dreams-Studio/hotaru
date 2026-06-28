@@ -23,11 +23,9 @@ use core::any::TypeId;
 use core::time::Duration;
 use alloc::sync::Arc;
 
-use tokio::io::BufReader;
-
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, TransportSpec},
+    connection::{ConnStream, HotaruRead, HotaruWrite, TransportSpec},
     executable::{
         ExecutableBinding,
         entry::{ProtocolEntry, ProtocolEntryTrait},
@@ -95,7 +93,8 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         match self {
             Self::Single(handler) => {
                 let (reader, writer, meta) = conn.split();
-                let reader = BufReader::new(reader);
+                let reader = reader.into_buf();
+                let writer = writer.into_buf_write();
                 handler.serve(runtime, reader, writer, meta).await;
             }
             Self::Multi(registry) => {
@@ -115,7 +114,8 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         match self {
             Self::Single(handler) => {
                 let (reader, writer, meta) = conn.split();
-                let reader = BufReader::new(reader);
+                let reader = reader.into_buf();
+                let writer = writer.into_buf_write();
                 handler.request(runtime, reader, writer, meta).await;
             }
             Self::Multi(registry) => {

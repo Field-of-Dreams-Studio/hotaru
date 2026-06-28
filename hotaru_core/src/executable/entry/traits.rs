@@ -2,12 +2,10 @@ use core::{any::Any, future::Future, pin::Pin, time::Duration};
 use alloc::sync::Arc;
 
 use akari::extensions::{Locals, Params};
-use tokio::io::BufReader;
-
 use crate::{
     alias::PRwLock,
     app::common::RuntimeConfig,
-    connection::{ConnStream, TransportSpec},
+    connection::{BufferedReadHalf, BufferedWriteHalf, ConnStream, TransportSpec},
 };
 
 /// Neutral protocol-entry boundary shared by server and client execution.
@@ -25,8 +23,8 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
     fn serve(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
 
@@ -34,8 +32,8 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
     fn serve_upgrade(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
         params: PRwLock<Params>,
         locals: PRwLock<Locals>,
@@ -44,16 +42,16 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
     fn request(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
     ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
 
     fn request_upgrade(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
         params: PRwLock<Params>,
         locals: PRwLock<Locals>,
