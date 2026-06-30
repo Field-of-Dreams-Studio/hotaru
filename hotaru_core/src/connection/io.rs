@@ -1,7 +1,8 @@
 //! Framework-owned async IO traits.
 
 pub mod marker; 
-pub use marker::{IoCompat, MaybeSend};
+pub use crate::marker::MaybeSend;
+pub use marker::IoCompat;
 
 pub mod rw_traits; 
 pub use rw_traits::{HotaruBufRead, HotaruIOError, HotaruRead, HotaruWrite, HotaruBufWrite}; 

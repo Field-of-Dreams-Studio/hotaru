@@ -1,7 +1,7 @@
 //! Runtime backend abstraction.
 
 pub mod spec;
-pub use spec::RuntimeSpec;
+pub use spec::{AsyncMutexCap, BoxFuture, Either, MaybeSendFuture, OnceCellCap, RuntimeSpec};
 
 #[cfg(feature = "rt_tokio")]
 pub mod tokio_impl;

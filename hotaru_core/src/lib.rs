@@ -19,7 +19,10 @@ compile_error!(
 #[cfg(not(any(feature = "io_futures", feature = "io_embedded", feature = "io_tokio")))]
 compile_error!("hotaru_core: at least one io_* feature must be enabled");
 
-// Type aliases (must be declared before other modules that use it)
+// Marker traits and type aliases (must be declared before modules that use them).
+pub mod marker;
+
+// Backward-compatible alias shim; new code should use `marker`.
 pub mod alias;
 
 pub mod app;
@@ -33,5 +36,7 @@ pub mod url;
 
 pub use akari::*;
 
-// Re-export commonly used type aliases
-pub use alias::{PRwLock, PRwLockReadGuard, PRwLockWriteGuard};
+// Re-export commonly used marker aliases.
+pub use marker::{
+    BoxFuture, MaybeSend, MaybeSendFuture, PRwLock, PRwLockReadGuard, PRwLockWriteGuard,
+};
