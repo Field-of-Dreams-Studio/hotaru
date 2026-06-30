@@ -7,6 +7,7 @@ use alloc::sync::Arc;
 
 use crate::app::runtime::{DefaultRuntime, Either, OnceCellCap, RuntimeSpec};
 use crate::executable::ExecutableBinding;
+use crate::marker::MaybeSend;
 use crate::{debug_error, debug_log, debug_warn};
 
 use crate::connection::{Inbound, TransportSpec};
@@ -205,14 +206,13 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
         });
     }
 
-    /// Run the application with its own dedicated tokio runtime
+    /// Run the application until this runtime's default stop condition fires.
     ///
-    /// This method creates a new multi-threaded tokio runtime with the number of worker threads
-    /// specified by the `worker` field (set via `AppBuilder::worker()`). Each Server instance
-    /// runs with its own independent runtime and thread pool.
-    ///
-    /// Note: This can be called from within an async context. The worker thread configuration
-    /// of any outer runtime does not affect the Server's internal worker thread count.
+    /// `run()` is executor-neutral: it does not create a Tokio runtime or any
+    /// other executor. The caller (or a future `hotaru::main` macro) is
+    /// responsible for driving this future. For Tokio, the default stop
+    /// condition is Ctrl+C; for runtimes without a default stop source it may
+    /// be `pending()` forever.
     ///
     /// Example:
     /// ```no_run
@@ -227,33 +227,50 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
     ///     app.run().await;
     /// }
     /// ```
-    // TODO(runtime-abstraction): Tokio-specific runner. Creates/owns a Tokio
-    // multi-thread runtime via `spawn_blocking` + `runtime::Builder`. Gated on
-    // `rt_tokio` (Stage 6.9). A backend-neutral driver (e.g. `run_until(stop)`
-    // / `serve_forever`) built on Stage 7 runtime primitives is the planned
-    // cross-runtime replacement; Embassy supplies its own executor task.
-    #[cfg(feature = "rt_tokio")]
     pub async fn run(self: Arc<Self>) {
-        let worker_count = self.config.worker();
-        let app = self.clone();
+        self.run_until(Rt::default_stop()).await;
+    }
 
-        println!("Starting Hotaru server");
+    /// Run the application until `stop` resolves.
+    ///
+    /// This is the runtime-neutral accept loop. It uses `Rt::select2`,
+    /// `Rt::sleep`, and `Rt::spawn_detached`; no Tokio APIs are referenced.
+    /// Provide any stop source you want: OS signal, board interrupt, supervisor
+    /// message, deadline, or `core::future::pending()` for never-stop service.
+    pub async fn run_until<S>(self: Arc<Self>, stop: S)
+    where
+        S: core::future::Future<Output = ()> + MaybeSend,
+    {
+        let inbound = self
+            .ensure_inbound()
+            .await
+            .unwrap_or_else(|_| panic!("Failed to bind inbound transport"))
+            .clone();
 
-        // Spawn a blocking task to create and run the runtime
-        // This allows the runtime to be created from within an async context
-        tokio::task::spawn_blocking(move || {
-            // Create a new multi-threaded runtime with the specified worker threads
-            let runtime = tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(worker_count)
-                .enable_all()
-                .build()
-                .expect("Failed to create tokio runtime");
+        debug_log!("Inbound transport bound");
 
-            // Run the actual server logic within this runtime
-            runtime.block_on(app.run_app_loop());
-        })
-        .await
-        .expect("Runtime task panicked");
+        let mut stop = core::pin::pin!(stop);
+
+        loop {
+            match Rt::select2(inbound.accept(), &mut stop).await {
+                Either::Left(Ok(conn)) => {
+                    debug_log!("Accepted inbound wire");
+                    Arc::clone(&self).handle_wire(conn);
+                }
+                Either::Left(Err(_e)) => {
+                    if self.get_mode() == RunMode::Build {
+                        debug_error!("Failed to accept connection: {_e}");
+                    }
+                }
+                Either::Right(()) => {
+                    debug_log!("Shutting down server...");
+                    break;
+                }
+            }
+        }
+
+        Rt::sleep(Duration::from_secs(1)).await;
+        debug_log!("Server shutdown complete");
     }
 
     /// Synthetically invoke a registered endpoint by name. Builds a fresh
@@ -303,56 +320,4 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
             .await
     }
 
-    /// Internal application loop - listens for and handles connections
-    // TODO(runtime-abstraction): Tokio-specific accept loop. Uses
-    // `tokio::sync::oneshot`, `tokio::signal::ctrl_c`, `tokio::select!`, and
-    // `tokio::time::sleep`. Gated on `rt_tokio` (Stage 6.9). Stage 7 abstracts
-    // OnceCell/time/select; the stop source should later be caller-provided or
-    // a backend capability rather than hard-wired Ctrl+C.
-    #[cfg(feature = "rt_tokio")]
-    async fn run_app_loop(self: Arc<Self>) {
-        let inbound = self
-            .ensure_inbound()
-            .await
-            .unwrap_or_else(|_| panic!("Failed to bind inbound transport"))
-            .clone();
-
-        debug_log!("Inbound transport bound");
-
-        // Create a signal handler for clean shutdown
-        let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-
-        // Handle Ctrl+C for clean shutdown
-        Rt::spawn_detached(async move {
-            if let Ok(_) = tokio::signal::ctrl_c().await {
-                debug_log!("Received shutdown signal");
-                let _ = shutdown_tx.send(());
-            }
-        });
-
-        loop {
-            tokio::select! {
-                accept_result = inbound.accept() => {
-                    match accept_result {
-                        Ok(conn) => {
-                            debug_log!("Accepted inbound wire");
-                            Arc::clone(&self).handle_wire(conn);
-                        }
-                        Err(_e) => {
-                            if self.get_mode() == RunMode::Build{
-                                debug_error!("Failed to accept connection: {_e}");
-                            }
-                        }
-                    }
-                }
-                _ = &mut shutdown_rx => {
-                    debug_log!("Shutting down server...");
-                    break;
-                }
-            }
-        }
-
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        debug_log!("Server shutdown complete");
-    }
 }

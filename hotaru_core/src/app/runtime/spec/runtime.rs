@@ -63,6 +63,15 @@ pub trait RuntimeSpec: 'static {
         A::Output: MaybeSend,
         B::Output: MaybeSend;
 
+    /// Default shutdown signal for [`Server::run`](crate::app::server::Server::run).
+    ///
+    /// The default is "never stop"; runtimes with a natural process-level
+    /// signal may override it (Tokio uses Ctrl+C). Callers that need a custom
+    /// stop source should use `Server::run_until(stop)`.
+    fn default_stop() -> crate::marker::BoxFuture<'static, ()> {
+        alloc::boxed::Box::pin(core::future::pending())
+    }
+
     /// Runtime-specific one-time-init cell.
     type OnceCell<T: MaybeSend + Sync + 'static>: OnceCellCap<T>;
 

@@ -71,6 +71,12 @@ impl RuntimeSpec for TokioRuntime {
         }
     }
 
+    fn default_stop() -> crate::marker::BoxFuture<'static, ()> {
+        alloc::boxed::Box::pin(async {
+            let _ = tokio::signal::ctrl_c().await;
+        })
+    }
+
     type OnceCell<T: Send + Sync + 'static> = TokioOnceCell<T>;
     type AsyncMutex<T: Send + 'static> = TokioMutex<T>;
 }
