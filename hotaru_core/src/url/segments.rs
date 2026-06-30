@@ -12,7 +12,7 @@ use super::{node::StepName, pattern::PathPattern};
 
 /// Represents a URL in the application.
 /// This struct holds the various components of a URL, including its path, query parameters, and more.
-pub struct Url<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct Url<C: RequestContext, TS: TransportSpec> {
     // The last segment of the URL path
     path: PathPattern,
 
@@ -39,7 +39,7 @@ pub struct Url<C: RequestContext, TS: TransportSpec = crate::connection::tcp::Tc
     // app_cache: PRwLock<Option<Arc<App<TS>>>>,
 }
 
-pub struct Children<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct Children<C: RequestContext, TS: TransportSpec> {
     // Private vec - only accessible through methods
     inner: Vec<Arc<Url<C, TS>>>,
 }
@@ -102,7 +102,7 @@ impl<C: RequestContext, TS: TransportSpec> Children<C, TS> {
     }
 }
 
-pub enum Ancestor<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub enum Ancestor<C: RequestContext, TS: TransportSpec> {
     Nil,
     // App(Arc<App<TS>>),
     Some(Arc<Url<C, TS>>),

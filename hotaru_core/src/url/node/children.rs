@@ -1,6 +1,6 @@
-use core::marker::PhantomData;
-use alloc::sync::Arc;
 use akari::hash::HashMap;
+use alloc::sync::Arc;
+use core::marker::PhantomData;
 
 use crate::{
     alias::PRwLock,
@@ -15,7 +15,7 @@ use super::{PartialState, UrlNode};
 ///
 /// The lock is expected to live at the `Children` layer so all child-cache
 /// updates remain atomic from the caller's perspective.
-pub struct Children<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct Children<C: RequestContext, TS: TransportSpec> {
     inner: PRwLock<ChildrenInner<C, TS>>,
     _ts: PhantomData<TS>,
 }
@@ -27,10 +27,7 @@ pub struct Children<C: RequestContext, TS: TransportSpec = crate::connection::tc
 /// 2. regex scan
 /// 3. single-segment wildcard
 /// 4. catch-all wildcard
-pub struct ChildrenInner<
-    C: RequestContext,
-    TS: TransportSpec = crate::connection::tcp::TcpTransport,
-> {
+pub struct ChildrenInner<C: RequestContext, TS: TransportSpec> {
     /// Exact-match children keyed by literal segment.
     literals: LiteralChild<C, TS>,
     /// Regex children evaluated after exact literal lookup.
@@ -43,8 +40,7 @@ pub struct ChildrenInner<
 }
 
 /// Exact-match child cache for literal path segments.
-pub struct LiteralChild<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport>
-{
+pub struct LiteralChild<C: RequestContext, TS: TransportSpec> {
     inner: HashMap<String, Arc<UrlNode<C, TS>>>,
     _ts: PhantomData<TS>,
 }
@@ -54,7 +50,7 @@ pub struct LiteralChild<C: RequestContext, TS: TransportSpec = crate::connection
 /// Holds the compiled `RegexSegment` (shared with the originating
 /// `PathPattern::Regex` via `Arc`), so matching against incoming segments
 /// never recompiles the regex.
-pub struct RegexChild<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct RegexChild<C: RequestContext, TS: TransportSpec> {
     seg: RegexSegment,
     node: Arc<UrlNode<C, TS>>,
     _ts: PhantomData<TS>,
@@ -210,7 +206,10 @@ impl<C: RequestContext, TS: TransportSpec> ChildrenInner<C, TS> {
         match pattern {
             PathPattern::Literal(segment) => self.literals.remove(segment),
             PathPattern::Regex(seg) => {
-                if let Some(pos) = self.regex.iter().position(|entry| entry.pattern() == seg.src())
+                if let Some(pos) = self
+                    .regex
+                    .iter()
+                    .position(|entry| entry.pattern() == seg.src())
                 {
                     Some(self.regex.remove(pos).node())
                 } else {
@@ -468,8 +467,8 @@ impl<C: RequestContext, TS: TransportSpec> Clone for RegexChild<C, TS> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::sync::Arc;
     use akari::hash::HashMap;
+    use alloc::sync::Arc;
 
     use crate::{
         connection::tcp::TcpTransport,
@@ -485,7 +484,9 @@ mod tests {
     struct TestChannel;
 
     impl Channel for TestChannel {
-        fn is_open(&self) -> bool { true }
+        fn is_open(&self) -> bool {
+            true
+        }
         fn close(&self) {}
     }
 

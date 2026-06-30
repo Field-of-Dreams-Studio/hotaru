@@ -2,11 +2,7 @@ use alloc::sync::Arc;
 use core::marker::PhantomData;
 
 use crate::{
-    app::{
-        client::Client,
-        registry::ProtocolRegistryKind,
-        server::Server,
-    },
+    app::{client::Client, registry::ProtocolRegistryKind, runtime::RuntimeSpec, server::Server},
     connection::{Inbound, Outbound, TransportSpec},
     executable::{ProtocolEntryBuilder, ProtocolRegistryBuilder, registry::ProtocolEntryRegistry},
     extensions::{Locals, Params},
@@ -21,9 +17,9 @@ pub struct ClientRole;
 /// Shared runtime builder used as the base for server and client construction.
 ///
 /// The role marker decides which terminal `build()` method is available:
-/// `AppBuilder<ServerRole, TS>` builds a [`Server`], while
-/// `AppBuilder<ClientRole, TS>` builds a [`Client`].
-pub struct AppBuilder<R, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+/// `AppBuilder<ServerRole, TS, Rt>` builds a [`Server`], while
+/// `AppBuilder<ClientRole, TS, Rt>` builds a [`Client`].
+pub struct AppBuilder<R, TS: TransportSpec, Rt: RuntimeSpec> {
     registry: Option<ProtocolEntryRegistry<TS>>,
     binding: Option<<TS::Inbound as Inbound>::BindTarget>,
     target: Option<<TS::Outbound as Outbound>::ConnectTarget>,
@@ -34,9 +30,10 @@ pub struct AppBuilder<R, TS: TransportSpec = crate::connection::tcp::TcpTranspor
     config: Params,
     statics: Locals,
     _role: PhantomData<R>,
+    _rt: PhantomData<fn() -> Rt>,
 }
 
-impl<R, TS: TransportSpec> AppBuilder<R, TS> {
+impl<R, TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<R, TS, Rt> {
     pub fn new() -> Self {
         Self {
             registry: None,
@@ -49,6 +46,7 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
             config: Params::new(),
             statics: Locals::new(),
             _role: PhantomData,
+            _rt: PhantomData,
         }
     }
 
@@ -136,12 +134,12 @@ impl<R, TS: TransportSpec> AppBuilder<R, TS> {
     }
 }
 
-impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
+impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ServerRole, TS, Rt> {
     /// Builds a server runtime from the configured server-side builder state.
-    /// 
+    ///
     /// Panics - server runtimes require a protocol registry, so this must be set
-    /// via the builder methods before calling `build()`. 
-    pub fn build(self) -> Arc<super::super::server::Server<TS>> {
+    /// via the builder methods before calling `build()`.
+    pub fn build(self) -> Arc<Server<TS, Rt>> {
         let registry = self
             .registry
             .map(ProtocolRegistryKind::from)
@@ -176,12 +174,12 @@ impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
     }
 }
 
-impl<TS: TransportSpec> AppBuilder<ClientRole, TS> {
+impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ClientRole, TS, Rt> {
     /// Builds a client runtime from the configured client-side builder state.
-    /// 
+    ///
     /// Panics - client runtimes require a target and protocol registry, so these must be set
-    /// via the builder methods before calling `build()`. 
-    pub fn build(self) -> Arc<Client<TS>> {
+    /// via the builder methods before calling `build()`.
+    pub fn build(self) -> Arc<Client<TS, Rt>> {
         let registry = self
             .registry
             .map(ProtocolRegistryKind::from)

@@ -7,7 +7,7 @@ pub use crate::Url;
 pub use crate::Value;
 pub use crate::object;
 pub use crate::{AnyPath, AnyUrl, LitUrl, RegUrl, TrailingSlash};
-pub use crate::{Client, RunMode, Server, TcpTransport, TimeoutSetting};
+pub use crate::{Client, RunMode, Server, TcpTransport, TimeoutSetting, TokioRuntime};
 pub use crate::{Inbound, Outbound};
 pub use crate::{
     ProtocolHandlerBuilder as ProtocolBuilder, ProtocolRegistryBuilder as HandlerBuilder,
@@ -43,13 +43,13 @@ pub use tokio;
 
 /// Lazy-static `Arc<Server<TS>>` — pair with `LServer!` to declare
 /// a process-wide server.
-pub type SServer<TS = TcpTransport> = Lazy<Arc<Server<TS>>>;
+pub type SServer<TS = TcpTransport, Rt = TokioRuntime> = Lazy<Arc<Server<TS, Rt>>>;
 /// Lazy-static `Arc<Client<TS>>` — pair with `LClient!` to declare
 /// a process-wide outbound client.
-pub type SClient<TS = TcpTransport> = Lazy<Arc<Client<TS>>>;
+pub type SClient<TS = TcpTransport, Rt = TokioRuntime> = Lazy<Arc<Client<TS, Rt>>>;
 /// Lazy-static `Arc<Url<C>>` — pair with `LUrl!` to declare a
 /// process-wide registered URL node.
-pub type SUrl<C> = Lazy<Arc<Url<C>>>;
+pub type SUrl<C, TS = TcpTransport> = Lazy<Arc<Url<C, TS>>>;
 /// Lazy-static `PathPattern` — pair with `LPattern!` to declare a
 /// process-wide compiled URL pattern.
 pub type SPattern = Lazy<PathPattern>;

@@ -7,18 +7,18 @@ use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
     },
-    app::runtime::{DefaultRuntime, Either, OnceCellCap, RuntimeSpec},
-    connection::{Outbound, TransportSpec}, executable::ExecutableBinding, protocol::{Channel, RequestContext}, url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
+    app::runtime::{Either, OnceCellCap, RuntimeSpec},
+    connection::{Outbound, TransportSpec},
+    executable::ExecutableBinding,
     protocol::Protocol,
+    protocol::{Channel, RequestContext},
+    url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
 };
 
 pub use crate::app::registry::ProtocolRegistryKind;
 
 /// Outbound runtime for protocol-routed requests.
-pub struct Client<
-    TS: TransportSpec = crate::connection::tcp::TcpTransport,
-    Rt: RuntimeSpec = DefaultRuntime,
-> {
+pub struct Client<TS: TransportSpec, Rt: RuntimeSpec> {
     pub registry: ProtocolRegistryKind<TS>,
     pub target: <TS::Outbound as Outbound>::ConnectTarget,
     /// Built `TS::Outbound`, materialized on first `ensure_outbound`.
@@ -28,14 +28,12 @@ pub struct Client<
     pub(crate) _rt: PhantomData<fn() -> Rt>,
 }
 
-impl<TS: TransportSpec> Client<TS, DefaultRuntime> {
+impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
     /// Creates a client builder whose terminal method is `build()`.
-    pub fn new() -> AppBuilder<ClientRole, TS> {
+    pub fn new() -> AppBuilder<ClientRole, TS, Rt> {
         AppBuilder::new()
     }
-}
 
-impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
     /// Returns the registered root URL tree for one protocol.
     pub fn root<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
@@ -65,7 +63,8 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
         } else {
             url.split('/').map(PathPattern::literal_path).collect()
         };
-        self.registry.register::<P, _>(name, path, StepName::default(), executable, config)?;
+        self.registry
+            .register::<P, _>(name, path, StepName::default(), executable, config)?;
         Ok(())
     }
 
@@ -86,7 +85,8 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
     {
         let tokens = P::tokenize_url(url.as_ref())?;
         let (path, step_names) = crate::url::tokens_to_patterns(&tokens)?;
-        self.registry.register::<P, _>(name, path, step_names.into(), executable, config)?;
+        self.registry
+            .register::<P, _>(name, path, step_names.into(), executable, config)?;
         Ok(())
     }
 
@@ -203,7 +203,7 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
         ctx: P::Context,
     ) -> Result<Result<P::Context, <P::Context as RequestContext>::Error>, UrlError> {
         let outpoint = self.resolve::<P>(path).await?;
-        Ok(outpoint.run(ctx).await) 
+        Ok(outpoint.run(ctx).await)
     }
 
     /// Executes one outbound route by path with an explicit depth limit.
@@ -269,10 +269,7 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
     pub async fn call_fn<P>(
         self: &Arc<Self>,
         name: &str,
-    ) -> Result<
-        Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
-        UrlError,
-    >
+    ) -> Result<Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>, UrlError>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
         <P::Context as RequestContext>::Error: Send + 'static,
@@ -297,10 +294,7 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
     pub async fn call_url<P>(
         self: &Arc<Self>,
         path: &str,
-    ) -> Result<
-        Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
-        UrlError,
-    >
+    ) -> Result<Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>, UrlError>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
         <P::Context as RequestContext>::Error: Send + 'static,
@@ -332,9 +326,7 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
             // Acquire the channel inside the task so I/O errors fall into
             // the join handle's inner result, not the outer UrlError.
             let outbound = this.ensure_outbound().await?.clone();
-            let channel = protocol
-                .acquire_channel(&this.runtime, outbound)
-                .await?;
+            let channel = protocol.acquire_channel(&this.runtime, outbound).await?;
 
             // One ctx, reused across iterations; channel stays installed.
             let mut ctx = <P::Context as Default>::default();

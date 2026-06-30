@@ -1,11 +1,11 @@
 use akari::extensions::ParamsClone;
+use alloc::sync::Arc;
 use core::any::TypeId;
 use core::marker::PhantomData;
 use core::panic;
 use core::time::Duration;
-use alloc::sync::Arc;
 
-use crate::app::runtime::{DefaultRuntime, Either, OnceCellCap, RuntimeSpec};
+use crate::app::runtime::{Either, OnceCellCap, RuntimeSpec};
 use crate::executable::ExecutableBinding;
 use crate::marker::MaybeSend;
 use crate::{debug_error, debug_log, debug_warn};
@@ -14,8 +14,8 @@ use crate::connection::{Inbound, TransportSpec};
 use crate::protocol::{Protocol, RequestContext};
 use crate::url::{PathPattern, UrlError, node::StepName};
 
-pub use crate::executable::ProtocolRegistryBuilder;
 pub use crate::app::registry::ProtocolRegistryKind;
+pub use crate::executable::ProtocolRegistryBuilder;
 
 // use super::middleware::AsyncMiddleware;
 pub use super::common::builder::AppBuilder;
@@ -25,11 +25,8 @@ use super::common::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
 // type Job = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 /// Server runtime for inbound protocol traffic.
-pub struct Server<
-    TS: TransportSpec = crate::connection::tcp::TcpTransport,
-    Rt: RuntimeSpec = DefaultRuntime,
-> {
-    pub registry: ProtocolRegistryKind<TS>, 
+pub struct Server<TS: TransportSpec, Rt: RuntimeSpec> {
+    pub registry: ProtocolRegistryKind<TS>,
     pub binding: <TS::Inbound as Inbound>::BindTarget,
     pub inbound: <Rt as RuntimeSpec>::OnceCell<Arc<TS::Inbound>>,
     pub runtime: Arc<RuntimeConfig>,
@@ -37,14 +34,12 @@ pub struct Server<
     pub(crate) _rt: PhantomData<fn() -> Rt>,
 }
 
-impl<TS: TransportSpec> Server<TS, DefaultRuntime> {
+impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
     /// Creates a server builder whose terminal method is `build()`.
-    pub fn new() -> AppBuilder<ServerRole, TS> {
+    pub fn new() -> AppBuilder<ServerRole, TS, Rt> {
         AppBuilder::new()
     }
-}
 
-impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
     // TODO : implement this method
     // pub fn get_protocol_address<P: Protocol>(&self) -> String {
     //     unimplemented!()
@@ -135,7 +130,8 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
         } else {
             url.split('/').map(PathPattern::literal_path).collect()
         };
-        self.registry.register::<P, _>(name, path, StepName::default(), executable, config)?;
+        self.registry
+            .register::<P, _>(name, path, StepName::default(), executable, config)?;
         Ok(())
     }
 
@@ -160,7 +156,8 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
         }
         let tokens = P::tokenize_url(url.as_ref())?;
         let (path, step_names) = crate::url::tokens_to_patterns(&tokens)?;
-        self.registry.register::<P, _>(name, path, step_names.into(), executable, config)?;
+        self.registry
+            .register::<P, _>(name, path, step_names.into(), executable, config)?;
         Ok(())
     }
 
@@ -216,12 +213,13 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
     ///
     /// Example:
     /// ```no_run
+    /// use hotaru_core::app::runtime::TokioRuntime;
     /// use hotaru_core::app::server::Server;
     /// use hotaru_core::connection::tcp::TcpTransport;
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let app = Server::<TcpTransport>::new()
+    ///     let app = Server::<TcpTransport, TokioRuntime>::new()
     ///         .worker(4)  // Server will use 4 worker threads
     ///         .build();
     ///     app.run().await;
@@ -319,5 +317,4 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
             })
             .await
     }
-
 }
