@@ -1,9 +1,8 @@
 use crate::extensions::{ParamValue, ParamsClone};
 use crate::{debug_log, debug_trace};
 use crate::connection::{RequestContext, TransportSpec};
+use crate::marker::MaybeSendBoxFuture;
 use crate::url::parser::parse;
-use core::future::Future;
-use core::pin::Pin;
 use core::slice::Iter;
 use alloc::sync::Arc;
 use crate::alias::PRwLock; 
@@ -214,7 +213,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
     pub fn walk<'a>(
         self: Arc<Self>,
         mut path: Iter<'a, &str>,
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<Self>>> + Send + 'a>> {
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<Self>>> {
 
         // Get the current segment to match
         let this_segment = match path.next() {
@@ -320,7 +319,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
     pub fn run_child(
         self: Arc<Self>,
         mut rc: C,
-    ) -> Pin<Box<dyn Future<Output = C> + Send>> {
+    ) -> MaybeSendBoxFuture<'static, C> {
         Box::pin(async move {
             let chain = {
                 let guard = self.binding.read();

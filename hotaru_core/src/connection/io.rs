@@ -1,7 +1,7 @@
 //! Framework-owned async IO traits.
 
 pub mod marker; 
-pub use crate::marker::MaybeSend;
+pub use crate::marker::{MaybeSend, MaybeSendBoxFuture};
 pub use marker::IoCompat;
 
 pub mod rw_traits; 

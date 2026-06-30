@@ -1,4 +1,4 @@
-use core::{future::Future, pin::Pin, slice::Iter};
+use core::slice::Iter;
 use alloc::sync::Arc;
 
 use akari::extensions::ParamsClone;
@@ -8,6 +8,7 @@ use crate::{
     connection::TransportSpec,
     debug_log,
     executable::ExecutableBinding,
+    marker::MaybeSendBoxFuture,
     protocol::RequestContext,
     url::{Children, PathPattern, UrlError},
 };
@@ -68,7 +69,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
     fn walk<'a>(
         self: Arc<Self>,
         mut path: Iter<'a, &str>,
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<UrlNode<C, TS>>>> + Send + 'a>> {
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
         let this_segment = match path.next() {
             Some(s) => *s,
             None => {
@@ -152,7 +153,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
     pub fn walk<'a>(
         &self,
         path: Iter<'a, &str>,
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<UrlNode<C, TS>>>> + Send + 'a>> {
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
         self.root.clone().walk(path)
     }
 
@@ -161,7 +162,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         &self,
         path: Iter<'a, &str>,
         max_depth: u32,
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<UrlNode<C, TS>>>> + Send + 'a>> {
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
         if path.len() > max_depth as usize {
             Box::pin(async { None })
         } else {

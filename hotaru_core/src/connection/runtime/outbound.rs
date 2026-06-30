@@ -10,7 +10,7 @@
 
 use core::future::Future;
 
-use crate::connection::ConnStream;
+use crate::connection::{ConnStream, MaybeSend};
 
 /// Outbound runtime that opens final wire streams.
 pub trait Outbound: Send + Sync + 'static {
@@ -35,7 +35,7 @@ pub trait Outbound: Send + Sync + 'static {
     /// pre-establish pools, prepare TLS state, resolve DNS once, etc.
     fn build(
         target: Self::ConnectTarget,
-    ) -> impl Future<Output = Result<Self, Self::Error>> + Send
+    ) -> impl Future<Output = Result<Self, Self::Error>> + MaybeSend
     where
         Self: Sized;
 
@@ -45,5 +45,5 @@ pub trait Outbound: Send + Sync + 'static {
     /// from a pool, a logical stream over a multiplexed connection, or
     /// anything else the transport considers a valid "one wire to the
     /// configured target."
-    fn connect(&self) -> impl Future<Output = Result<Self::Wire, Self::Error>> + Send;
+    fn connect(&self) -> impl Future<Output = Result<Self::Wire, Self::Error>> + MaybeSend;
 }

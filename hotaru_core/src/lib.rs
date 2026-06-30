@@ -16,6 +16,17 @@ compile_error!(
     "hotaru_core: enable at least one async-runtime feature (`rt_tokio` or `rt_embassy`)"
 );
 
+#[cfg(all(feature = "spawn_send", feature = "spawn_local"))]
+compile_error!("hotaru_core: features `spawn_send` and `spawn_local` are mutually exclusive");
+
+#[cfg(not(any(feature = "spawn_send", feature = "spawn_local")))]
+compile_error!(
+    "hotaru_core: enable exactly one task-mobility feature (`spawn_send` or `spawn_local`)"
+);
+
+#[cfg(all(feature = "rt_tokio", feature = "spawn_local"))]
+compile_error!("hotaru_core: `rt_tokio` requires `spawn_send`, not `spawn_local`");
+
 #[cfg(not(any(feature = "io_futures", feature = "io_embedded", feature = "io_tokio")))]
 compile_error!("hotaru_core: at least one io_* feature must be enabled");
 
@@ -38,5 +49,6 @@ pub use akari::*;
 
 // Re-export commonly used marker aliases.
 pub use marker::{
-    BoxFuture, MaybeSend, MaybeSendFuture, PRwLock, PRwLockReadGuard, PRwLockWriteGuard,
+    BoxFuture, MaybeSend, MaybeSendBoxFuture, MaybeSendFuture, PRwLock, PRwLockReadGuard,
+    PRwLockWriteGuard,
 };

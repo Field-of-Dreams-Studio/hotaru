@@ -1,6 +1,6 @@
 use core::net::SocketAddr;
 
-use crate::connection::{HotaruRead, HotaruWrite};
+use crate::connection::{HotaruRead, HotaruWrite, MaybeSend};
 
 /// Per-connection metadata produced when a wire stream is split.
 ///
@@ -25,14 +25,14 @@ pub trait ConnMeta: Send + Sync + 'static {
 /// existing tokio-based transports (`TcpStream`, `TlsStream`) satisfy the
 /// bound without code changes. Under `embedded`, the embedded-io-async
 /// blanket plays the same role.
-pub trait ConnStream: HotaruRead + HotaruWrite + Unpin + Send + Sync + 'static {
+pub trait ConnStream: HotaruRead + HotaruWrite + Unpin + MaybeSend + Sync + 'static {
     /// Read half type produced by `split`.
-    type ReadHalf: HotaruRead + Unpin + Send + 'static;
+    type ReadHalf: HotaruRead + Unpin + MaybeSend + 'static;
 
     /// Write half type produced by `split`.
     ///
     /// Note: `shutdown()` is available via `HotaruWrite`.
-    type WriteHalf: HotaruWrite + Unpin + Send + 'static;
+    type WriteHalf: HotaruWrite + Unpin + MaybeSend + 'static;
 
     /// Connection metadata produced by `split`.
     type Meta: ConnMeta;

@@ -2,7 +2,7 @@
 
 use core::future::Future;
 
-use crate::connection::ConnStream;
+use crate::connection::{ConnStream, MaybeSend};
 
 /// Bound inbound runtime that accepts final wire streams.
 pub trait Inbound: Send + Sync + 'static {
@@ -20,10 +20,10 @@ pub trait Inbound: Send + Sync + 'static {
     /// Bind and construct the inbound runtime.
     fn bind(
         target: Self::BindTarget,
-    ) -> impl Future<Output = Result<Self, Self::Error>> + Send
+    ) -> impl Future<Output = Result<Self, Self::Error>> + MaybeSend
     where
         Self: Sized;
 
     /// Wait for one inbound wire.
-    fn accept(&self) -> impl Future<Output = Result<Self::Wire, Self::Error>> + Send;
+    fn accept(&self) -> impl Future<Output = Result<Self::Wire, Self::Error>> + MaybeSend;
 }

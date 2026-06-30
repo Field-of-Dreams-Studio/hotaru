@@ -8,6 +8,7 @@
 use std::future::Future;
 use std::net::SocketAddr;
 
+use hotaru_core::MaybeSend;
 use hotaru_core::protocol::Channel;
 
 use crate::message::request::HttpRequest;
@@ -35,25 +36,25 @@ pub trait HttpChannel: Channel {
     fn parse_request(
         &self,
         safety: &HttpSafety,
-    ) -> impl Future<Output = Result<HttpRequest, HttpError>> + Send;
+    ) -> impl Future<Output = Result<HttpRequest, HttpError>> + MaybeSend;
 
     /// Send an HTTP response on the channel's writer.
     fn send_response(
         &self,
         response: HttpResponse,
-    ) -> impl Future<Output = Result<(), HttpError>> + Send;
+    ) -> impl Future<Output = Result<(), HttpError>> + MaybeSend;
 
     /// Send an HTTP request on the channel's writer (client-side).
     fn send_request(
         &self,
         request: HttpRequest,
-    ) -> impl Future<Output = Result<(), HttpError>> + Send;
+    ) -> impl Future<Output = Result<(), HttpError>> + MaybeSend;
 
     /// Parse one HTTP response from the channel's reader (client-side).
     fn parse_response(
         &self,
         safety: &HttpSafety,
-    ) -> impl Future<Output = Result<HttpResponse, HttpError>> + Send;
+    ) -> impl Future<Output = Result<HttpResponse, HttpError>> + MaybeSend;
 
     /// Local socket address of the underlying connection, if any.
     fn local_addr(&self) -> Option<SocketAddr>;

@@ -2,7 +2,7 @@
 
 use core::future::Future;
 
-use crate::connection::ConnStream;
+use crate::connection::{ConnStream, MaybeSend};
 
 /// Opens outbound connections and returns the final wire stream.
 pub trait Connector: Send + Sync + 'static {
@@ -16,5 +16,5 @@ pub trait Connector: Send + Sync + 'static {
     fn connect(
         &self,
         target: Self::Target,
-    ) -> impl Future<Output = std::io::Result<Self::Stream>> + Send;
+    ) -> impl Future<Output = std::io::Result<Self::Stream>> + MaybeSend;
 }

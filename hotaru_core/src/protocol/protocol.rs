@@ -3,7 +3,7 @@ use core::time::Duration;
 use alloc::sync::Arc;
 
 use crate::{app::common::RuntimeConfig, protocol::ProtocolFlow};
-use crate::connection::{HotaruRead, HotaruWrite, TransportSpec};
+use crate::connection::{HotaruRead, HotaruWrite, MaybeSend, TransportSpec};
 use crate::connection::stream::ConnStream;
 use crate::protocol::ProtocolRole;
 use crate::url::UrlRoot;
@@ -132,7 +132,7 @@ where
         channel: &Self::Channel,
         runtime: Arc<RuntimeConfig>,
         root: Arc<UrlRoot<Self::Context, Self::TS>>,
-    ) -> impl Future<Output = Result<ProtocolFlow, CtxError<Self>>> + Send;
+    ) -> impl Future<Output = Result<ProtocolFlow, CtxError<Self>>> + MaybeSend;
 
     /// Client-side: produce a `Self::Channel` for one outbound exchange.
     /// The impl owns whatever sits behind it — a fresh dial through
@@ -149,14 +149,14 @@ where
         &self,
         runtime: &Arc<RuntimeConfig>,
         outbound: Arc<<Self::TS as TransportSpec>::Outbound>,
-    ) -> impl Future<Output = Result<Self::Channel, CtxError<Self>>> + Send;
+    ) -> impl Future<Output = Result<Self::Channel, CtxError<Self>>> + MaybeSend;
 
     /// Outpoint final handler: send the request in `ctx`, read the response
     /// back into `ctx`, return ctx. Impl reads channel + request + any
     /// safety config from ctx via same-crate accessors on the concrete type.
     fn send(
         ctx: Self::Context,
-    ) -> impl Future<Output = Result<Self::Context, CtxError<Self>>> + Send;
+    ) -> impl Future<Output = Result<Self::Context, CtxError<Self>>> + MaybeSend;
 
     /// Install a channel into a freshly-built context. Impl writes the
     /// channel into Context's private slot via its same-crate accessor.

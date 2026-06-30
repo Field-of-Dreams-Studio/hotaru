@@ -2,7 +2,7 @@
 
 use core::future::Future;
 
-use crate::connection::ConnStream;
+use crate::connection::{ConnStream, MaybeSend};
 
 /// Converts an accepted raw stream into the final wire stream.
 pub trait Accepter: Send + Sync + 'static {
@@ -16,5 +16,5 @@ pub trait Accepter: Send + Sync + 'static {
     fn upgrade(
         &self,
         raw: Self::Raw,
-    ) -> impl Future<Output = std::io::Result<Self::Stream>> + Send;
+    ) -> impl Future<Output = std::io::Result<Self::Stream>> + MaybeSend;
 }

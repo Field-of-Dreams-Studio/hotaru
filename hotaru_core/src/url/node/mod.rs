@@ -1,10 +1,11 @@
-use core::{future::Future, pin::Pin, slice::Iter};
+use core::slice::Iter;
 use alloc::sync::Arc;
 
 use crate::{
     connection::TransportSpec,
     executable::{ExecutableBinding, ExecutionChain},
     extensions::{ParamValue, ParamsClone},
+    marker::MaybeSendBoxFuture,
     protocol::RequestContext,
     url::PathPattern,
 };
@@ -182,7 +183,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
         self: Arc<Self>,
         mut path: Iter<'a, &str>,
         mut state: PartialState 
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<Self>>> + Send + 'a>> {
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<Self>>> {
         let this_segment = match path.next() {
             Some(segment) => *segment,
             None => return Box::pin(async move { Some(self) }),

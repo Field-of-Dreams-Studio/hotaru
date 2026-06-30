@@ -1,11 +1,13 @@
-use core::{any::Any, future::Future, pin::Pin, time::Duration};
+use core::{any::Any, time::Duration};
 use alloc::sync::Arc;
 
 use akari::extensions::{Locals, Params};
 use crate::{
     alias::PRwLock,
     app::common::RuntimeConfig,
-    connection::{BufferedReadHalf, BufferedWriteHalf, ConnStream, TransportSpec},
+    connection::{
+        BufferedReadHalf, BufferedWriteHalf, ConnStream, MaybeSendBoxFuture, TransportSpec,
+    },
 };
 
 /// Neutral protocol-entry boundary shared by server and client execution.
@@ -26,7 +28,7 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
         reader: BufferedReadHalf<TS>,
         writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
+    ) -> MaybeSendBoxFuture<'static, ()>;
 
     /// Handle an upgrade from another protocol.
     fn serve_upgrade(
@@ -37,7 +39,7 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
         meta: <TS::Wire as ConnStream>::Meta,
         params: PRwLock<Params>,
         locals: PRwLock<Locals>,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
+    ) -> MaybeSendBoxFuture<'static, ()>;
 
     fn request(
         &self,
@@ -45,7 +47,7 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
         reader: BufferedReadHalf<TS>,
         writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
+    ) -> MaybeSendBoxFuture<'static, ()>;
 
     fn request_upgrade(
         &self,
@@ -55,7 +57,7 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
         meta: <TS::Wire as ConnStream>::Meta,
         params: PRwLock<Params>,
         locals: PRwLock<Locals>,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>; 
+    ) -> MaybeSendBoxFuture<'static, ()>;
 
     /// Returns the protocol's default connection-timeout policy.
     ///
@@ -66,4 +68,3 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
-

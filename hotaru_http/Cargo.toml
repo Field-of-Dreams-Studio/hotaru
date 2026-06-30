@@ -37,6 +37,8 @@ io_tokio = ["hotaru_core/io_tokio"]
 io_embedded = ["hotaru_core/io_embedded"]
 rt_tokio = ["hotaru_core/rt_tokio"]
 rt_embassy = ["hotaru_core/rt_embassy"]
+spawn_send = ["hotaru_core/spawn_send"]
+spawn_local = ["hotaru_core/spawn_local"]
 
 [dev-dependencies]
 tokio-test = "0.4"

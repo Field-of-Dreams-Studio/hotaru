@@ -13,7 +13,7 @@ pub use self::io::buf_reader::HotaruBufReader;
 pub use self::io::buf_writer::HotaruBufWriter;
 pub use self::io::{
     BufferedReadHalf, BufferedWriteHalf, HotaruBufRead, HotaruBufWrite, HotaruIOError, HotaruRead,
-    HotaruWrite, IoCompat,
+    HotaruWrite, IoCompat, MaybeSend, MaybeSendBoxFuture,
 };
 #[cfg(feature = "io_tokio")]
 pub use self::io::TokioIo;

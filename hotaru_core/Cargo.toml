@@ -52,9 +52,12 @@ io_futures = ["dep:futures-io", "dep:futures-util"]
 io_embedded = ["dep:embedded-io-async"]
 io_tokio = ["dep:tokio", "dep:tokio-util"]
 
-rt_tokio = ["dep:tokio"]
+rt_tokio = ["dep:tokio", "spawn_send"]
 # Phase 1 marker; real Embassy deps are deferred.
 rt_embassy = []
 
+spawn_send = []
+spawn_local = []
+
 tokio = ["std", "io_tokio", "rt_tokio"]
-embassy = ["embedded", "rt_embassy"]
+embassy = ["embedded", "rt_embassy", "spawn_local"]

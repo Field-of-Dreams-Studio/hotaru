@@ -1,7 +1,12 @@
-use core::{any::Any, future::Future, pin::Pin, time::Duration};
+use core::{any::Any, time::Duration};
 use alloc::sync::Arc;
 
-use crate::{alias::PRwLock, connection::{BufferedReadHalf, BufferedWriteHalf, HotaruRead, HotaruWrite}};
+use crate::{
+    alias::PRwLock,
+    connection::{
+        BufferedReadHalf, BufferedWriteHalf, HotaruRead, HotaruWrite, MaybeSendBoxFuture,
+    },
+};
 
 use akari::extensions::{Locals, Params, ParamsClone};
 use crate::{
@@ -99,7 +104,7 @@ where
         reader: BufferedReadHalf<TS>,
         writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+    ) -> MaybeSendBoxFuture<'static, ()> {
         let protocol = self.protocol.clone();
         let root = self.root_handler.clone();
 
@@ -128,7 +133,7 @@ where
         meta: <TS::Wire as ConnStream>::Meta,
         _params: PRwLock<Params>,
         _locals: PRwLock<Locals>,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+    ) -> MaybeSendBoxFuture<'static, ()> {
         self.serve(runtime, reader, writer, meta)
     }
 
@@ -138,7 +143,7 @@ where
         reader: BufferedReadHalf<TS>,
         writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+    ) -> MaybeSendBoxFuture<'static, ()> {
         let protocol = self.protocol.clone();
         let root = self.root_handler.clone();
 
@@ -167,7 +172,7 @@ where
         meta: <TS::Wire as ConnStream>::Meta,
         _params: PRwLock<Params>,
         _locals: PRwLock<Locals>,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+    ) -> MaybeSendBoxFuture<'static, ()> {
         self.request(runtime, reader, writer, meta)
     } 
 
