@@ -471,7 +471,7 @@ mod tests {
     use alloc::sync::Arc;
 
     use crate::{
-        connection::tcp::TcpTransport,
+        connection::test_support::TestTransport,
         executable::ExecutableBinding,
         extensions::ParamsClone,
         protocol::{Channel, ProtocolRole, RequestContext},
@@ -509,7 +509,7 @@ mod tests {
         fn into_response(self) -> Self::Response {}
     }
 
-    fn test_node(pattern: PathPattern) -> Arc<UrlNode<TestContext, TcpTransport>> {
+    fn test_node(pattern: PathPattern) -> Arc<UrlNode<TestContext, TestTransport>> {
         let binding = ExecutableBinding::new();
         Arc::new(UrlNode {
             path: pattern,
@@ -525,14 +525,14 @@ mod tests {
 
     #[test]
     fn children_new_is_empty() {
-        let children = Children::<TestContext, TcpTransport>::new();
+        let children = Children::<TestContext, TestTransport>::new();
         assert!(children.is_empty());
         assert_eq!(children.len(), 0);
     }
 
     #[test]
     fn children_insert_literal_and_find() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let node = test_node(PathPattern::Literal("home".into()));
         children.insert(node.clone());
         let found = children.find(&PathPattern::Literal("home".into())).unwrap();
@@ -541,7 +541,7 @@ mod tests {
 
     #[test]
     fn children_insert_literal_replaces_existing() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let first = test_node(PathPattern::Literal("home".into()));
         let second = test_node(PathPattern::Literal("home".into()));
         children.insert(first);
@@ -553,7 +553,7 @@ mod tests {
 
     #[test]
     fn children_insert_regex_and_find() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let node = test_node(PathPattern::regex_path("^user[0-9]+$"));
         children.insert(node.clone());
         let found = children
@@ -564,7 +564,7 @@ mod tests {
 
     #[test]
     fn children_insert_any_and_find() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let node = test_node(PathPattern::Any);
         children.insert(node.clone());
         let found = children.find(&PathPattern::Any).unwrap();
@@ -573,7 +573,7 @@ mod tests {
 
     #[test]
     fn children_insert_any_path_and_find() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let node = test_node(PathPattern::AnyPath);
         children.insert(node.clone());
         let found = children.find(&PathPattern::AnyPath).unwrap();
@@ -582,7 +582,7 @@ mod tests {
 
     #[test]
     fn children_match_prefers_literal_over_others() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let literal = test_node(PathPattern::Literal("user42".into()));
         let regex = test_node(PathPattern::regex_path("^user[0-9]+$"));
         let any = test_node(PathPattern::Any);
@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn children_match_uses_regex_when_no_literal() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let regex = test_node(PathPattern::regex_path("^user[0-9]+$"));
         children.insert(regex.clone());
 
@@ -608,7 +608,7 @@ mod tests {
 
     #[test]
     fn children_match_uses_any_when_no_literal_or_regex() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let any = test_node(PathPattern::Any);
         children.insert(any.clone());
 
@@ -618,7 +618,7 @@ mod tests {
 
     #[test]
     fn children_match_uses_any_path_last() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let any_path = test_node(PathPattern::AnyPath);
         children.insert(any_path.clone());
 
@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn children_remove_literal() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let node = test_node(PathPattern::Literal("home".into()));
         children.insert(node.clone());
         let removed = children
@@ -644,7 +644,7 @@ mod tests {
 
     #[test]
     fn children_remove_regex() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let node = test_node(PathPattern::regex_path("^user[0-9]+$"));
         children.insert(node.clone());
         let removed = children
@@ -660,7 +660,7 @@ mod tests {
 
     #[test]
     fn children_remove_missing_returns_none() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         assert!(
             children
                 .remove(&PathPattern::Literal("missing".into()))
@@ -670,7 +670,7 @@ mod tests {
 
     #[test]
     fn children_all_nodes_returns_every_bucket() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         children.insert(test_node(PathPattern::Literal("a".into())));
         children.insert(test_node(PathPattern::Literal("b".into())));
         children.insert(test_node(PathPattern::regex_path("^user[0-9]+$")));
@@ -682,7 +682,7 @@ mod tests {
 
     #[test]
     fn children_display_string_lists_patterns() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         children.insert(test_node(PathPattern::Literal("home".into())));
         children.insert(test_node(PathPattern::regex_path("^user[0-9]+$")));
         let display = children.display_string();
@@ -692,7 +692,7 @@ mod tests {
 
     #[test]
     fn children_match_literal_returns_exact_child() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let literal = test_node(PathPattern::Literal("home".into()));
         children.insert(literal.clone());
 
@@ -702,7 +702,7 @@ mod tests {
 
     #[test]
     fn children_match_regex_returns_first_matching_child() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let regex = test_node(PathPattern::regex_path("^user[0-9]+$"));
         children.insert(regex.clone());
 
@@ -712,7 +712,7 @@ mod tests {
 
     #[test]
     fn children_match_any_returns_wildcard_child() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let any = test_node(PathPattern::Any);
         children.insert(any.clone());
 
@@ -722,7 +722,7 @@ mod tests {
 
     #[test]
     fn children_match_any_path_returns_catch_all_child() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let any_path = test_node(PathPattern::AnyPath);
         children.insert(any_path.clone());
 
@@ -732,7 +732,7 @@ mod tests {
 
     #[test]
     fn children_match_one_segment_ignores_any_path() {
-        let mut children = Children::<TestContext, TcpTransport>::new();
+        let mut children = Children::<TestContext, TestTransport>::new();
         let any_path = test_node(PathPattern::AnyPath);
         children.insert(any_path);
 
@@ -741,7 +741,7 @@ mod tests {
 
     #[test]
     fn children_match_regex_with_idx_skips_previous_matches() {
-        let children = Children::<TestContext, TcpTransport>::new();
+        let children = Children::<TestContext, TestTransport>::new();
         let first = test_node(PathPattern::regex_path("^user.*$"));
         let second = test_node(PathPattern::regex_path("^user42$"));
         children.insert(first);
@@ -754,7 +754,7 @@ mod tests {
 
     #[test]
     fn children_match_step_returns_resume_state_after_literal() {
-        let children = Children::<TestContext, TcpTransport>::new();
+        let children = Children::<TestContext, TestTransport>::new();
         let literal = test_node(PathPattern::Literal("home".into()));
         children.insert(literal.clone());
 
@@ -765,7 +765,7 @@ mod tests {
 
     #[test]
     fn children_match_step_resumes_after_regex() {
-        let children = Children::<TestContext, TcpTransport>::new();
+        let children = Children::<TestContext, TestTransport>::new();
         let first = test_node(PathPattern::regex_path("^user.*$"));
         let second = test_node(PathPattern::regex_path("^user42$"));
         children.insert(first.clone());

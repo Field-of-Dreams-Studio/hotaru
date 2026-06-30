@@ -1,7 +1,7 @@
 use core::future::Future;
 use core::time::Duration;
 
-use crate::app::runtime::spec::{Either, RuntimeSpec};
+use hotaru_core::app::runtime::{Either, RuntimeSpec};
 
 use super::{TokioMutex, TokioOnceCell};
 
@@ -18,8 +18,6 @@ impl RuntimeSpec for TokioRuntime {
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        // `tokio::spawn` returns a must_use JoinHandle; drop it explicitly
-        // to signal fire-and-forget intent.
         let _ = tokio::spawn(future);
     }
 
@@ -71,8 +69,8 @@ impl RuntimeSpec for TokioRuntime {
         }
     }
 
-    fn default_stop() -> crate::marker::BoxFuture<'static, ()> {
-        alloc::boxed::Box::pin(async {
+    fn default_stop() -> hotaru_core::marker::BoxFuture<'static, ()> {
+        Box::pin(async {
             let _ = tokio::signal::ctrl_c().await;
         })
     }

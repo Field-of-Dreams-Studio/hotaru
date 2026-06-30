@@ -1,20 +1,22 @@
 //! TCP primitive accepter and connector implementations.
 
 use core::net::SocketAddr;
-use tokio::net::TcpStream;
 
-use crate::connection::{Accepter, Connector};
+use hotaru_core::connection::{Accepter, Connector};
+use tokio::net::TcpStream as TokioTcpStream;
 
-/// Plain TCP accepter that returns the accepted stream unchanged.
+use super::stream::TcpStream;
+
+/// Plain TCP accepter that wraps accepted Tokio streams.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TcpAccepter;
 
 impl Accepter for TcpAccepter {
-    type Raw = TcpStream;
+    type Raw = TokioTcpStream;
     type Stream = TcpStream;
 
     async fn upgrade(&self, raw: Self::Raw) -> std::io::Result<Self::Stream> {
-        Ok(raw)
+        Ok(TcpStream::new(raw))
     }
 }
 

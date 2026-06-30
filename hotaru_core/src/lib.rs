@@ -9,13 +9,6 @@ compile_error!("hotaru_core: features `std` and `embedded` are mutually exclusiv
 #[cfg(not(any(feature = "std", feature = "embedded")))]
 compile_error!("hotaru_core: one of `std` or `embedded` must be enabled");
 
-// Axis 3 is additive: one or more runtime backends may be enabled, and each
-// `App`/`Server`/`Client` picks its concrete `Rt`. Only require at least one.
-#[cfg(not(any(feature = "rt_tokio", feature = "rt_embassy")))]
-compile_error!(
-    "hotaru_core: enable at least one async-runtime feature (`rt_tokio` or `rt_embassy`)"
-);
-
 #[cfg(all(feature = "spawn_send", feature = "spawn_local"))]
 compile_error!("hotaru_core: features `spawn_send` and `spawn_local` are mutually exclusive");
 
@@ -23,12 +16,6 @@ compile_error!("hotaru_core: features `spawn_send` and `spawn_local` are mutuall
 compile_error!(
     "hotaru_core: enable exactly one task-mobility feature (`spawn_send` or `spawn_local`)"
 );
-
-#[cfg(all(feature = "rt_tokio", feature = "spawn_local"))]
-compile_error!("hotaru_core: `rt_tokio` requires `spawn_send`, not `spawn_local`");
-
-#[cfg(not(any(feature = "io_futures", feature = "io_embedded", feature = "io_tokio")))]
-compile_error!("hotaru_core: at least one io_* feature must be enabled");
 
 // Marker traits and type aliases (must be declared before modules that use them).
 pub mod marker;

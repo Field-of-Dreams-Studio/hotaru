@@ -1,34 +1,34 @@
+use akari::Value;
 use hotaru_core::app::common::{RunMode, RuntimeConfig};
-use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::connection::TransportSpec;
+use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::debug_log;
 use hotaru_core::extensions::{Locals, Params};
-use hotaru_core::url::UrlNode;
-use akari::Value;
 use hotaru_core::protocol::{
     BoxProtocolError, EndpointOutcome, ProtocolError, ProtocolRole, RequestContext,
 };
+use hotaru_core::url::UrlNode;
 
+use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
 
 use crate::channel::Http1Channel;
 use crate::message::body::HttpBody;
 use crate::message::http_value::{HttpMethod, StatusCode};
-use crate::protocol::HttpError;
 use crate::message::meta::HttpMeta;
 use crate::message::request::HttpRequest;
 use crate::message::response::{HttpResponse, response_templates};
+use crate::protocol::HttpError;
 use crate::security::safety::HttpSafety;
 
 use crate::util::cookie::{Cookie, CookieMap};
 use crate::util::form::{MultiForm, UrlEncodedForm};
 
 /// Executable context - determines what's available for execution
-pub enum Executable<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub enum Executable<TS: TransportSpec = hotaru_io_tokio::TcpTransport> {
     /// Server context with runtime config and matched endpoint.
     Request {
         runtime: Arc<RuntimeConfig>,
@@ -42,7 +42,7 @@ pub enum Executable<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
 ///
 /// This context flows through handlers and middleware, supporting both
 /// server-side request handling and client-side response processing.
-pub struct HttpContext<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct HttpContext<TS: TransportSpec = hotaru_io_tokio::TcpTransport> {
     pub request: HttpRequest,
     pub response: HttpResponse,
 
@@ -66,7 +66,7 @@ pub struct HttpContext<TS: TransportSpec = crate::connection::tcp::TcpTransport>
 }
 
 // Type alias for backward compatibility
-pub type HttpReqCtx<TS = crate::connection::tcp::TcpTransport> = HttpContext<TS>;
+pub type HttpReqCtx<TS = hotaru_io_tokio::TcpTransport> = HttpContext<TS>;
 
 /// Placeholder address for uninitialized or unknown connections.
 /// `0.0.0.0:0` indicates that no socket address information is available.
@@ -263,14 +263,12 @@ impl<TS: TransportSpec> HttpContext<TS> {
             let result = endpoint.run(self).await.map_err(|e| e.boxed());
             debug_log!("HTTP Context: Handler completed");
             result
-
         } else {
             debug_log!("HTTP Context: No endpoint available (client context)");
             // No endpoint available (client context)
             Ok(self)
         }
     }
-
 
     /// Checks whether the request fulfills the endpoint's security requirements.
     ///
@@ -603,7 +601,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
 }
 
 // Type alias for backward compatibility with client code
-pub type HttpResCtx<TS = crate::connection::tcp::TcpTransport> = HttpContext<TS>;
+pub type HttpResCtx<TS = hotaru_io_tokio::TcpTransport> = HttpContext<TS>;
 
 impl<TS: TransportSpec> HttpContext<TS> {
     /// Creates a client context for sending requests (backward compatibility)
@@ -627,7 +625,7 @@ mod tests {
     use crate::message::http_value::StatusCode;
     use crate::message::response::response_templates;
 
-    type TestHttpContext = HttpContext<crate::connection::tcp::TcpTransport>;
+    type TestHttpContext = HttpContext<hotaru_io_tokio::TcpTransport>;
 
     fn client_context(host: &str) -> TestHttpContext {
         TestHttpContext::new_client(host.to_string(), HttpSafety::default())
@@ -686,49 +684,49 @@ mod tests {
 //     use hotaru_tls::{TlsClientConfig, TlsConnector, TlsTransport};
 //     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-    // =========================================================================
-    // Socket Address Accessor Tests
-    // =========================================================================
+// =========================================================================
+// Socket Address Accessor Tests
+// =========================================================================
 
-    // #[test]
-    // fn test_client_ip_with_address() {
-    //     use crate::app::application::App;
-    //     use crate::http::request::HttpRequest;
-    //     use crate::url::Url;
-    //     use std::sync::Arc;
+// #[test]
+// fn test_client_ip_with_address() {
+//     use crate::app::application::App;
+//     use crate::http::request::HttpRequest;
+//     use crate::url::Url;
+//     use std::sync::Arc;
 
-    //     let app = App::new().build();
-    //     let endpoint = Arc::new(Url::<super::HttpContext>::default());
-    //     let request = HttpRequest::default();
-    //     let remote = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 54321);
-    //     let local = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8080);
+//     let app = App::new().build();
+//     let endpoint = Arc::new(Url::<super::HttpContext>::default());
+//     let request = HttpRequest::default();
+//     let remote = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 54321);
+//     let local = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8080);
 
-    //     let ctx = super::HttpContext::new_server(app, endpoint, request, Some(remote), Some(local));
+//     let ctx = super::HttpContext::new_server(app, endpoint, request, Some(remote), Some(local));
 
-    //     // Test client_ip()
-    //     assert_eq!(ctx.client_ip(), Some(remote));
-    //     assert_eq!(ctx.client_ip_or_default(), remote);
+//     // Test client_ip()
+//     assert_eq!(ctx.client_ip(), Some(remote));
+//     assert_eq!(ctx.client_ip_or_default(), remote);
 
-    //     // Test client_ip_only()
-    //     assert_eq!(
-    //         ctx.client_ip_only(),
-    //         Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)))
-    //     );
-    //     assert_eq!(
-    //         ctx.client_ip_only_or_default(),
-    //         IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100))
-    //     );
+//     // Test client_ip_only()
+//     assert_eq!(
+//         ctx.client_ip_only(),
+//         Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)))
+//     );
+//     assert_eq!(
+//         ctx.client_ip_only_or_default(),
+//         IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100))
+//     );
 
-    //     // Test server_addr()
-    //     assert_eq!(ctx.server_addr(), Some(local));
-    //     assert_eq!(ctx.server_addr_or_default(), local);
+//     // Test server_addr()
+//     assert_eq!(ctx.server_addr(), Some(local));
+//     assert_eq!(ctx.server_addr_or_default(), local);
 
-    //     // Test aliases
-    //     assert_eq!(ctx.remote_addr(), Some(remote));
-    //     assert_eq!(ctx.remote_addr_or_default(), remote);
-    //     assert_eq!(ctx.local_addr(), Some(local));
-    //     assert_eq!(ctx.local_addr_or_default(), local);
-    // }
+//     // Test aliases
+//     assert_eq!(ctx.remote_addr(), Some(remote));
+//     assert_eq!(ctx.remote_addr_or_default(), remote);
+//     assert_eq!(ctx.local_addr(), Some(local));
+//     assert_eq!(ctx.local_addr_or_default(), local);
+// }
 
 //     #[test]
 //     fn test_client_ip_without_address() {
@@ -772,7 +770,7 @@ mod tests {
 
 //     #[test]
 //     fn test_client_context_has_no_addresses() {
-//         let ctx = super::HttpContext::<crate::connection::tcp::TcpTransport>::new_client(
+//         let ctx = super::HttpContext::<hotaru_io_tokio::TcpTransport>::new_client(
 //             "example.com".to_string(),
 //             HttpSafety::default(),
 //         );

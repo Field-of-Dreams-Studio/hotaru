@@ -1,0 +1,18 @@
+[package]
+name = "hotaru_io_tokio"
+version = "0.8.2"
+edition = "2024"
+authors = ["Redstone <redstone@fds.moe>"]
+description = "Tokio IO and TCP backend for Hotaru"
+license = "MIT"
+repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
+homepage = "https://hotaru.rs"
+
+[dependencies]
+hotaru_core = { path = "../hotaru_core", version = "0.8.2", default-features = false }
+tokio = { version = "1.28", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+
+[features]
+default = ["std"]
+std = ["hotaru_core/std", "hotaru_core/spawn_send"]

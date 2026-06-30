@@ -13,29 +13,25 @@ pub mod http;
 /// and the core protocol traits.
 pub mod prelude;
 
-pub use hotaru_core::app::runtime::TokioRuntime;
+pub use hotaru_rt_tokio::TokioRuntime;
 
 /// Tokio-backed server alias used by the umbrella crate.
-pub type Server<
-    TS = hotaru_core::connection::TcpTransport,
-    Rt = hotaru_core::app::runtime::TokioRuntime,
-> = hotaru_core::app::server::Server<TS, Rt>;
+pub type Server<TS = hotaru_io_tokio::TcpTransport, Rt = hotaru_rt_tokio::TokioRuntime> =
+    hotaru_core::app::server::Server<TS, Rt>;
 
 /// Tokio-backed client alias used by the umbrella crate.
-pub type Client<
-    TS = hotaru_core::connection::TcpTransport,
-    Rt = hotaru_core::app::runtime::TokioRuntime,
-> = hotaru_core::app::client::Client<TS, Rt>;
+pub type Client<TS = hotaru_io_tokio::TcpTransport, Rt = hotaru_rt_tokio::TokioRuntime> =
+    hotaru_core::app::client::Client<TS, Rt>;
 pub use hotaru_core::app::common::{RunMode, TimeoutSetting};
 pub use hotaru_core::url::PathPattern;
-pub type Url<C, TS = hotaru_core::connection::TcpTransport> = hotaru_core::url::UrlRoot<C, TS>;
+pub type Url<C, TS = hotaru_io_tokio::TcpTransport> = hotaru_core::url::UrlRoot<C, TS>;
 pub use hotaru_core::url::pattern::path_pattern_creator::{
     any as AnyUrl, any_path as AnyPath, literal_path as LitUrl, regex_path as RegUrl,
     trailing_slash as TrailingSlash,
 };
 pub use hotaru_core::url::{FrameNode, WalkCursor, WalkFrame};
 
-pub type ProtocolHandlerBuilder<P, TS = hotaru_core::connection::TcpTransport> =
+pub type ProtocolHandlerBuilder<P, TS = hotaru_io_tokio::TcpTransport> =
     hotaru_core::executable::ProtocolEntryBuilder<P, TS>;
 pub use hotaru_core::app::server::ProtocolRegistryKind;
 pub use hotaru_core::executable::ProtocolRegistryBuilder;
@@ -48,12 +44,17 @@ pub use hotaru_core::object;
 pub use hotaru_core::connection::ConnStream;
 pub use hotaru_core::connection::error::{ConnectionError, Result};
 pub use hotaru_core::connection::{Inbound, Outbound};
-pub use hotaru_core::connection::{
-    TcpAccepter, TcpConnector, TcpConnectorAddr, TcpInbound, TcpMeta, TcpOutbound, TcpTransport,
-};
 pub use hotaru_core::protocol::{
     BoxProtocolError, DefaultProtocolError, EmptyError, EndpointOutcome, Message, Protocol,
     ProtocolError, ProtocolRole, RequestContext, Stream,
+};
+#[cfg(feature = "io_embedded")]
+pub use hotaru_io_embedded::{EmbeddedBackend, EmbeddedIo};
+#[cfg(feature = "io_futures")]
+pub use hotaru_io_futures::{FuturesBackend, FuturesIo};
+pub use hotaru_io_tokio::{
+    TcpAccepter, TcpConnector, TcpConnectorAddr, TcpInbound, TcpMeta, TcpOutbound, TcpStream,
+    TcpTransport, TokioBackend, TokioIo,
 };
 
 pub use hotaru_core::extensions::*;

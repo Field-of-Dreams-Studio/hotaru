@@ -319,7 +319,7 @@ mod tests {
     use alloc::sync::Arc;
 
     use crate::{
-        connection::tcp::TcpTransport,
+        connection::test_support::TestTransport,
         protocol::{Channel, ProtocolRole},
         url::PathPattern,
     };
@@ -355,7 +355,7 @@ mod tests {
         fn into_response(self) -> Self::Response {}
     }
 
-    type TestNode = UrlNode<TestContext, TcpTransport>;
+    type TestNode = UrlNode<TestContext, TestTransport>;
 
     fn empty_node(pattern: PathPattern) -> Arc<TestNode> {
         Arc::new(TestNode::empty(pattern))

@@ -14,11 +14,6 @@ keywords = ["hotaru"]
 akari = { version = "0.2.8", default-features = false, features = ["dynamic", "extension", "object_macro"] }
 parking_lot = { version = "0.12", optional = true }
 spin = { version = "0.12", default-features = false, features = ["mutex", "spin_mutex", "rwlock"], optional = true }
-futures-io = { version = "0.3", default-features = false, optional = true }
-futures-util = { version = "0.3", default-features = false, features = ["io"], optional = true }
-embedded-io-async = { version = "0.6", default-features = false, optional = true }
-tokio = { version = "1.28", features = ["full"], optional = true }
-tokio-util = { version = "0.7", features = ["codec"], optional = true }
 av = "0.1"
 
 hotaru_lib = { version = "0.8.2", path = "../hotaru_lib", default-features = false, features = ["url_encoding"] }
@@ -33,6 +28,7 @@ futures = "0.3"
 futures-core = "0.3"
 
 [dev-dependencies]
+tokio = { version = "1.28", features = ["full"] }
 hex = "0.4"
 serde_json = "1.0"
 rand = "0.8"
@@ -40,24 +36,13 @@ quickcheck = "1.0"
 env_logger = "0.10"
 
 [features]
-default = ["full", "tokio"]
+default = ["full", "std", "spawn_send"]
 full = ["regex/unicode", "akari/full"]
 lite = ["regex/unicode-perl", "akari/no_std"]
 dev-log = []
 
-std = ["dep:parking_lot", "io_futures"]
-embedded = ["dep:spin", "io_embedded"]
-
-io_futures = ["dep:futures-io", "dep:futures-util"]
-io_embedded = ["dep:embedded-io-async"]
-io_tokio = ["dep:tokio", "dep:tokio-util"]
-
-rt_tokio = ["dep:tokio", "spawn_send"]
-# Phase 1 marker; real Embassy deps are deferred.
-rt_embassy = []
+std = ["dep:parking_lot"]
+embedded = ["dep:spin"]
 
 spawn_send = []
 spawn_local = []
-
-tokio = ["std", "io_tokio", "rt_tokio"]
-embassy = ["embedded", "rt_embassy", "spawn_local"]

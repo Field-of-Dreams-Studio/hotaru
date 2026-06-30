@@ -1,5 +1,5 @@
+use super::{HotaruBufRead, HotaruRead, MaybeSend};
 use alloc::vec::Vec;
-use super::{HotaruBufRead, HotaruRead, MaybeSend}; 
 
 /// Concrete buffered reader generic over any `HotaruRead`.
 ///
@@ -23,13 +23,24 @@ impl<R> HotaruBufReader<R> {
     pub fn with_capacity(capacity: usize, inner: R) -> Self {
         let mut buf = Vec::with_capacity(capacity);
         buf.resize(capacity, 0);
-        Self { inner, buf, pos: 0, cap: 0 }
+        Self {
+            inner,
+            buf,
+            pos: 0,
+            cap: 0,
+        }
     }
 
-    pub fn into_inner(self) -> R { self.inner }
-    pub fn get_ref(&self) -> &R { &self.inner }
+    pub fn into_inner(self) -> R {
+        self.inner
+    }
+    pub fn get_ref(&self) -> &R {
+        &self.inner
+    }
     /// Currently-buffered unconsumed bytes.
-    pub fn buffer(&self) -> &[u8] { &self.buf[self.pos..self.cap] }
+    pub fn buffer(&self) -> &[u8] {
+        &self.buf[self.pos..self.cap]
+    }
 }
 
 impl<R> From<R> for HotaruBufReader<R>
@@ -102,4 +113,4 @@ impl<R: HotaruRead + MaybeSend + Unpin + 'static> HotaruBufRead for HotaruBufRea
     fn consume(&mut self, amt: usize) {
         self.pos = (self.pos + amt).min(self.cap);
     }
-} 
+}

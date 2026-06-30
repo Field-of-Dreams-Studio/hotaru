@@ -1,21 +1,21 @@
-//! Plain TCP transport implementation.
+//! Plain Tokio TCP transport implementation.
 
-pub mod primitive;
-pub mod runtime;
-pub mod stream;
-pub mod transport;
+mod primitive;
+mod runtime;
+mod stream;
+mod transport;
 
 pub use primitive::{TcpAccepter, TcpConnector, TcpConnectorAddr};
 pub use runtime::{TcpInbound, TcpOutbound};
-pub use stream::TcpMeta;
+pub use stream::{TcpMeta, TcpStream};
 pub use transport::TcpTransport;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::connection::{Accepter, ConnStream};
+    use hotaru_core::connection::{Accepter, ConnStream, HotaruRead, HotaruWrite};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::{TcpListener, TcpStream};
+    use tokio::net::{TcpListener, TcpStream as TokioTcpStream};
 
     #[tokio::test]
     async fn test_tcp_stream_split() {
@@ -31,7 +31,7 @@ mod tests {
         let (mut read, _write, _meta) = ConnStream::split(stream);
 
         let mut buf = [0u8; 4];
-        read.read_exact(&mut buf).await.unwrap();
+        HotaruRead::read_exact(&mut read, &mut buf).await.unwrap();
         assert_eq!(&buf, b"pong");
     }
 
@@ -63,11 +63,11 @@ mod tests {
             let mut stream = accepter.upgrade(tcp).await.unwrap();
 
             let mut buf = [0u8; 4];
-            stream.read_exact(&mut buf).await.unwrap();
-            stream.write_all(&buf).await.unwrap();
+            HotaruRead::read_exact(&mut stream, &mut buf).await.unwrap();
+            HotaruWrite::write_all(&mut stream, &buf).await.unwrap();
         });
 
-        let mut client = TcpStream::connect(server_addr).await.unwrap();
+        let mut client = TokioTcpStream::connect(server_addr).await.unwrap();
         client.write_all(b"ping").await.unwrap();
 
         let mut response = [0u8; 4];

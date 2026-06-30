@@ -12,6 +12,7 @@ keywords = ["hotaru", "tls"]
 
 [dependencies]
 hotaru_core = { version = "0.8.2", path = "../hotaru_core" }
+hotaru_io_tokio = { version = "0.8.2", path = "../hotaru_io_tokio" }
 tokio = { version = "1.28", features = ["full"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
@@ -21,15 +22,12 @@ webpki-roots = "1"
 [features]
 default = []
 
-tokio = ["hotaru_core/tokio"]
-embassy = ["hotaru_core/embassy"]
+tokio = ["hotaru_core/std", "hotaru_core/spawn_send", "hotaru_io_tokio/std"]
 std = ["hotaru_core/std"]
 embedded = ["hotaru_core/embedded"]
-io_futures = ["hotaru_core/io_futures"]
-io_tokio = ["hotaru_core/io_tokio"]
-io_embedded = ["hotaru_core/io_embedded"]
-rt_tokio = ["hotaru_core/rt_tokio"]
-rt_embassy = ["hotaru_core/rt_embassy"]
+io_futures = []
+io_tokio = ["hotaru_io_tokio/std"]
+io_embedded = []
 spawn_send = ["hotaru_core/spawn_send"]
 spawn_local = ["hotaru_core/spawn_local"]
 

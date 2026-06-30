@@ -213,9 +213,9 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
     ///
     /// Example:
     /// ```no_run
-    /// use hotaru_core::app::runtime::TokioRuntime;
     /// use hotaru_core::app::server::Server;
-    /// use hotaru_core::connection::tcp::TcpTransport;
+    /// use hotaru_io_tokio::TcpTransport;
+    /// use hotaru_rt_tokio::TokioRuntime;
     ///
     /// #[tokio::main]
     /// async fn main() {

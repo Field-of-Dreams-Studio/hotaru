@@ -14,7 +14,8 @@ use tokio::io::{
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
 
-use hotaru_core::connection::{ConnMeta, ConnStream};
+use hotaru_core::connection::{ConnMeta, ConnStream, HotaruRead, HotaruWrite};
+use hotaru_io_tokio::TokioIo;
 
 /// Connection metadata for flexible TCP/TLS streams.
 pub struct FlexMeta {
@@ -124,9 +125,53 @@ impl AsyncWrite for TcpOrTlsStream {
     }
 }
 
+impl HotaruRead for TcpOrTlsStream {
+    type Error = std::io::Error;
+    type Buffered = TokioIo<BufReader<Self>>;
+
+    fn into_buf(self) -> Self::Buffered {
+        TokioIo::new(BufReader::new(self))
+    }
+
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        tokio::io::AsyncReadExt::read(self, buf).await
+    }
+
+    async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        tokio::io::AsyncReadExt::read_exact(self, buf)
+            .await
+            .map(|_| ())
+    }
+}
+
+impl HotaruWrite for TcpOrTlsStream {
+    type Error = std::io::Error;
+    type Buffered = TokioIo<BufWriter<Self>>;
+
+    fn into_buf_write(self) -> Self::Buffered {
+        TokioIo::new(BufWriter::new(self))
+    }
+
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        tokio::io::AsyncWriteExt::write(self, buf).await
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        tokio::io::AsyncWriteExt::flush(self).await
+    }
+
+    async fn shutdown(&mut self) -> Result<(), Self::Error> {
+        tokio::io::AsyncWriteExt::shutdown(self).await
+    }
+
+    async fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+        tokio::io::AsyncWriteExt::write_all(self, buf).await
+    }
+}
+
 impl ConnStream for TcpOrTlsStream {
-    type ReadHalf = ReadHalf<Self>;
-    type WriteHalf = WriteHalf<Self>;
+    type ReadHalf = TokioIo<ReadHalf<Self>>;
+    type WriteHalf = TokioIo<WriteHalf<Self>>;
     type Meta = FlexMeta;
 
     fn split(self) -> (Self::ReadHalf, Self::WriteHalf, Self::Meta) {
@@ -135,7 +180,7 @@ impl ConnStream for TcpOrTlsStream {
             remote: TcpOrTlsStream::peer_addr(&self).ok(),
         };
         let (r, w) = io::split(self);
-        (r, w, meta)
+        (TokioIo::new(r), TokioIo::new(w), meta)
     }
 
     fn peer_addr(&self) -> Option<SocketAddr> {
@@ -214,7 +259,7 @@ impl TcpWriter {
 pub fn split_connection(conn: TcpOrTlsStream) -> (TcpReader, TcpWriter) {
     let local_addr = conn.local_addr().ok();
     let remote_addr = conn.peer_addr().ok();
-    let (r, w, _meta) = ConnStream::split(conn);
+    let (r, w) = io::split(conn);
     (
         TcpReader::new(BufReader::new(r), local_addr, remote_addr),
         TcpWriter::new(BufWriter::new(w)),

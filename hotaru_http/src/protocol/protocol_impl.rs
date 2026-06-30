@@ -10,10 +10,12 @@ use std::sync::Arc;
 use hotaru_core::{
     app::common::RuntimeConfig,
     connection::{ConnStream, HotaruRead, HotaruWrite, Outbound, TransportSpec},
-    protocol::{Channel, CtxError, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext},
+    protocol::{
+        Channel, CtxError, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext,
+    },
     url::UrlRoot,
 };
-use tokio::net::TcpStream;
+use hotaru_io_tokio::TcpStream;
 
 use crate::{
     channel::{Http1Channel, HttpChannel},
@@ -30,7 +32,7 @@ use crate::{
 // ============================================================================
 
 /// Default transport spec used by HTTP when callers don't specify one.
-pub type DefaultHttpTransport = hotaru_core::connection::tcp::TcpTransport;
+pub type DefaultHttpTransport = hotaru_io_tokio::TcpTransport;
 
 /// Default HTTP protocol (currently HTTP/1.1)
 /// This provides a simpler name for user-facing code while maintaining
@@ -184,7 +186,11 @@ where
             None => {
                 // No route: send 404 and decide based on keep-alive.
                 channel.send_response(not_found_response()).await?;
-                return Ok(if keep_alive { ProtocolFlow::Continue } else { ProtocolFlow::Close });
+                return Ok(if keep_alive {
+                    ProtocolFlow::Continue
+                } else {
+                    ProtocolFlow::Close
+                });
             }
         };
 
@@ -204,12 +210,20 @@ where
         match endpoint.run(ctx).await {
             Ok(ctx) => {
                 channel.send_response(ctx.response).await?;
-                Ok(if keep_alive { ProtocolFlow::Continue } else { ProtocolFlow::Close })
+                Ok(if keep_alive {
+                    ProtocolFlow::Continue
+                } else {
+                    ProtocolFlow::Close
+                })
             }
             Err(err) if err.can_continue() => {
                 // Recoverable: map error to a response and keep going.
                 channel.send_response(error_response_from(&err)).await?;
-                Ok(if keep_alive { ProtocolFlow::Continue } else { ProtocolFlow::Close })
+                Ok(if keep_alive {
+                    ProtocolFlow::Continue
+                } else {
+                    ProtocolFlow::Close
+                })
             }
             Err(_) => Ok(ProtocolFlow::Close),
         }
@@ -232,10 +246,9 @@ where
     async fn send(
         mut ctx: Self::Context,
     ) -> Result<Self::Context, <Self::Context as RequestContext>::Error> {
-        let channel = ctx
-            .channel()
-            .cloned()
-            .ok_or_else(|| HttpError::ProtocolViolation("outpoint channel is not installed".to_string()))?;
+        let channel = ctx.channel().cloned().ok_or_else(|| {
+            HttpError::ProtocolViolation("outpoint channel is not installed".to_string())
+        })?;
 
         let safety = ctx.safety.clone();
 
@@ -284,11 +297,17 @@ mod tests {
         assert!(is_keep_alive(&request));
 
         // Connection: close
-        request.meta.header.insert("connection".to_string(), HeaderValue::Single("close".to_string()));
+        request.meta.header.insert(
+            "connection".to_string(),
+            HeaderValue::Single("close".to_string()),
+        );
         assert!(!is_keep_alive(&request));
 
         // Connection: keep-alive
-        request.meta.header.insert("connection".to_string(), HeaderValue::Single("keep-alive".to_string()));
+        request.meta.header.insert(
+            "connection".to_string(),
+            HeaderValue::Single("keep-alive".to_string()),
+        );
         assert!(is_keep_alive(&request));
     }
 
@@ -306,9 +325,18 @@ mod tests {
         let (patterns, _names) = tokens_to_patterns(&tokens).unwrap();
         let segments = HTTP::lit_parser("/users/42");
 
-        assert_eq!(patterns.len(), segments.len(), "leading-slash arity mismatch");
+        assert_eq!(
+            patterns.len(),
+            segments.len(),
+            "leading-slash arity mismatch"
+        );
         for (pat, seg) in patterns.iter().zip(segments.iter()) {
-            assert!(pat.matches(seg), "pattern {:?} did not match segment {:?}", pat, seg);
+            assert!(
+                pat.matches(seg),
+                "pattern {:?} did not match segment {:?}",
+                pat,
+                seg
+            );
         }
     }
 

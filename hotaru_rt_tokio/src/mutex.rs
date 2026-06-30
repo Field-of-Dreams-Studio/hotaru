@@ -1,7 +1,6 @@
-use crate::app::runtime::spec::AsyncMutexCap;
+use hotaru_core::app::runtime::AsyncMutexCap;
 
 /// Newtype wrapper over `tokio::sync::Mutex` implementing `AsyncMutexCap`.
-#[derive(Debug)]
 pub struct TokioMutex<T>(pub tokio::sync::Mutex<T>);
 
 impl<T: Send + 'static> AsyncMutexCap<T> for TokioMutex<T> {

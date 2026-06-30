@@ -32,7 +32,7 @@ pub trait HotaruRead {
     ) -> impl Future<Output = Result<(), Self::Error>> + MaybeSend + 'a
     where
         Self: MaybeSend;
-} 
+}
 
 /// Buffered async byte reader. Carries protocol-detection peeked bytes
 /// through `Protocol::open_channel` without leaking `tokio::io::BufReader`.

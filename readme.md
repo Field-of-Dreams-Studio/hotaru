@@ -2,7 +2,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.2-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.3-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
@@ -80,7 +80,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.8.2"
+hotaru = "0.8.3"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -106,7 +106,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 - **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation. When enabling, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.8.2", features = ["external-ctor"] }
+  hotaru = { version = "0.8.3", features = ["external-ctor"] }
   ctor = "0.4.0"
   tokio = { version = "1", features = ["full"] }
   ```
@@ -115,7 +115,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.2", features = ["https", "http_compression"] }
+hotaru = { version = "0.8.3", features = ["https", "http_compression"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -123,7 +123,7 @@ tokio = { version = "1", features = ["full"] }
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.2", default-features = false, features = ["trans"] }
+hotaru = { version = "0.8.3", default-features = false, features = ["trans"] }
 hotaru_grpc = "..."
 tokio = { version = "1", features = ["full"] }
 ```
@@ -199,7 +199,7 @@ pub fn get_user<HTTP>() {
 
 - Endpoints and middleware auto-register at startup — no manual `router.register()`.
 - `trans` form: brace syntax `{}` with doc comments inside the block; angle-bracket body defaults to `req`. Optional fn-style `pub fn name(req: HTTP) { ... }` is also accepted.
-- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.2", default-features = false, features = ["semi-trans", "http"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` since `default-features = false` also drops the default HTTP stack.
+- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.3", default-features = false, features = ["semi-trans", "http"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` since `default-features = false` also drops the default HTTP stack.
 - See `macro_ra.md` for syntax details. Analyzer support is planned.
 
 ### Middleware
@@ -301,14 +301,17 @@ Hotaru is built on a modular architecture:
 ## Changelog
 
 ### 0.8.3 (Current)
-- **Protocol-agnostic `endpoint!` via `EndpointOutcome`**: new `EndpointOutcome<C>` trait in `hotaru_core::protocol` (re-exported from `hotaru::prelude`) decouples endpoint return values from the HTTP `response` field. Generated handlers now return `impl EndpointOutcome<Ctx> + 'static`; the wrapper applies the outcome via `EndpointOutcome::apply_to(__outcome, &mut req)?` instead of writing `req.response` directly. Generic impls for `()` (no-op) and `Result<O, C::Error>` (fallible bodies) live in `hotaru_core`; `impl EndpointOutcome<HttpContext<TS>> for HttpResponse` lives in `hotaru_http`. **Existing HTTP endpoint bodies compile unchanged** — bodies that end in `HttpResponse` still land in `ctx.response`. Inbound-only protocols can now use `()`-returning endpoints with no placeholder response.
-- **Per-protocol URL parsing on `Protocol` trait**: new `tokenize_url` (pattern side, default = the framework lexer) and `lit_parser` (literal side, minimal default — HTTP overrides with `/`-split that mirrors `UrlRoot::walk_str` empty-input semantics). `lexer::tokenize` is now fallible (`Result<Vec<RawToken>, PatternError>`); `RawToken`, `TypeKind`, `tokenize`, `tokens_to_patterns` are re-exported from `hotaru_core::url`. `url::parser::parse` signature unchanged.
-- **Preferred-language middleware in `htmstd`**: new `language` module exposing `PreferredLanguageMiddleware` plus the `PreferredLanguage` struct that parses the request `Accept-Language` header into ordered, q-weighted `LanguageRange` entries and stores it in `req.params`. `PreferredLanguage` provides downstream helpers — `preferred()`, `primary()`, `accepts()`, `quality_for()` / `quality_millis_for()` (q-values as `u16` milli-units), and `best_match()` / `best_match_owned()` for negotiating against a supported-language set. Configurable via `PreferredLanguageSettings` (fallback language, etc.) and ergonomic access via the `PreferredLanguageRequestExt` extension trait. All re-exported from `htmstd`.
-- **Framework-owned async IO trait family (`connection::io`)**: HTTP/transport code no longer hardcodes `tokio::io` traits. New `HotaruRead` / `HotaruWrite` / `HotaruBufRead` / `HotaruBufWrite` traits, a concrete `HotaruIOError`, fallback `HotaruBufReader` / `HotaruBufWriter`, and per-backend buffered halves (`HotaruRead::Buffered` / `HotaruWrite::Buffered`, surfaced as `BufferedReadHalf<TS>` / `BufferedWriteHalf<TS>`). Tokio and `embedded-io-async` are bridged via feature-gated blanket impls, so existing Tokio transports keep working unchanged. `ConnStream` now builds on these traits and returns `Option<SocketAddr>` for `peer_addr` / `local_addr`.
-- **`async-trait` dropped for native RPIT**: core async traits (`Protocol`, transport `Inbound` / `Outbound`, `HttpChannel`, etc.) now use return-position `impl Future` instead of the `async-trait` crate, removing a proc-macro dependency and per-call boxing from the trait surface.
-- **no_std / `alloc` plumbing + target-flavour features**: `hotaru_core` is being prepared for `no_std`/embedded targets — `extern crate alloc`, `core::`/`alloc::` imports replacing `std::`, `akari::hash::HashMap`, and associated-type IO errors. New mutually-exclusive `std` (pulls `parking_lot`) and `embedded` (pulls `spin` + `embedded-io-async`) target markers, plus a `tokio` feature (default-on, auto-enables `std`) that gates the Tokio IO blanket impls. `lite` trims the Unicode/regex footprint for small devices.
-- **Akari 0.2.8 alignment**: `hotaru_core` depends on `akari` with `default-features = false` (`dynamic`, `extension`, `object_macro`), with `full` / `lite` features mapping to `akari/full` / `akari/no_std` so embedded builds drop the heavy Unicode tables.
-- **(In progress) `RuntimeSpec` runtime abstraction**: new `hotaru_core::app::runtime` module introducing a `RuntimeSpec` backend trait (spawn / time / `OnceCell` / async `Mutex` / `select2`) with a working `TokioRuntime` impl and a typecheck-only `EmbassyRuntime` stub, laying groundwork for making the Tokio dependency optional on embedded targets.
+- **Core/backend split**: `hotaru_core` is now backend-neutral at the public type layer. Concrete Tokio runtime and TCP/IO implementations moved into sibling crates (`hotaru_rt_tokio`, `hotaru_io_tokio`), while the umbrella `hotaru` crate keeps the familiar Tokio defaults.
+- **IO adapter crates**: futures-io and embedded-io-async adapters moved out of core into `hotaru_io_futures` and `hotaru_io_embedded`. Each backend uses local wrapper types (`TokioIo<T>`, `FuturesIo<T>`, `EmbeddedIo<T>`) so adapter impls stay additive and avoid trait-coherence conflicts.
+- **Simpler `hotaru_core` features**: core no longer owns `io_*`, `rt_*`, `tokio`, or `embassy` feature flags. It now keeps only the platform axis (`std` / `embedded`) and task-mobility axis (`spawn_send` / `spawn_local`); runtime and IO backends are selected through backend crates or the `hotaru` facade.
+- **Runtime abstraction cleanup**: `RuntimeSpec` is the backend-neutral runtime trait, with Tokio implemented externally by `hotaru_rt_tokio::TokioRuntime`. Framework types (`Server`, `Client`, builders, and URL/protocol-entry types) now carry explicit transport/runtime parameters in core, while `hotaru` restores ergonomic defaults.
+- **`MaybeSend` task-mobility model**: async framework surfaces use `MaybeSend` so `spawn_send` builds keep real `Send` bounds and `spawn_local` builds can support local `!Send` futures. `hotaru_io_embedded` gates its actual embedded-io-async trait impls on `spawn_local`, not on the `embedded` platform flag.
+- **Framework-owned async IO traits**: `HotaruRead`, `HotaruWrite`, `HotaruBufRead`, `HotaruBufWrite`, `HotaruIOError`, `HotaruBufReader`, and `HotaruBufWriter` provide the common IO trait surface used by transports and protocols without hardcoding Tokio types in core.
+- **Native async trait surfaces**: core transport/protocol traits use return-position `impl Future` instead of `async-trait`, reducing proc-macro dependency surface and avoiding unnecessary boxed futures at trait boundaries.
+- **Protocol-agnostic endpoint outcomes**: `EndpointOutcome<C>` lets generated endpoints apply return values to any request context. HTTP keeps the existing `HttpResponse` endpoint style, while non-HTTP/inbound-only protocols can use `()` outcomes without placeholder responses.
+- **Per-protocol URL parsing hooks**: `Protocol` can customize URL tokenization/literal parsing, and URL parser internals such as `RawToken`, `TypeKind`, `tokenize`, and `tokens_to_patterns` are re-exported for protocol-specific routing work.
+- **Preferred-language middleware**: `htmstd` adds `PreferredLanguageMiddleware`, `PreferredLanguage`, settings, and request-extension helpers for parsing and negotiating the `Accept-Language` header.
+- **no_std preparation**: core continues moving toward `no_std` readiness with `alloc` usage, `core` imports, Akari `lite`/`no_std` alignment, generic IO errors, and backend-neutral abstractions. Real Embassy wiring remains deferred; embedded support is still experimental.
 
 ### 0.8.2
 - **`http` (default-on) + `http_compression` (default-off) features**: HTTP and codecs are now optional; `default-features = false` drops HTTP entirely, `https`/`http_compression` imply `http`.

@@ -1,18 +1,45 @@
-use super::super::buf_reader::HotaruBufReader;
-use super::super::buf_writer::HotaruBufWriter;
-use super::super::IoCompat;
-use super::{HotaruBufRead, HotaruBufWrite, HotaruRead, HotaruWrite};
+//! futures-io adapter backend for Hotaru.
+
+use hotaru_core::connection::{
+    HotaruBufRead, HotaruBufReader, HotaruBufWrite, HotaruBufWriter, HotaruRead, HotaruWrite,
+};
+
 use futures_util::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 
-/// Backend tag for `futures-io` IO types.
+/// Backend tag for `futures-io` IO values.
 pub enum FuturesBackend {}
 
-/// Backend-tagged adapter for `futures-io` IO sources.
+/// Local adapter for `futures-io` IO sources.
 ///
-/// `futures-io` values opt into the Hotaru IO traits by wrapping in
-/// `FuturesIo` so the impls below target a distinct self-type instead of a
-/// broad blanket over `T` (which would overlap with the Tokio blanket).
-pub type FuturesIo<T> = IoCompat<T, FuturesBackend>;
+/// `futures-io` values opt into Hotaru IO by wrapping in this newtype. The
+/// impl target is local, so it cannot overlap with other backend adapters.
+pub struct FuturesIo<T> {
+    inner: T,
+}
+
+impl<T> FuturesIo<T> {
+    pub fn new(inner: T) -> Self {
+        Self { inner }
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+
+    pub fn inner(&self) -> &T {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+}
+
+impl<T> From<T> for FuturesIo<T> {
+    fn from(inner: T) -> Self {
+        Self::new(inner)
+    }
+}
 
 impl<T> HotaruRead for FuturesIo<T>
 where
@@ -26,11 +53,11 @@ where
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        AsyncReadExt::read(self.inner_mut(), buf).await
+        AsyncReadExt::read(&mut self.inner, buf).await
     }
 
     async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        AsyncReadExt::read_exact(self.inner_mut(), buf)
+        AsyncReadExt::read_exact(&mut self.inner, buf)
             .await
             .map(|_| ())
     }
@@ -48,19 +75,19 @@ where
     }
 
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        AsyncWriteExt::write(self.inner_mut(), buf).await
+        AsyncWriteExt::write(&mut self.inner, buf).await
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        AsyncWriteExt::flush(self.inner_mut()).await
+        AsyncWriteExt::flush(&mut self.inner).await
     }
 
     async fn shutdown(&mut self) -> Result<(), Self::Error> {
-        AsyncWriteExt::close(self.inner_mut()).await
+        AsyncWriteExt::close(&mut self.inner).await
     }
 
     async fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
-        AsyncWriteExt::write_all(self.inner_mut(), buf).await
+        AsyncWriteExt::write_all(&mut self.inner, buf).await
     }
 }
 
@@ -69,11 +96,11 @@ where
     T: futures_io::AsyncBufRead + futures_io::AsyncRead + Unpin + Send + 'static,
 {
     async fn fill_buf(&mut self) -> Result<&[u8], Self::Error> {
-        AsyncBufReadExt::fill_buf(self.inner_mut()).await
+        AsyncBufReadExt::fill_buf(&mut self.inner).await
     }
 
     fn consume(&mut self, amt: usize) {
-        AsyncBufReadExt::consume_unpin(self.inner_mut(), amt)
+        AsyncBufReadExt::consume_unpin(&mut self.inner, amt)
     }
 }
 

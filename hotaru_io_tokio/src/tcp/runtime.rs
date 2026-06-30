@@ -1,10 +1,9 @@
 //! TCP inbound and outbound runtime objects.
 
-use tokio::net::{TcpListener, TcpStream};
+use hotaru_core::connection::{Accepter, Inbound, Outbound};
+use tokio::net::TcpListener;
 
-use crate::connection::{Accepter, Inbound, Outbound};
-
-use super::primitive::TcpAccepter;
+use super::{primitive::TcpAccepter, stream::TcpStream};
 
 /// Bound plain TCP inbound runtime.
 pub struct TcpInbound {
@@ -31,9 +30,6 @@ impl Inbound for TcpInbound {
 }
 
 /// TCP outbound runtime using normal `TcpStream::connect`.
-///
-/// The OS chooses the local address and port. The remote target is
-/// captured at `build` time and used by every `connect` call.
 pub struct TcpOutbound {
     target: String,
 }
@@ -51,9 +47,6 @@ impl Outbound for TcpOutbound {
     type Error = std::io::Error;
 
     async fn build(target: Self::ConnectTarget) -> Result<Self, Self::Error> {
-        // No work at build time for plain TCP — DNS resolution and socket
-        // creation happen per-`connect`. Future TLS / pooled variants can
-        // do more here.
         Ok(Self { target })
     }
 

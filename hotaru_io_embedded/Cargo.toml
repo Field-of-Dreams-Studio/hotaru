@@ -1,0 +1,20 @@
+[package]
+name = "hotaru_io_embedded"
+version = "0.8.2"
+edition = "2024"
+authors = ["Redstone <redstone@fds.moe>"]
+description = "embedded-io-async adapter backend for Hotaru"
+license = "MIT"
+repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
+homepage = "https://hotaru.rs"
+
+[dependencies]
+hotaru_core = { path = "../hotaru_core", version = "0.8.2", default-features = false }
+embedded-io-async = { version = "0.6", default-features = false }
+
+[features]
+default = ["std", "spawn_send"]
+std = ["hotaru_core/std"]
+embedded = ["hotaru_core/embedded"]
+spawn_send = ["hotaru_core/spawn_send"]
+spawn_local = ["hotaru_core/spawn_local"]

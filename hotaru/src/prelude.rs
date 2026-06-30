@@ -2,12 +2,16 @@
 //! `Client`, the `endpoint!` / `outpoint!` / `middleware!` macros, the
 //! lazy-static `S*` aliases, and the core protocol traits.
 
+#[cfg(feature = "io_embedded")]
+pub use crate::EmbeddedIo;
+#[cfg(feature = "io_futures")]
+pub use crate::FuturesIo;
 pub use crate::PathPattern;
 pub use crate::Url;
 pub use crate::Value;
 pub use crate::object;
 pub use crate::{AnyPath, AnyUrl, LitUrl, RegUrl, TrailingSlash};
-pub use crate::{Client, RunMode, Server, TcpTransport, TimeoutSetting, TokioRuntime};
+pub use crate::{Client, RunMode, Server, TcpTransport, TimeoutSetting, TokioIo, TokioRuntime};
 pub use crate::{Inbound, Outbound};
 pub use crate::{
     ProtocolHandlerBuilder as ProtocolBuilder, ProtocolRegistryBuilder as HandlerBuilder,

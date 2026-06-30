@@ -2,6 +2,10 @@
 members = [
     "hotaru",
     "hotaru_core",
+    "hotaru_rt_tokio",
+    "hotaru_io_tokio",
+    "hotaru_io_futures",
+    "hotaru_io_embedded",
     "hotaru_trans",
     
     "hotaru_tls",

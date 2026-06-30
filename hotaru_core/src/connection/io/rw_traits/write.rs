@@ -37,4 +37,4 @@ pub trait HotaruWrite {
         Self: MaybeSend;
 }
 
-pub trait HotaruBufWrite: HotaruWrite {} 
+pub trait HotaruBufWrite: HotaruWrite {}

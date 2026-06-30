@@ -1,4 +1,4 @@
-use super::{HotaruWrite, HotaruBufWrite, MaybeSend};
+use super::{HotaruBufWrite, HotaruWrite, MaybeSend};
 
 pub struct HotaruBufWriter<W> {
     inner: W,
@@ -61,7 +61,4 @@ where
     }
 }
 
-impl<W> HotaruBufWrite for HotaruBufWriter<W>
-where
-    W: HotaruWrite + MaybeSend + Unpin + 'static,
-{} 
+impl<W> HotaruBufWrite for HotaruBufWriter<W> where W: HotaruWrite + MaybeSend + Unpin + 'static {}

@@ -361,8 +361,8 @@ mod tests {
     use akari::extensions::ParamsClone;
 
     use crate::{
-        connection::tcp::TcpTransport,
-        executable::{middleware::AsyncFinalHandler, ExecutableBinding},
+        connection::test_support::TestTransport,
+        executable::{ExecutableBinding, middleware::AsyncFinalHandler},
         protocol::{Channel, ProtocolRole},
         url::PathPattern,
     };
@@ -398,7 +398,7 @@ mod tests {
         fn into_response(self) -> Self::Response {}
     }
 
-    type TestUrlRoot = UrlRoot<TestContext, TcpTransport>;
+    type TestUrlRoot = UrlRoot<TestContext, TestTransport>;
 
     fn binding_with_handler() -> ExecutableBinding<TestContext> {
         let handler: Arc<dyn AsyncFinalHandler<TestContext>> =

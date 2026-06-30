@@ -6,9 +6,7 @@
 //! ```
 
 // HTTP protocol traits and transports
-pub use hotaru_http::traits::{
-    DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol,
-};
+pub use hotaru_http::traits::{DefaultHttpTransport, HTTP, Http1Protocol, Http1TcpProtocol};
 
 // HTTPS + TLS types (gated by the `https` feature on the umbrella crate).
 #[cfg(feature = "https")]
@@ -18,8 +16,8 @@ pub use hotaru_http::{
 };
 
 // Request / response / context
-pub use hotaru_http::context::{Executable, HttpContext};
 pub use hotaru_http::context::HttpReqCtx;
+pub use hotaru_http::context::{Executable, HttpContext};
 /// Response-context alias kept for source compatibility with old
 /// Starberry-era code. Use [`HttpContext`] directly in new code.
 pub type HttpResCtx = HttpContext;
@@ -35,11 +33,11 @@ pub use hotaru_http::http_value::HttpMethod::*;
 pub use hotaru_http::http_value::*;
 pub use hotaru_http::meta::*;
 pub use hotaru_http::safety::HttpSafety;
-pub use hotaru_http::start_line::*;
 pub use hotaru_http::send_request;
+pub use hotaru_http::start_line::*;
 
 // Request and response templates
 pub use hotaru_http::request::request_templates;
-pub use hotaru_http::response::response_templates;
 pub use hotaru_http::request::request_templates::*;
+pub use hotaru_http::response::response_templates;
 pub use hotaru_http::response::response_templates::*;
