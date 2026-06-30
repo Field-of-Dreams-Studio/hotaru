@@ -3,15 +3,22 @@
 // alloc); required once the crate flips to no_std.
 extern crate alloc;
 
-// Target-flavour features are mutually exclusive — `std` (host targets,
-// pulls parking_lot today + std-flavoured surfaces in future stages) or
-// `embedded` (no_std-friendly, pulls spin today). Default features include
-// `std`.
 #[cfg(all(feature = "std", feature = "embedded"))]
 compile_error!("hotaru_core: features `std` and `embedded` are mutually exclusive");
 
 #[cfg(not(any(feature = "std", feature = "embedded")))]
 compile_error!("hotaru_core: one of `std` or `embedded` must be enabled");
+
+#[cfg(not(any(feature = "rt_tokio", feature = "rt_embassy")))]
+compile_error!(
+    "hotaru_core: pick exactly one async-runtime feature (`rt_tokio` or `rt_embassy`)"
+);
+
+#[cfg(all(feature = "rt_tokio", feature = "rt_embassy"))]
+compile_error!("hotaru_core: `rt_tokio` and `rt_embassy` are mutually exclusive");
+
+#[cfg(not(any(feature = "io_futures", feature = "io_embedded", feature = "io_tokio")))]
+compile_error!("hotaru_core: at least one io_* feature must be enabled");
 
 // Type aliases (must be declared before other modules that use it)
 pub mod alias;

@@ -1,8 +1,19 @@
 use super::super::buf_reader::HotaruBufReader;
 use super::super::buf_writer::HotaruBufWriter;
+use super::super::IoCompat;
 use super::{HotaruBufRead, HotaruBufWrite, HotaruIOError, HotaruRead, HotaruWrite};
 
-impl<T> HotaruRead for T
+/// Backend tag for `embedded-io-async` IO types.
+pub enum EmbeddedBackend {}
+
+/// Backend-tagged adapter for `embedded-io-async` IO sources.
+///
+/// Embedded IO values opt into the Hotaru IO traits by wrapping in
+/// `EmbeddedIo` so the impls below target a distinct self-type instead of a
+/// broad blanket over `T`.
+pub type EmbeddedIo<T> = IoCompat<T, EmbeddedBackend>;
+
+impl<T> HotaruRead for EmbeddedIo<T>
 where
     T: embedded_io_async::Read + Unpin + 'static,
     T::Error: Into<HotaruIOError>,
@@ -15,7 +26,7 @@ where
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_async::Read::read(self, buf)
+        embedded_io_async::Read::read(self.inner_mut(), buf)
             .await
             .map_err(Into::into)
     }
@@ -23,7 +34,7 @@ where
     async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
         let mut total = 0;
         while total < buf.len() {
-            match embedded_io_async::Read::read(self, &mut buf[total..])
+            match embedded_io_async::Read::read(self.inner_mut(), &mut buf[total..])
                 .await
                 .map_err(Into::into)?
             {
@@ -35,7 +46,7 @@ where
     }
 }
 
-impl<T> HotaruWrite for T
+impl<T> HotaruWrite for EmbeddedIo<T>
 where
     T: embedded_io_async::Write + Unpin + 'static,
     T::Error: Into<HotaruIOError>,
@@ -48,13 +59,13 @@ where
     }
 
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_async::Write::write(self, buf)
+        embedded_io_async::Write::write(self.inner_mut(), buf)
             .await
             .map_err(Into::into)
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_async::Write::flush(self)
+        embedded_io_async::Write::flush(self.inner_mut())
             .await
             .map_err(Into::into)
     }
@@ -62,7 +73,7 @@ where
     async fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
         let mut total = 0;
         while total < buf.len() {
-            match embedded_io_async::Write::write(self, &buf[total..])
+            match embedded_io_async::Write::write(self.inner_mut(), &buf[total..])
                 .await
                 .map_err(Into::into)?
             {
@@ -74,18 +85,18 @@ where
     }
 }
 
-impl<T> HotaruBufRead for T
+impl<T> HotaruBufRead for EmbeddedIo<T>
 where
     T: embedded_io_async::BufRead + embedded_io_async::Read + Unpin + 'static,
     T::Error: Into<HotaruIOError>,
 {
     async fn fill_buf(&mut self) -> Result<&[u8], Self::Error> {
-        embedded_io_async::BufRead::fill_buf(self)
+        embedded_io_async::BufRead::fill_buf(self.inner_mut())
             .await
             .map_err(Into::into)
     }
 
     fn consume(&mut self, amt: usize) {
-        embedded_io_async::BufRead::consume(self, amt)
+        embedded_io_async::BufRead::consume(self.inner_mut(), amt)
     }
 }

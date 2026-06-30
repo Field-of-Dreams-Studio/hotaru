@@ -18,5 +18,18 @@ rustls = { version = "0.23", default-features = false, features = ["ring"] }
 rustls-pemfile = "2.2.0"
 webpki-roots = "1"
 
+[features]
+default = []
+
+tokio = ["hotaru_core/tokio"]
+embassy = ["hotaru_core/embassy"]
+std = ["hotaru_core/std"]
+embedded = ["hotaru_core/embedded"]
+io_futures = ["hotaru_core/io_futures"]
+io_tokio = ["hotaru_core/io_tokio"]
+io_embedded = ["hotaru_core/io_embedded"]
+rt_tokio = ["hotaru_core/rt_tokio"]
+rt_embassy = ["hotaru_core/rt_embassy"]
+
 [dev-dependencies]
 rcgen = "0.13"

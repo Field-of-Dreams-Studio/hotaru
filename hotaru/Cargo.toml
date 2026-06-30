@@ -49,3 +49,13 @@ https = ["http", "hotaru_http/tls"]
 # HTTP body compression (gzip/deflate/brotli/zstd) for Content-Encoding.
 # Implies `http`. Off by default to keep clean builds fast.
 http_compression = ["http", "hotaru_http/compression", "hotaru_lib/compression"]
+
+tokio = ["hotaru_core/tokio"]
+embassy = ["hotaru_core/embassy"]
+std = ["hotaru_core/std"]
+embedded = ["hotaru_core/embedded"]
+io_futures = ["hotaru_core/io_futures"]
+io_tokio = ["hotaru_core/io_tokio"]
+io_embedded = ["hotaru_core/io_embedded"]
+rt_tokio = ["hotaru_core/rt_tokio"]
+rt_embassy = ["hotaru_core/rt_embassy"]

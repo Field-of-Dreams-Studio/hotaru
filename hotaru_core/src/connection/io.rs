@@ -1,10 +1,17 @@
 //! Framework-owned async IO traits.
 
 pub mod marker; 
-pub use marker::MaybeSend; 
+pub use marker::{IoCompat, MaybeSend};
 
 pub mod rw_traits; 
 pub use rw_traits::{HotaruBufRead, HotaruIOError, HotaruRead, HotaruWrite, HotaruBufWrite}; 
+
+#[cfg(feature = "io_tokio")]
+pub use rw_traits::{TokioBackend, TokioIo};
+#[cfg(feature = "io_embedded")]
+pub use rw_traits::{EmbeddedBackend, EmbeddedIo};
+#[cfg(feature = "io_futures")]
+pub use rw_traits::{FuturesBackend, FuturesIo};
 
 pub mod buf_reader; 
 pub mod buf_writer; 

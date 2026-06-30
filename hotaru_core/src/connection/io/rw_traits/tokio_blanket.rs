@@ -1,7 +1,17 @@
 use core::pin::Pin;
 
+use super::super::IoCompat;
 use super::{HotaruBufRead, HotaruBufWrite, HotaruRead, HotaruWrite};
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+
+/// Backend tag for Tokio IO types.
+pub enum TokioBackend {}
+
+/// Backend-tagged adapter for Tokio IO sources.
+///
+/// `io_tokio` also keeps the raw blanket impls below for backwards
+/// compatibility, so wrapping in `TokioIo` is optional for Tokio types.
+pub type TokioIo<T> = IoCompat<T, TokioBackend>;
 
 impl<T> HotaruRead for T
 where

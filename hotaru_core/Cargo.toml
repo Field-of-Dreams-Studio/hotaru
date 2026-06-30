@@ -12,23 +12,16 @@ keywords = ["hotaru"]
 
 [dependencies]
 akari = { version = "0.2.8", default-features = false, features = ["dynamic", "extension", "object_macro"] }
-# Async runtime — still a hard (mandatory) dep today; the framework's spawn /
-# OnceCell / select uses are unconditional. The `tokio` feature gates only the
-# `connection::io` tokio<->Hotaru blanket impls. Making tokio truly optional is
-# a later stage.
-tokio = { version = "1.28", features = ["full"] }
-# Sync backends — exactly one of `std-sync` (parking_lot) or `embedded` (spin)
-# must be enabled. Default features include `std-sync`.
 parking_lot = { version = "0.12", optional = true }
 spin = { version = "0.12", default-features = false, features = ["mutex", "spin_mutex", "rwlock"], optional = true }
-# Async IO backend for the `embedded` feature; the blanket `HotaruRead` /
-# `HotaruWrite` / `HotaruBufRead` impls in `connection::io` bridge to it.
+futures-io = { version = "0.3", default-features = false, optional = true }
+futures-util = { version = "0.3", default-features = false, features = ["io"], optional = true }
 embedded-io-async = { version = "0.6", default-features = false, optional = true }
+tokio = { version = "1.28", features = ["full"], optional = true }
+tokio-util = { version = "0.7", features = ["codec"], optional = true }
 av = "0.1"
 
 hotaru_lib = { version = "0.8.2", path = "../hotaru_lib", default-features = false, features = ["url_encoding"] }
-# Unicode features are pulled in by the `full` / `lite` features below — keep
-# this list to perf-only flags so the unicode footprint stays opt-in.
 regex = { version = "1.12", default-features = false, features = [
     "perf-dfa",
     "perf-onepass",
@@ -38,8 +31,6 @@ regex = { version = "1.12", default-features = false, features = [
 ] }
 futures = "0.3"
 futures-core = "0.3"
-futures-util = "0.3"
-tokio-util = { version = "0.7", features = ["codec"] }
 
 [dev-dependencies]
 hex = "0.4"
@@ -49,22 +40,21 @@ quickcheck = "1.0"
 env_logger = "0.10"
 
 [features]
-default = ["full", "std", "tokio"]
-full = ["regex/unicode", "akari/full"]        # normal devices
-lite = ["regex/unicode-perl", "akari/no_std"] # small devices
+default = ["full", "tokio"]
+full = ["regex/unicode", "akari/full"]
+lite = ["regex/unicode-perl", "akari/no_std"]
+dev-log = []
 
-# Target-flavour markers — exactly one of `std` / `embedded` must be enabled.
-# Today they gate the sync backend (parking_lot vs spin); future stages will
-# fold more std-vs-no_std switches into the same markers (runtime feature
-# gates, error variants, etc.).
-std = ["dep:parking_lot"]                                  # std target
-embedded = ["dep:spin", "dep:embedded-io-async"]           # no_std-friendly target
+std = ["dep:parking_lot", "io_futures"]
+embedded = ["dep:spin", "io_embedded"]
 
-# Async-runtime marker. Enabling `tokio` turns on the tokio<->Hotaru blanket
-# impls in `connection::io::rw` and auto-enables `std`. The tokio crate itself
-# stays a mandatory dependency for now; this feature only gates the blanket
-# impls. Mutually exclusive with `embedded` by transitive conflict
-# (`tokio` -> `std`, and `std` + `embedded` already conflict).
-tokio = ["std"]
+io_futures = ["dep:futures-io", "dep:futures-util"]
+io_embedded = ["dep:embedded-io-async"]
+io_tokio = ["dep:tokio", "dep:tokio-util"]
 
-dev-log = [] # Feature for debugging hotaru
+rt_tokio = ["dep:tokio"]
+# Phase 1 marker; real Embassy deps are deferred.
+rt_embassy = []
+
+tokio = ["std", "io_tokio", "rt_tokio"]
+embassy = ["embedded", "rt_embassy"]

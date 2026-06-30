@@ -28,6 +28,16 @@ default = []
 tls = ["dep:hotaru_tls"]
 compression = ["hotaru_lib/compression"]
 
+tokio = ["hotaru_core/tokio"]
+embassy = ["hotaru_core/embassy"]
+std = ["hotaru_core/std"]
+embedded = ["hotaru_core/embedded"]
+io_futures = ["hotaru_core/io_futures"]
+io_tokio = ["hotaru_core/io_tokio"]
+io_embedded = ["hotaru_core/io_embedded"]
+rt_tokio = ["hotaru_core/rt_tokio"]
+rt_embassy = ["hotaru_core/rt_embassy"]
+
 [dev-dependencies]
 tokio-test = "0.4"
 once_cell = "1.19" 
