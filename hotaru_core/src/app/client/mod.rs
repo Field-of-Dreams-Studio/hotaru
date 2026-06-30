@@ -7,7 +7,7 @@ use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
     },
-    app::runtime::{DefaultRuntime, RuntimeSpec},
+    app::runtime::{DefaultRuntime, Either, OnceCellCap, RuntimeSpec},
     connection::{Outbound, TransportSpec}, executable::ExecutableBinding, protocol::{Channel, RequestContext}, url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
     protocol::Protocol,
 };
@@ -22,7 +22,7 @@ pub struct Client<
     pub registry: ProtocolRegistryKind<TS>,
     pub target: <TS::Outbound as Outbound>::ConnectTarget,
     /// Built `TS::Outbound`, materialized on first `ensure_outbound`.
-    pub outbound: tokio::sync::OnceCell<Arc<TS::Outbound>>,
+    pub outbound: <Rt as RuntimeSpec>::OnceCell<Arc<TS::Outbound>>,
     pub runtime: Arc<RuntimeConfig>,
     pub config: OperationalConfig,
     pub(crate) _rt: PhantomData<fn() -> Rt>,
@@ -341,16 +341,16 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
             P::install_channel(&mut ctx, channel.clone());
 
             let deadline = match deadline_setting {
-                TimeoutSetting::Fixed(d) => Some(tokio::time::Instant::now() + d),
+                TimeoutSetting::Fixed(d) => Some(Rt::instant_plus(Rt::now(), d)),
                 _ => None,
             };
 
             while channel.is_open() {
                 let iter = node.run(ctx);
                 ctx = match deadline {
-                    Some(d) => tokio::select! {
-                        result = iter => result?,
-                        _ = tokio::time::sleep_until(d) => {
+                    Some(d) => match Rt::select2(iter, Rt::sleep_until(d)).await {
+                        Either::Left(result) => result?,
+                        Either::Right(_) => {
                             channel.close();
                             break;
                         }

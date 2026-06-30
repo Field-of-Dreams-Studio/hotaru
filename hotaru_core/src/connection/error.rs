@@ -60,6 +60,7 @@ impl From<io::Error> for ConnectionError {
     }
 }
 
+#[cfg(feature = "rt_tokio")]
 impl From<tokio::time::error::Elapsed> for ConnectionError {
     fn from(_err: tokio::time::error::Elapsed) -> Self {
         Self::ConnectionTimeout

@@ -6,7 +6,7 @@ pub use spec::{AsyncMutexCap, BoxFuture, Either, MaybeSendFuture, OnceCellCap, R
 #[cfg(feature = "rt_tokio")]
 pub mod tokio_impl;
 #[cfg(feature = "rt_tokio")]
-pub use tokio_impl::TokioRuntime;
+pub use tokio_impl::{TokioMutex, TokioOnceCell, TokioRuntime};
 
 // #[cfg(feature = "rt_embassy")]
 // pub mod embassy_impl;

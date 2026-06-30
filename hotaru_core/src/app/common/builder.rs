@@ -166,7 +166,7 @@ impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
         let app = Arc::new(Server {
             registry,
             binding,
-            inbound: tokio::sync::OnceCell::new(),
+            inbound: Default::default(),
             runtime,
             config,
             _rt: PhantomData,
@@ -205,7 +205,7 @@ impl<TS: TransportSpec> AppBuilder<ClientRole, TS> {
         Arc::new(Client {
             registry,
             target,
-            outbound: tokio::sync::OnceCell::new(),
+            outbound: Default::default(),
             runtime,
             config,
             _rt: PhantomData,

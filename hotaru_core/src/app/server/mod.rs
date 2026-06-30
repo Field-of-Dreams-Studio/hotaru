@@ -5,7 +5,7 @@ use core::panic;
 use core::time::Duration;
 use alloc::sync::Arc;
 
-use crate::app::runtime::{DefaultRuntime, RuntimeSpec};
+use crate::app::runtime::{DefaultRuntime, Either, OnceCellCap, RuntimeSpec};
 use crate::executable::ExecutableBinding;
 use crate::{debug_error, debug_log, debug_warn};
 
@@ -30,7 +30,7 @@ pub struct Server<
 > {
     pub registry: ProtocolRegistryKind<TS>, 
     pub binding: <TS::Inbound as Inbound>::BindTarget,
-    pub inbound: tokio::sync::OnceCell<Arc<TS::Inbound>>,
+    pub inbound: <Rt as RuntimeSpec>::OnceCell<Arc<TS::Inbound>>,
     pub runtime: Arc<RuntimeConfig>,
     pub config: OperationalConfig,
     pub(crate) _rt: PhantomData<fn() -> Rt>,
@@ -189,9 +189,14 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
                     self.registry.serve(app.runtime.clone(), conn).await;
                 }
                 Some(duration) => {
-                    tokio::select! {
-                        _ = self.registry.serve(app.runtime.clone(), conn) => {},
-                        _ = tokio::time::sleep(duration) => {
+                    match Rt::select2(
+                        self.registry.serve(app.runtime.clone(), conn),
+                        Rt::sleep(duration),
+                    )
+                    .await
+                    {
+                        Either::Left(_) => {}
+                        Either::Right(_) => {
                             debug_warn!("⚠️ Connection timed out after {:?}", duration);
                         }
                     }
