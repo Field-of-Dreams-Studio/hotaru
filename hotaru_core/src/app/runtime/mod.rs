@@ -8,12 +8,15 @@ pub mod tokio_impl;
 #[cfg(feature = "rt_tokio")]
 pub use tokio_impl::TokioRuntime;
 
-// `rt_embassy` is a Phase-1 marker in Stage 6.0. The placeholder
-// `EmbassyRuntime` implementation lands in Stage 9.C Phase 1, after the
-// runtime trait surface has been corrected.
+// #[cfg(feature = "rt_embassy")]
+// pub mod embassy_impl;
+// #[cfg(feature = "rt_embassy")]
+// pub use embassy_impl::EmbassyRuntime;
 
 /// Default runtime alias used by `Server` / `Client` when callers don't
-/// specify one. Picks tokio under `feature = "rt_tokio"`; falls back to
-/// embassy under embassy-only.
+/// specify one.
 #[cfg(feature = "rt_tokio")]
 pub type DefaultRuntime = TokioRuntime;
+
+// #[cfg(all(not(feature = "rt_tokio"), feature = "rt_embassy"))]
+// pub type DefaultRuntime = EmbassyRuntime;

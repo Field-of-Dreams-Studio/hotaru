@@ -1,5 +1,5 @@
-use core::marker::PhantomData;
 use alloc::sync::Arc;
+use core::marker::PhantomData;
 
 use crate::{
     app::{
@@ -169,6 +169,7 @@ impl<TS: TransportSpec> AppBuilder<ServerRole, TS> {
             inbound: tokio::sync::OnceCell::new(),
             runtime,
             config,
+            _rt: PhantomData,
         });
 
         app
@@ -207,6 +208,7 @@ impl<TS: TransportSpec> AppBuilder<ClientRole, TS> {
             outbound: tokio::sync::OnceCell::new(),
             runtime,
             config,
+            _rt: PhantomData,
         })
     }
 }

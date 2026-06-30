@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use core::marker::PhantomData;
 
 use akari::extensions::ParamsClone;
 
@@ -6,6 +7,7 @@ use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
     },
+    app::runtime::{DefaultRuntime, RuntimeSpec},
     connection::{Outbound, TransportSpec}, executable::ExecutableBinding, protocol::{Channel, RequestContext}, url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
     protocol::Protocol,
 };
@@ -13,21 +15,27 @@ use crate::{
 pub use crate::app::registry::ProtocolRegistryKind;
 
 /// Outbound runtime for protocol-routed requests.
-pub struct Client<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct Client<
+    TS: TransportSpec = crate::connection::tcp::TcpTransport,
+    Rt: RuntimeSpec = DefaultRuntime,
+> {
     pub registry: ProtocolRegistryKind<TS>,
     pub target: <TS::Outbound as Outbound>::ConnectTarget,
     /// Built `TS::Outbound`, materialized on first `ensure_outbound`.
     pub outbound: tokio::sync::OnceCell<Arc<TS::Outbound>>,
     pub runtime: Arc<RuntimeConfig>,
     pub config: OperationalConfig,
+    pub(crate) _rt: PhantomData<fn() -> Rt>,
 }
 
-impl<TS: TransportSpec> Client<TS> {
+impl<TS: TransportSpec> Client<TS, DefaultRuntime> {
     /// Creates a client builder whose terminal method is `build()`.
     pub fn new() -> AppBuilder<ClientRole, TS> {
         AppBuilder::new()
     }
+}
 
+impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
     /// Returns the registered root URL tree for one protocol.
     pub fn root<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
@@ -262,11 +270,12 @@ impl<TS: TransportSpec> Client<TS> {
         self: &Arc<Self>,
         name: &str,
     ) -> Result<
-        tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
+        Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
         UrlError,
     >
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: Send + 'static,
     {
         let entry = self
             .registry
@@ -289,11 +298,12 @@ impl<TS: TransportSpec> Client<TS> {
         self: &Arc<Self>,
         path: &str,
     ) -> Result<
-        tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
+        Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
         UrlError,
     >
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: Send + 'static,
     {
         let node = self.resolve::<P>(path).await?;
         let entry = self
@@ -310,14 +320,15 @@ impl<TS: TransportSpec> Client<TS> {
         self: &Arc<Self>,
         protocol: P,
         node: Arc<UrlNode<P::Context, TS>>,
-    ) -> tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>
+    ) -> Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: Send + 'static,
     {
         let this = self.clone();
         let deadline_setting = self.config.max_connection_time();
 
-        tokio::spawn(async move {
+        Rt::spawn(async move {
             // Acquire the channel inside the task so I/O errors fall into
             // the join handle's inner result, not the outer UrlError.
             let outbound = this.ensure_outbound().await?.clone();

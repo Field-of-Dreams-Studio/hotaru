@@ -1,9 +1,11 @@
 use akari::extensions::ParamsClone;
 use core::any::TypeId;
+use core::marker::PhantomData;
 use core::panic;
 use core::time::Duration;
 use alloc::sync::Arc;
 
+use crate::app::runtime::{DefaultRuntime, RuntimeSpec};
 use crate::executable::ExecutableBinding;
 use crate::{debug_error, debug_log, debug_warn};
 
@@ -22,20 +24,26 @@ use super::common::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
 // type Job = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 /// Server runtime for inbound protocol traffic.
-pub struct Server<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct Server<
+    TS: TransportSpec = crate::connection::tcp::TcpTransport,
+    Rt: RuntimeSpec = DefaultRuntime,
+> {
     pub registry: ProtocolRegistryKind<TS>, 
     pub binding: <TS::Inbound as Inbound>::BindTarget,
     pub inbound: tokio::sync::OnceCell<Arc<TS::Inbound>>,
     pub runtime: Arc<RuntimeConfig>,
     pub config: OperationalConfig,
+    pub(crate) _rt: PhantomData<fn() -> Rt>,
 }
 
-impl<TS: TransportSpec> Server<TS> {
+impl<TS: TransportSpec> Server<TS, DefaultRuntime> {
     /// Creates a server builder whose terminal method is `build()`.
     pub fn new() -> AppBuilder<ServerRole, TS> {
         AppBuilder::new()
     }
+}
 
+impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
     // TODO : implement this method
     // pub fn get_protocol_address<P: Protocol>(&self) -> String {
     //     unimplemented!()
@@ -175,7 +183,7 @@ impl<TS: TransportSpec> Server<TS> {
             TimeoutSetting::Fixed(d) => Some(d),
         };
         let app = self.clone();
-        tokio::spawn(async move {
+        Rt::spawn_detached(async move {
             match timeout {
                 None => {
                     self.registry.serve(app.runtime.clone(), conn).await;
@@ -214,6 +222,12 @@ impl<TS: TransportSpec> Server<TS> {
     ///     app.run().await;
     /// }
     /// ```
+    // TODO(runtime-abstraction): Tokio-specific runner. Creates/owns a Tokio
+    // multi-thread runtime via `spawn_blocking` + `runtime::Builder`. Gated on
+    // `rt_tokio` (Stage 6.9). A backend-neutral driver (e.g. `run_until(stop)`
+    // / `serve_forever`) built on Stage 7 runtime primitives is the planned
+    // cross-runtime replacement; Embassy supplies its own executor task.
+    #[cfg(feature = "rt_tokio")]
     pub async fn run(self: Arc<Self>) {
         let worker_count = self.config.worker();
         let app = self.clone();
@@ -285,6 +299,12 @@ impl<TS: TransportSpec> Server<TS> {
     }
 
     /// Internal application loop - listens for and handles connections
+    // TODO(runtime-abstraction): Tokio-specific accept loop. Uses
+    // `tokio::sync::oneshot`, `tokio::signal::ctrl_c`, `tokio::select!`, and
+    // `tokio::time::sleep`. Gated on `rt_tokio` (Stage 6.9). Stage 7 abstracts
+    // OnceCell/time/select; the stop source should later be caller-provided or
+    // a backend capability rather than hard-wired Ctrl+C.
+    #[cfg(feature = "rt_tokio")]
     async fn run_app_loop(self: Arc<Self>) {
         let inbound = self
             .ensure_inbound()
@@ -298,7 +318,7 @@ impl<TS: TransportSpec> Server<TS> {
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
         // Handle Ctrl+C for clean shutdown
-        tokio::spawn(async move {
+        Rt::spawn_detached(async move {
             if let Ok(_) = tokio::signal::ctrl_c().await {
                 debug_log!("Received shutdown signal");
                 let _ = shutdown_tx.send(());
