@@ -15,7 +15,12 @@ hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = 
 embedded-io-async = { version = "0.6", default-features = false }
 
 [features]
-default = ["std", "spawn_send"]
+# This crate's reason to exist is the bare-metal path, so its default is the
+# no_std flavour: `embedded` (→ hotaru_core/embedded, spin) + `spawn_local`
+# (the mobility mode the trait impls below require — embedded-io-async futures
+# are typically `!Send`). Std consumers pull it via the `hotaru` umbrella with
+# `default-features = false`, so this default never leaks into their builds.
+default = ["embedded", "spawn_local"]
 std = ["hotaru_core/std"]
 embedded = ["hotaru_core/embedded"]
 spawn_send = ["hotaru_core/spawn_send"]

@@ -1,4 +1,12 @@
 //! embedded-io-async adapter backend for Hotaru.
+//!
+//! Mirrors `hotaru_core`: `#![no_std]` whenever the `std` feature is off (i.e.
+//! under `feature = "embedded"`). The adapter itself names only `core` prelude
+//! items (`Result`, `Into`, `Unpin`, …) and slices, so no `alloc` import is
+//! needed here — the `Vec`/`String` used by `HotaruBufRead`'s default methods
+//! live in `hotaru_core`.
+
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "spawn_local")]
 use hotaru_core::connection::{

@@ -425,10 +425,12 @@ mod tests {
     }
 
     #[test]
-    /// `\d+` must NOT match `"123abc"` — the segment must consume the
-    /// entire string. This is the anchoring fix.
+    /// `[0-9]+` must NOT match `"123abc"` — the segment must consume the
+    /// entire string. This is the anchoring fix. (Uses `[0-9]` rather than
+    /// `\d` so the test is portable to the `lite`/`embedded` no_std flavour,
+    /// which builds `regex` without unicode tables.)
     fn regex_matches_full_segment_only() {
-        let p = PathPattern::regex_path(r"\d+");
+        let p = PathPattern::regex_path(r"[0-9]+");
         assert!(p.matches("123"));
         assert!(!p.matches("123abc"));
         assert!(!p.matches("abc123"));
@@ -464,5 +466,79 @@ mod tests {
     /// `AnyPath` matches every segment (the catch-all multi-segment marker).
     fn any_path_matches_any_segment() {
         assert!(PathPattern::AnyPath.matches("anything"));
+    }
+
+    // ------------------------------------------------------------------
+    // Built-in typed-route regexes — no_std / `lite` regression guard
+    // ------------------------------------------------------------------
+
+    /// Every built-in `TypeKind` regex must COMPILE (not degrade to
+    /// `re = None`) and match correctly under EVERY feature flavour,
+    /// including `lite`/`embedded` where `regex` is built without its
+    /// unicode tables. Before the ASCII rewrite of `TypeKind::to_regex`,
+    /// `\d` / `(?i)` failed to compile under `lite`, so `<int>` / `<uint>`
+    /// / `<decimal>` / `<uuid>` routes silently never matched. This test
+    /// fails loudly if that regression ever returns.
+    #[test]
+    fn typed_route_regexes_compile_and_match_under_every_flavour() {
+        use super::RegexSegment;
+        use crate::url::parser::TypeKind;
+
+        // All non-Path kinds must compile.
+        for kind in [
+            TypeKind::Int,
+            TypeKind::UInt,
+            TypeKind::Decimal,
+            TypeKind::Str,
+            TypeKind::Uuid,
+        ] {
+            let src = kind.to_regex().expect("non-Path kinds expand to a regex");
+            assert!(
+                RegexSegment::new(src).is_compiled(),
+                "typed-route regex for {:?} must compile under every flavour (src = {:?})",
+                kind,
+                src,
+            );
+        }
+        // Path is intentionally not a regex.
+        assert_eq!(TypeKind::Path.to_regex(), None);
+
+        let seg = |k: TypeKind| RegexSegment::new(k.to_regex().unwrap());
+
+        // Int — optional leading '-', ASCII digits, whole segment only.
+        let int = seg(TypeKind::Int);
+        assert!(int.is_match("123"));
+        assert!(int.is_match("-42"));
+        assert!(!int.is_match("12a"));
+        assert!(!int.is_match(""));
+
+        // UInt — no sign.
+        let uint = seg(TypeKind::UInt);
+        assert!(uint.is_match("7"));
+        assert!(!uint.is_match("-7"));
+
+        // Decimal — optional sign and fractional part; no bare/leading dot.
+        let dec = seg(TypeKind::Decimal);
+        assert!(dec.is_match("3"));
+        assert!(dec.is_match("-3.14"));
+        assert!(!dec.is_match("3."));
+        assert!(!dec.is_match(".5"));
+
+        // Uuid — 8-4-4-4-12 hex, case-insensitive via an explicit ASCII class.
+        let uuid = seg(TypeKind::Uuid);
+        assert!(uuid.is_match("550e8400-e29b-41d4-a716-446655440000"));
+        assert!(uuid.is_match("550E8400-E29B-41D4-A716-446655440000"));
+        assert!(!uuid.is_match("550e8400e29b41d4a716446655440000"));
+        assert!(!uuid.is_match("zzze8400-e29b-41d4-a716-446655440000"));
+
+        // ASCII-only is intentional: `[0-9]` never matches non-ASCII digits
+        // (fullwidth "１２３") under any flavour, matching what the downstream
+        // integer parser accepts.
+        assert!(!uint.is_match("１２３"));
+
+        // Str — any single non-slash segment.
+        let s = seg(TypeKind::Str);
+        assert!(s.is_match("hello"));
+        assert!(!s.is_match("a/b"));
     }
 }

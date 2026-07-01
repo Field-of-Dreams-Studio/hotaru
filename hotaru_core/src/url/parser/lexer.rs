@@ -61,15 +61,28 @@ impl TypeKind {
 
     // Convert to a regex snippet if applicable. Path is special and returns None.
     // These are intended for composing a full route regex later.
+    //
+    // # ASCII-only by design (no_std / `lite` / `embedded`)
+    //
+    // These snippets deliberately use ASCII classes (`[0-9]`, explicit
+    // `[0-9a-fA-F]`) instead of `\d` or the `(?i)` flag. Under the
+    // `lite`/`embedded` flavour the `regex` crate is built without its
+    // `unicode-perl` / `unicode-case` tables, so `\d` and `(?i)` fail to
+    // compile — and because `RegexSegment::new` swallows a compile error into
+    // `re = None`, a `\d`-based typed route would *silently never match*.
+    // ASCII classes compile under every flavour and also match exactly the
+    // input the downstream `i64` / `u64` / `f64` / UUID parsers accept, so the
+    // patterns are both portable and stricter (e.g. non-ASCII digits are
+    // rejected at the route rather than accepted and then failing to parse).
     pub fn to_regex(&self) -> Option<&'static str> {
         match self {
-            TypeKind::Int => Some(r"-?\d+"),
-            TypeKind::UInt => Some(r"\d+"),
-            TypeKind::Decimal => Some(r"-?\d+(?:\.\d+)?"),
+            TypeKind::Int => Some(r"-?[0-9]+"),
+            TypeKind::UInt => Some(r"[0-9]+"),
+            TypeKind::Decimal => Some(r"-?[0-9]+(?:\.[0-9]+)?"),
             TypeKind::Str => Some(r"[^/]+"),
-            TypeKind::Uuid => {
-                Some(r"(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-            }
+            TypeKind::Uuid => Some(
+                r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            ),
             TypeKind::Path => None, // special: handled outside regex-building (e.g., greedy capture)
         }
     }
@@ -584,13 +597,13 @@ mod tests {
 
     #[test]
     fn typekind_to_regex_contract() {
-        assert_eq!(TypeKind::Int.to_regex(), Some(r"-?\d+"));
-        assert_eq!(TypeKind::UInt.to_regex(), Some(r"\d+"));
-        assert_eq!(TypeKind::Decimal.to_regex(), Some(r"-?\d+(?:\.\d+)?"));
+        assert_eq!(TypeKind::Int.to_regex(), Some(r"-?[0-9]+"));
+        assert_eq!(TypeKind::UInt.to_regex(), Some(r"[0-9]+"));
+        assert_eq!(TypeKind::Decimal.to_regex(), Some(r"-?[0-9]+(?:\.[0-9]+)?"));
         assert_eq!(TypeKind::Str.to_regex(), Some(r"[^/]+"));
         assert_eq!(
             TypeKind::Uuid.to_regex(),
-            Some(r"(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+            Some(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
         );
         assert_eq!(TypeKind::Path.to_regex(), None);
     }
