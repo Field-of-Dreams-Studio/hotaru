@@ -1,9 +1,12 @@
 use core::fmt;
-use std::io;
 
 #[derive(Debug)]
 pub enum ConnectionError {
-    IoError(io::Error),
+    /// Underlying `std::io::Error`. Only available under `feature = "std"`
+    /// — embedded builds surface transport errors through the transport's
+    /// own `Error` associated type instead.
+    #[cfg(feature = "std")]
+    IoError(std::io::Error),
     TlsError(String),
     ConnectionTimeout,
     HostResolutionFailed(String),
@@ -28,6 +31,7 @@ pub enum ConnectionError {
 impl fmt::Display for ConnectionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            #[cfg(feature = "std")]
             Self::IoError(err) => write!(f, "I/O error: {}", err),
             Self::TlsError(err) => write!(f, "TLS error: {}", err),
             Self::ConnectionTimeout => write!(f, "Connection timed out"),
@@ -54,10 +58,11 @@ impl fmt::Display for ConnectionError {
 
 impl core::error::Error for ConnectionError {}
 
-impl From<io::Error> for ConnectionError {
-    fn from(err: io::Error) -> Self {
+#[cfg(feature = "std")]
+impl From<std::io::Error> for ConnectionError {
+    fn from(err: std::io::Error) -> Self {
         Self::IoError(err)
     }
 }
 
-pub type Result<T> = std::result::Result<T, ConnectionError>;
+pub type Result<T> = core::result::Result<T, ConnectionError>;

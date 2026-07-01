@@ -76,7 +76,7 @@ impl TypeKind {
 impl RawToken {
     fn push_literal(buf: &mut String, out: &mut Vec<RawToken>) {
         if !buf.is_empty() {
-            out.push(RawToken::Literal(std::mem::take(buf)));
+            out.push(RawToken::Literal(core::mem::take(buf)));
         }
     }
 }

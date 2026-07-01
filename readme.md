@@ -6,23 +6,21 @@ The Hotaru 0.8 era starts from 23/May/2026.
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-> Small, sweet, easy framework for full-stack Rust web applications 
+> Small, sweet, easy framework for full-stack Rust web applications
 
 ## Overview
 
 Hotaru is a lightweight, intuitive web framework focused on simplicity and productivity. It supports regex-based routing, tree-structured URLs, and integrates seamlessly with the Akari templating system.
 
-The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly. 
+The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly.
 
-**[Official Website](https://hotaru.rs)**
-
-**[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
+**[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
 
 MSRV: 1.86
 
 ## Key Features
 
-- **Multi-Protocol Support**: Handle HTTP/HTTPS, WebSocket, and custom TCP protocols 
+- **Multi-Protocol Support**: Handle HTTP/HTTPS, WebSocket, and custom TCP protocols
 - **Simple API**: Intuitive request/response handling with minimal boilerplate
 - **Full-Stack**: Built-in template rendering with Akari templates
 - **Flexible Routing**: Support for regex patterns, literal URLs, and nested routes
@@ -86,11 +84,12 @@ tokio = { version = "1", features = ["full"] }
 
 ### Optional Features
 
-Default features: `trans`, `http`. Cargo's additive feature unification means sub-features pull in their prerequisites automatically — you never have to enable a base feature by hand.
+Default features: `trans`, `http`, `tokio`. Cargo's additive feature unification means sub-features pull in their prerequisites automatically — you never have to enable a base feature by hand.
 
 **Protocol stack**
 
 - **`http`** *(default-on)*: HTTP/1.1 stack (`hotaru_http` + `ahttpm`). Opt out with `default-features = false` for protocol-only builds (e.g. gRPC-only deployments) — `hotaru::http::*`, `HTTP`, `HttpContext`, `HttpRequest`, `HttpResponse`, etc. then disappear from the crate surface.
+- **`tokio`** *(default-on)*: Tokio runtime + TCP/IO defaults for the umbrella crate (`Server`, `Client`, `Url`, `S*` aliases, `TcpTransport`, `TokioRuntime`). If you disable default features but still use those defaults, re-enable `tokio`.
 - **`https`**: TLS/HTTPS support — surfaces `HTTPS`, `TlsTransport`, `TlsOutboundTarget`, `TlsClientConfig`. Implies `http`.
 - **`http_compression`**: HTTP body codecs for `Content-Encoding` (gzip / deflate / brotli / zstd). Off by default because `brotli` + `zstd` together add ~7 s to a clean build. Implies `http`. Without this feature, `ContentCoding::decode_compressed` / `encode_compressed` return `io::ErrorKind::Unsupported` for compressed bodies.
 
@@ -123,7 +122,7 @@ tokio = { version = "1", features = ["full"] }
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.3", default-features = false, features = ["trans"] }
+hotaru = { version = "0.8.3", default-features = false, features = ["trans", "tokio"] }
 hotaru_grpc = "..."
 tokio = { version = "1", features = ["full"] }
 ```
@@ -199,7 +198,7 @@ pub fn get_user<HTTP>() {
 
 - Endpoints and middleware auto-register at startup — no manual `router.register()`.
 - `trans` form: brace syntax `{}` with doc comments inside the block; angle-bracket body defaults to `req`. Optional fn-style `pub fn name(req: HTTP) { ... }` is also accepted.
-- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.3", default-features = false, features = ["semi-trans", "http"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` since `default-features = false` also drops the default HTTP stack.
+- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.3", default-features = false, features = ["semi-trans", "http", "tokio"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` and `tokio` since `default-features = false` also drops the default HTTP stack and Tokio facade defaults.
 - See `macro_ra.md` for syntax details. Analyzer support is planned.
 
 ### Middleware
@@ -292,9 +291,13 @@ Hotaru is built on a modular architecture:
 
 - **[hotaru](https://crates.io/crates/hotaru)** - Main framework with convenient API
 - **[hotaru_core](https://crates.io/crates/hotaru_core)** - Core protocol and routing engine
-- **[hotaru_trans](https://crates.io/crates/hotaru_trans)** - Procedural macros for endpoint! and middleware! 
-- **[hotaru_http](https://crates.io/crates/hotaru_http)** - HTTP implementation for Hotaru 
-- **[hotaru_tls](https://crates.io/crates/hotaru_tls)** - TLS/HTTPS implementation for Hotaru 
+- **[hotaru_trans](https://crates.io/crates/hotaru_trans)** - Procedural macros for endpoint! and middleware!
+- **[hotaru_http](https://crates.io/crates/hotaru_http)** - HTTP implementation for Hotaru
+- **[hotaru_tls](https://crates.io/crates/hotaru_tls)** - TLS/HTTPS implementation for Hotaru
+- **[hotaru_rt_tokio](https://crates.io/crates/hotaru_rt_tokio)** - Tokio runtime backend (`TokioRuntime`)
+- **[hotaru_io_tokio](https://crates.io/crates/hotaru_io_tokio)** - Tokio TCP/IO backend (`TcpTransport`, `TokioIo`)
+- **[hotaru_io_futures](https://crates.io/crates/hotaru_io_futures)** - `futures-io` adapter backend (`FuturesIo`)
+- **[hotaru_io_embedded](https://crates.io/crates/hotaru_io_embedded)** - `embedded-io-async` adapter backend (`EmbeddedIo`, experimental)
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
@@ -354,26 +357,26 @@ Hotaru is built on a modular architecture:
 - Akari templating integration
 - Cookie manipulation APIs
 - File upload handling
-- Form data processing improvements 
+- Form data processing improvements
 
 ## Learn More
 
 - **Akari Template Engine**: https://crates.io/crates/akari
-- **Homepage**: https://hotaru.rs 
+- **Homepage**: https://hotaru.rs
 - **Documentation Home Page**: https://fds.rs
 - **GitHub**: https://github.com/Field-of-Dreams-Studio/hotaru
-- **Documentation**: https://docs.rs/hotaru 
+- **Documentation**: https://docs.rs/hotaru
 
-| Video Resources | URL | 
-| --- | --- | 
-| Quick Tutorial | Youtube: https://www.youtube.com/watch?v=8pV-o04GuKk&t=6s <br> Bilibili: https://www.bilibili.com/video/BV1BamFB7E8n/ | 
+| Video Resources | URL |
+| --- | --- |
+| Quick Tutorial | Youtube: https://www.youtube.com/watch?v=8pV-o04GuKk&t=6s <br> Bilibili: https://www.bilibili.com/video/BV1BamFB7E8n/ |
 
 ## AI Declaration of each Mod
 
 We believe in transparency about AI-assisted development. The framework is governed jointly by two maintainer groups using a shared four-tier system that prioritizes understanding over line counts.
 
-<details> 
-<summary><b>Click for more details</b></summary> 
+<details>
+<summary><b>Click for more details</b></summary>
 
 ### Maintained by: PMINE/Research
 
@@ -426,11 +429,11 @@ The understanding requirement is uniform across Author-Owned, Human-Led, and Co-
 3. **Reviewer-driven understanding check.** Any reviewer may flag a PR with "this doesn't feel author-owned" — regardless of the module's tier. The author clears the flag by demonstrating understanding in PR comments or a short walkthrough. Flags are requests for evidence, not accusations.
 4. **Smell-test threshold scales with tier.** Author-Owned code is flagged if any section visibly reads as AI-generated. Human-Led is flagged if the structural code reads as AI-generated or AI's hand pervades rather than appearing locally. Co-Authored is flagged only if the author cannot defend the code in review.
 5. **Tier reflects the work, not preferences.** Maintainers set tiers based on the nature of the module. If the character of a module changes, the tier is re-set rather than stretched.
-6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked. 
-</details> 
+6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked.
+</details>
 
 ## 📄 License
 
 MIT License — see [LICENSE.txt](LICENSE.txt).
 
-Copyright (c) 2024-2026 @ [Field of Dreams Studio (FDS)](https://fds.moe) & [Project-StarFall](https://sf.fds.moe) & [PMINE-FDS](https://pmine.fds.moe) 
+Copyright (c) 2024-2026 @ [Field of Dreams Studio (FDS)](https://fds.moe) & [Project-StarFall](https://sf.fds.moe) & [PMINE-FDS](https://pmine.fds.moe)

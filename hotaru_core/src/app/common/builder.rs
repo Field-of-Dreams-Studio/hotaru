@@ -211,10 +211,18 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ClientRole, TS, Rt> {
     }
 }
 
-// Helper function for determining CPU count
+// Helper function for determining CPU count. `std::thread::available_parallelism`
+// has no core equivalent; embedded builds fall back to a single worker (the
+// only sensible default under a single-executor runtime).
+#[cfg(feature = "std")]
 fn num_cpus() -> usize {
     match std::thread::available_parallelism() {
         Ok(n) => n.get(),
-        Err(_) => 1, // Fallback if we can't determine
+        Err(_) => 1,
     }
+}
+
+#[cfg(not(feature = "std"))]
+fn num_cpus() -> usize {
+    1
 }
