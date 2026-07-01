@@ -66,8 +66,11 @@ pub use hotaru_core::protocol::{
     BoxProtocolError, DefaultProtocolError, EmptyError, EndpointOutcome, Message, Protocol,
     ProtocolError, ProtocolRole, RequestContext, Stream,
 };
-#[cfg(feature = "io_embedded")]
-pub use hotaru_io_embedded::{EmbeddedBackend, EmbeddedIo};
+// `hotaru_io_embedded` is not surfaced through the umbrella in 0.8.x (`hotaru`
+// is std-only — see Cargo.toml). For no_std, use `hotaru_core` +
+// `hotaru_io_embedded` directly.
+// #[cfg(feature = "io_embedded")]
+// pub use hotaru_io_embedded::{EmbeddedBackend, EmbeddedIo};
 #[cfg(feature = "io_futures")]
 pub use hotaru_io_futures::{FuturesBackend, FuturesIo};
 #[cfg(feature = "io_tokio")]

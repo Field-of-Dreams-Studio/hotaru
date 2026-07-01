@@ -2,8 +2,10 @@
 //! `Client`, the `endpoint!` / `outpoint!` / `middleware!` macros, the
 //! lazy-static `S*` aliases, and the core protocol traits.
 
-#[cfg(feature = "io_embedded")]
-pub use crate::EmbeddedIo;
+// `EmbeddedIo` is not surfaced through the umbrella in 0.8.x — `hotaru` is
+// std-only. For no_std, use `hotaru_core` + `hotaru_io_embedded` directly.
+// #[cfg(feature = "io_embedded")]
+// pub use crate::EmbeddedIo;
 #[cfg(feature = "io_futures")]
 pub use crate::FuturesIo;
 pub use crate::PathPattern;

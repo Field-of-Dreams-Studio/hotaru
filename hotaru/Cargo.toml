@@ -22,7 +22,12 @@ hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = 
 hotaru_rt_tokio = { path = "../hotaru_rt_tokio", version = "=0.8.3", optional = true }
 hotaru_io_tokio = { path = "../hotaru_io_tokio", version = "=0.8.3", optional = true }
 hotaru_io_futures = { path = "../hotaru_io_futures", version = "=0.8.3", optional = true }
-hotaru_io_embedded = { path = "../hotaru_io_embedded", version = "=0.8.3", optional = true, default-features = false }
+# `hotaru_io_embedded` is intentionally NOT re-exported through the umbrella in
+# 0.8.x. `hotaru` is the std convenience layer (its prelude pulls
+# `std::thread::sleep`, `std::sync::Arc`, `once_cell::sync::Lazy`), so it cannot
+# build `no_std`. For bare-metal, depend on `hotaru_core` + `hotaru_io_embedded`
+# directly — see readme.md ("no_std / embedded").
+# hotaru_io_embedded = { path = "../hotaru_io_embedded", version = "=0.8.3", optional = true, default-features = false }
 hotaru_http = { path = "../hotaru_http", version = "=0.8.3", optional = true }
 ahttpm = { path = "../ahttpm", version = "=0.7.1", optional = true }
 hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3", optional = true, default-features = false, features = ["url_encoding"] }
@@ -61,10 +66,14 @@ https = ["http", "hotaru_http/tls"]
 http_compression = ["http", "hotaru_http/compression", "hotaru_lib/compression"]
 
 tokio = ["hotaru_core/std", "hotaru_core/spawn_send", "dep:tokio", "dep:hotaru_rt_tokio", "hotaru_rt_tokio/std", "io_tokio"]
-std = ["hotaru_core/std", "hotaru_io_embedded?/std"]
-embedded = ["hotaru_core/embedded", "hotaru_io_embedded?/embedded"]
+std = ["hotaru_core/std"]
 io_futures = ["dep:hotaru_io_futures", "hotaru_io_futures/std"]
 io_tokio = ["dep:hotaru_io_tokio", "hotaru_io_tokio/std"]
-io_embedded = ["dep:hotaru_io_embedded"]
-spawn_send = ["hotaru_core/spawn_send", "hotaru_io_embedded?/spawn_send"]
-spawn_local = ["hotaru_core/spawn_local", "hotaru_io_embedded?/spawn_local"]
+spawn_send = ["hotaru_core/spawn_send"]
+spawn_local = ["hotaru_core/spawn_local"]
+
+# `embedded` / `io_embedded` are dropped from the umbrella in 0.8.x — `hotaru` is
+# a std-only convenience crate and cannot build no_std. For bare-metal targets,
+# depend on `hotaru_core` + `hotaru_io_embedded` directly.
+# embedded = ["hotaru_core/embedded", "hotaru_io_embedded?/embedded"]
+# io_embedded = ["dep:hotaru_io_embedded"]
