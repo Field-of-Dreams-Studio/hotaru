@@ -55,7 +55,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
     }
 
     /// Returns a cloned `Arc` of the current root endpoint node, if the
-    /// slot is populated. Used by [`AccessPoint::resolve`] to follow the
+    /// slot is populated. Used by [`AccessPoint::resolve`](crate::executable::access::access_point::AccessPoint::resolve) to follow the
     /// `PRwLock` indirection for `UrlRegistration::Root` entries — every
     /// call reads the current slot, so root-endpoint rebinds are picked
     /// up automatically without explicit `refresh_path` notifications.

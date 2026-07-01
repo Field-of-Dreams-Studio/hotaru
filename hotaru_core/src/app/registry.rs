@@ -19,9 +19,9 @@
 //! wrapper should shrink to just the enum + `from`/`into` + the two
 //! dispatchers + `default_connection_timeout`.
 
+use alloc::sync::Arc;
 use core::any::TypeId;
 use core::time::Duration;
-use alloc::sync::Arc;
 
 use crate::{
     app::common::RuntimeConfig,
@@ -129,7 +129,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
     // see file-level TODO)
     // ------------------------------------------------------------------
 
-    /// Find the root URL node for a protocol, if registered. Used by URL registration 
+    /// Find the root URL node for a protocol, if registered. Used by URL registration
     pub fn url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
     ) -> Option<Arc<UrlRoot<P::Context, TS>>> {
@@ -147,16 +147,14 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
                 None
             }
         }
-    } 
+    }
 
-    /// Find the protocol entry for a protocol, if registered. Else, returns `None`. 
+    /// Find the protocol entry for a protocol, if registered. Else, returns `None`.
     pub fn entry<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
-        &self
+        &self,
     ) -> Option<&ProtocolEntry<P, TS>> {
         match self {
-            Self::Single(handler) => handler
-                .as_any()
-                .downcast_ref::<ProtocolEntry<P, TS>>(),
+            Self::Single(handler) => handler.as_any().downcast_ref::<ProtocolEntry<P, TS>>(),
             Self::Multi(registry) => {
                 for handler in &registry.handlers {
                     if let Some(ph) = handler.as_any().downcast_ref::<ProtocolEntry<P, TS>>() {
@@ -165,8 +163,8 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
                 }
                 None
             }
-        } 
-    } 
+        }
+    }
 
     /// The canonical registration funnel. Caller passes a name, pre-parsed
     /// path segments, and step-name metadata. Routes to the matching
@@ -192,7 +190,11 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         entry.register(name, path, step_names, executable, config)
     }
 
-    #[av::ver(deprecated, since = "0.8.0", note = "Use `register` after parsing the path. This method bypasses the protocol entry's AccessPointTable and will silently orphan named registrations from the freshness logic.")]
+    #[av::ver(
+        deprecated,
+        since = "0.8.0",
+        note = "Use `register` after parsing the path. This method bypasses the protocol entry's AccessPointTable and will silently orphan named registrations from the freshness logic."
+    )]
     pub fn lit_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         &self,
         url: T,
@@ -209,7 +211,11 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         }
     }
 
-    #[av::ver(deprecated, since = "0.8.0", note = "Use `register` after parsing the path. This method bypasses the protocol entry's AccessPointTable and will silently orphan named registrations from the freshness logic.")]
+    #[av::ver(
+        deprecated,
+        since = "0.8.0",
+        note = "Use `register` after parsing the path. This method bypasses the protocol entry's AccessPointTable and will silently orphan named registrations from the freshness logic."
+    )]
     pub fn sub_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         &self,
         pattern: T,
@@ -230,7 +236,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
     // Server-only: timeout resolution
     // ------------------------------------------------------------------
 
-    /// Returns the default connection-timeout to use when [`TimeoutSetting::Inherit`]
+    /// Returns the default connection-timeout to use when [`TimeoutSetting::Inherit`](crate::app::common::TimeoutSetting::Inherit)
     /// is configured.
     ///
     /// For `Single`, delegates directly to the protocol.

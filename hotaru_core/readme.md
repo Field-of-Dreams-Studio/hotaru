@@ -32,7 +32,7 @@ MSRV: 1.86
 
 ## Quick Start
 
-```rust
+```ignore
 use hotaru::prelude::*;
 use hotaru::http::*;
 

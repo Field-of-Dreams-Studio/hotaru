@@ -1,3 +1,8 @@
+//! Core protocol, routing, connection, and runtime abstractions for Hotaru.
+//!
+//! This crate is transport- and runtime-neutral. Higher-level crates provide
+//! concrete HTTP, Tokio, futures-io, or embedded adapters.
+
 // Pull `alloc` into scope so source files can `use alloc::sync::Arc;`
 // regardless of std/no_std mode. Harmless in std builds (std already links
 // alloc); required once the crate flips to no_std.
@@ -17,19 +22,27 @@ compile_error!(
     "hotaru_core: enable exactly one task-mobility feature (`spawn_send` or `spawn_local`)"
 );
 
-// Marker traits and type aliases (must be declared before modules that use them).
+/// Shared marker traits and task-mobility aliases.
+///
+/// Must be declared before modules that use them.
 pub mod marker;
 
-// Backward-compatible alias shim; new code should use `marker`.
+/// Backward-compatible alias shim; new code should use [`marker`].
 pub mod alias;
 
+/// Application runtimes, builders, server/client types, and runtime traits.
 pub mod app;
 
+/// Executable handlers, middleware chains, and protocol entry registries.
 pub mod executable;
 
+/// Transport-neutral connection, stream, and async IO traits.
 pub mod connection;
+/// Debug logging helpers used by Hotaru internals.
 pub mod debug;
+/// Protocol traits, request contexts, messages, and protocol flow types.
 pub mod protocol;
+/// URL pattern parsing, routing trees, and path matching.
 pub mod url;
 
 pub use akari::*;

@@ -3,6 +3,8 @@
 /// completed first.
 #[derive(Debug)]
 pub enum Either<A, B> {
+    /// The first future completed first.
     Left(A),
+    /// The second future completed first.
     Right(B),
 }

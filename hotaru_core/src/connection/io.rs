@@ -2,10 +2,13 @@
 
 pub use crate::marker::{MaybeSend, MaybeSendBoxFuture};
 
+/// Async read/write trait definitions.
 pub mod rw_traits;
 pub use rw_traits::{HotaruBufRead, HotaruBufWrite, HotaruIOError, HotaruRead, HotaruWrite};
 
+/// Buffered reader wrapper for Hotaru IO traits.
 pub mod buf_reader;
+/// Buffered writer wrapper for Hotaru IO traits.
 pub mod buf_writer;
 
 pub use buf_reader::HotaruBufReader;

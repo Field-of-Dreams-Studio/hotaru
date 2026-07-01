@@ -11,8 +11,10 @@ pub trait AsyncMutexCap<T: MaybeSend + 'static>: MaybeSend + Sync + 'static {
     where
         Self: 'a;
 
+    /// Creates a new async mutex protecting `value`.
     fn new(value: T) -> Self;
 
+    /// Acquires the mutex and returns its async guard.
     fn lock(&self) -> impl Future<Output = Self::Guard<'_>> + MaybeSend + '_;
 }
 

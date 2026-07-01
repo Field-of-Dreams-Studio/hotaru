@@ -1,5 +1,5 @@
-use core::future::Future;
 use alloc::sync::Arc;
+use core::future::Future;
 
 // use crate::debug_log;
 
@@ -38,7 +38,7 @@ pub trait AsyncFinalHandler<C: RequestContext>: Send + Sync + 'static {
     fn handle(&self, ctx: C) -> BoxFuture<C>;
 }
 
-/// Blanket impl: any async fn or closure `Fn(R) -> impl Future<Output=R>` becomes an AsyncFinalHandler<R>.
+/// Blanket impl: any async fn or closure `Fn(R) -> impl Future<Output=R>` becomes an `AsyncFinalHandler<R>`.
 impl<F, Fut, C> AsyncFinalHandler<C> for F
 where
     C: RequestContext,
@@ -48,7 +48,7 @@ where
     fn handle(&self, ctx: C) -> BoxFuture<C> {
         Box::pin((self)(ctx))
     }
-} 
+}
 
 // HTTP Implementation example (to be moved to hotaru_http crate later)
 // pub struct LoggingMiddleware;

@@ -1,21 +1,21 @@
+use alloc::sync::Arc;
 use core::future::Future;
 use core::time::Duration;
-use alloc::sync::Arc;
 
-use crate::{app::common::RuntimeConfig, protocol::ProtocolFlow};
-use crate::connection::{HotaruRead, HotaruWrite, MaybeSend, TransportSpec};
 use crate::connection::stream::ConnStream;
+use crate::connection::{HotaruRead, HotaruWrite, MaybeSend, TransportSpec};
 use crate::protocol::ProtocolRole;
 use crate::url::UrlRoot;
+use crate::{app::common::RuntimeConfig, protocol::ProtocolFlow};
 
-use super::{Message, RequestContext, Stream as ProtocolStream, Channel};
+use super::{Channel, Message, RequestContext, Stream as ProtocolStream};
 
 // ----------------------------------------------------------------------------
 // Protocol Trait
 // ----------------------------------------------------------------------------
 
 /// Convenience alias: the error type produced by `P`'s context.
-/// Protocol's Error is stored in Context because it's often needed for request handling and middleware, so this alias makes it easier to refer to. 
+/// Protocol's Error is stored in Context because it's often needed for request handling and middleware, so this alias makes it easier to refer to.
 pub type CtxError<P> = <<P as Protocol>::Context as RequestContext>::Error;
 
 /// User-defined protocol handler.
@@ -33,8 +33,7 @@ pub type CtxError<P> = <<P as Protocol>::Context as RequestContext>::Error;
 /// when the transport is the default TCP one).
 pub trait Protocol: Clone + Send + Sync + 'static
 where
-    <Self::Context as RequestContext>::Error:
-        From<<Self::TS as TransportSpec>::IoError>,
+    <Self::Context as RequestContext>::Error: From<<Self::TS as TransportSpec>::IoError>,
 {
     /// The protocol's wire-level connection stream type.
     type Wire: ConnStream;
@@ -62,7 +61,7 @@ where
 
     /// Returns the default connection-timeout for this protocol.
     ///
-    /// Called when [`TimeoutSetting::Inherit`] is configured so the protocol
+    /// Called when [`TimeoutSetting::Inherit`](crate::app::common::TimeoutSetting::Inherit) is configured so the protocol
     /// can supply its own policy. Return `None` for no timeout (suitable for
     /// long-lived protocols such as MQTT), or `Some(d)` for a fixed duration.
     fn default_connection_timeout(&self) -> Option<Duration> {
@@ -75,9 +74,7 @@ where
     /// non-HTTP URL syntax (MQTT topic filters, gRPC method paths, etc.)
     /// override this to plug in a custom lexer while still emitting
     /// `Vec<RawToken>` for the shared `tokens_to_patterns` stage.
-    fn tokenize_url(
-        input: &str,
-    ) -> Result<Vec<crate::url::RawToken>, crate::url::PatternError>
+    fn tokenize_url(input: &str) -> Result<Vec<crate::url::RawToken>, crate::url::PatternError>
     where
         Self: Sized,
     {
@@ -122,12 +119,12 @@ where
     ///
     /// This is where all protocol logic lives. The implementation should
     /// check `self.role()` to determine whether to act as client or server.
-    /// 
+    ///
     /// The framework calls this in a loop while `channel.is_open()`.
     ///
-    /// - Reader and Writer wrapped in Channel 
-    /// - Runtime 
-    /// - Root URL 
+    /// - Reader and Writer wrapped in Channel
+    /// - Runtime
+    /// - Root URL
     fn handle(
         channel: &Self::Channel,
         runtime: Arc<RuntimeConfig>,

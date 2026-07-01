@@ -15,6 +15,7 @@ use crate::{
     url::{UrlError, UrlRegistration, UrlRoot},
 };
 
+/// Builder for protocol entry registries.
 pub mod builder;
 
 pub use builder::ProtocolRegistryBuilder;
@@ -96,7 +97,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
             }
         }
         None
-    } 
+    }
 
     pub fn entry<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
@@ -107,7 +108,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
             }
         }
         None
-    } 
+    }
 
     pub fn lit_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         &self,

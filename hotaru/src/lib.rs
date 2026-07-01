@@ -13,26 +13,43 @@ pub mod http;
 /// and the core protocol traits.
 pub mod prelude;
 
+#[cfg(feature = "tokio")]
 pub use hotaru_rt_tokio::TokioRuntime;
 
 /// Tokio-backed server alias used by the umbrella crate.
+#[cfg(feature = "tokio")]
 pub type Server<TS = hotaru_io_tokio::TcpTransport, Rt = hotaru_rt_tokio::TokioRuntime> =
     hotaru_core::app::server::Server<TS, Rt>;
+#[cfg(not(feature = "tokio"))]
+pub type Server<TS, Rt> = hotaru_core::app::server::Server<TS, Rt>;
 
 /// Tokio-backed client alias used by the umbrella crate.
+#[cfg(feature = "tokio")]
 pub type Client<TS = hotaru_io_tokio::TcpTransport, Rt = hotaru_rt_tokio::TokioRuntime> =
     hotaru_core::app::client::Client<TS, Rt>;
+#[cfg(not(feature = "tokio"))]
+pub type Client<TS, Rt> = hotaru_core::app::client::Client<TS, Rt>;
 pub use hotaru_core::app::common::{RunMode, TimeoutSetting};
 pub use hotaru_core::url::PathPattern;
+/// Umbrella alias for Hotaru's URL routing tree.
+#[cfg(feature = "io_tokio")]
 pub type Url<C, TS = hotaru_io_tokio::TcpTransport> = hotaru_core::url::UrlRoot<C, TS>;
+/// Umbrella alias for Hotaru's URL routing tree.
+#[cfg(not(feature = "io_tokio"))]
+pub type Url<C, TS> = hotaru_core::url::UrlRoot<C, TS>;
 pub use hotaru_core::url::pattern::path_pattern_creator::{
     any as AnyUrl, any_path as AnyPath, literal_path as LitUrl, regex_path as RegUrl,
     trailing_slash as TrailingSlash,
 };
 pub use hotaru_core::url::{FrameNode, WalkCursor, WalkFrame};
 
+/// Umbrella alias for building protocol handler registries.
+#[cfg(feature = "io_tokio")]
 pub type ProtocolHandlerBuilder<P, TS = hotaru_io_tokio::TcpTransport> =
     hotaru_core::executable::ProtocolEntryBuilder<P, TS>;
+/// Umbrella alias for building protocol handler registries.
+#[cfg(not(feature = "io_tokio"))]
+pub type ProtocolHandlerBuilder<P, TS> = hotaru_core::executable::ProtocolEntryBuilder<P, TS>;
 pub use hotaru_core::app::server::ProtocolRegistryKind;
 pub use hotaru_core::executable::ProtocolRegistryBuilder;
 pub use hotaru_core::executable::middleware::AsyncMiddleware;
@@ -52,6 +69,7 @@ pub use hotaru_core::protocol::{
 pub use hotaru_io_embedded::{EmbeddedBackend, EmbeddedIo};
 #[cfg(feature = "io_futures")]
 pub use hotaru_io_futures::{FuturesBackend, FuturesIo};
+#[cfg(feature = "io_tokio")]
 pub use hotaru_io_tokio::{
     TcpAccepter, TcpConnector, TcpConnectorAddr, TcpInbound, TcpMeta, TcpOutbound, TcpStream,
     TcpTransport, TokioBackend, TokioIo,

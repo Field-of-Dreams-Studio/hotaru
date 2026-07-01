@@ -1,7 +1,6 @@
-use core::{any::Any, time::Duration};
 use alloc::sync::Arc;
+use core::{any::Any, time::Duration};
 
-use akari::extensions::{Locals, Params};
 use crate::{
     alias::PRwLock,
     app::common::RuntimeConfig,
@@ -9,6 +8,7 @@ use crate::{
         BufferedReadHalf, BufferedWriteHalf, ConnStream, MaybeSendBoxFuture, TransportSpec,
     },
 };
+use akari::extensions::{Locals, Params};
 
 /// Neutral protocol-entry boundary shared by server and client execution.
 ///
@@ -61,7 +61,7 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
 
     /// Returns the protocol's default connection-timeout policy.
     ///
-    /// Used to resolve [`TimeoutSetting::Inherit`] at connection time.
+    /// Used to resolve [`TimeoutSetting::Inherit`](crate::app::common::TimeoutSetting::Inherit) at connection time.
     fn default_connection_timeout(&self) -> Option<Duration>;
 
     /// Allows downcasting.

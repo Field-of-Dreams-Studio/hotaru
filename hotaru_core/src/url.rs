@@ -1,8 +1,13 @@
 // pub mod segments;
+/// URL registration and routing errors.
 pub mod error;
+/// URL tree node types and traversal state.
 pub mod node;
+/// Pattern lexer/parser for route declarations.
 pub mod parser;
+/// Path pattern types and constructors.
 pub mod pattern;
+/// Root URL registry and registration APIs.
 pub mod root;
 
 // pub use self::segments::{Url, dangling_url};

@@ -1,6 +1,8 @@
 pub use crate::url::{PathPattern, parser::parser::PatternError};
 
+/// Tokenizer for URL pattern strings.
 pub mod lexer;
+/// Parser from URL pattern tokens into path patterns.
 pub mod parser;
 
 pub use lexer::{RawToken, TypeKind, tokenize};

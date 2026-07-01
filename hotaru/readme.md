@@ -2,7 +2,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.2-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.3-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
@@ -11,6 +11,8 @@ The Hotaru 0.8 era starts from 23/May/2026.
 ## Overview
 
 Hotaru is a lightweight, intuitive web framework focused on simplicity and productivity. It supports regex-based routing, tree-structured URLs, and integrates seamlessly with the Akari templating system.
+
+The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly. 
 
 **[Official Website](https://hotaru.rs)**
 
@@ -78,7 +80,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.8.2"
+hotaru = "0.8.3"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -104,7 +106,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 - **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation. When enabling, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.8.2", features = ["external-ctor"] }
+  hotaru = { version = "0.8.3", features = ["external-ctor"] }
   ctor = "0.4.0"
   tokio = { version = "1", features = ["full"] }
   ```
@@ -113,7 +115,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.2", features = ["https", "http_compression"] }
+hotaru = { version = "0.8.3", features = ["https", "http_compression"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -121,7 +123,7 @@ tokio = { version = "1", features = ["full"] }
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.2", default-features = false, features = ["trans"] }
+hotaru = { version = "0.8.3", default-features = false, features = ["trans"] }
 hotaru_grpc = "..."
 tokio = { version = "1", features = ["full"] }
 ```
@@ -197,7 +199,7 @@ pub fn get_user<HTTP>() {
 
 - Endpoints and middleware auto-register at startup — no manual `router.register()`.
 - `trans` form: brace syntax `{}` with doc comments inside the block; angle-bracket body defaults to `req`. Optional fn-style `pub fn name(req: HTTP) { ... }` is also accepted.
-- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.2", default-features = false, features = ["semi-trans", "http"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` since `default-features = false` also drops the default HTTP stack.
+- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.3", default-features = false, features = ["semi-trans", "http"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` since `default-features = false` also drops the default HTTP stack.
 - See `macro_ra.md` for syntax details. Analyzer support is planned.
 
 ### Middleware
@@ -205,7 +207,7 @@ pub fn get_user<HTTP>() {
 Attach a middleware to a protocol via the `ProtocolBuilder`. Add `htmstd = "0.8"` to your `Cargo.toml` for the bundled middleware library:
 
 ```rust
-use htmstd::session::CookieSession;
+use htmstd::CookieSession;
 
 LServer!(
     APP = Server::new()
@@ -217,6 +219,31 @@ LServer!(
         .build()
 );
 ```
+
+`CookieSession` writes encrypted session cookies. By default, those cookies are
+production-safe (`Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`). If you are
+running a plain-HTTP development environment, configure the cookie safety policy
+explicitly through the app config:
+
+```rust
+use htmstd::{CookieSecurity, CookieSession, CookieSessionSettings};
+
+LServer!(
+    APP = Server::new()
+        .binding("127.0.0.1:3003")
+        .mode(RunMode::Development)
+        .set_config(CookieSessionSettings::new().security(CookieSecurity::Auto))
+        .single_protocol(
+            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+                .append_middleware::<CookieSession>(),
+        )
+        .build()
+);
+```
+
+`CookieSecurity::Auto` follows `RunMode`: `Production`/`Beta` keep `Secure`
+cookies, while `Development`/`Build` allow plain HTTP cookies. For production,
+also configure a stable `SessionSecret` so sessions survive process restarts.
 
 Middleware can also be attached per-endpoint via `middleware = [...]` inside the `endpoint!` block — see `example_hotaru` for the pattern.
 
@@ -273,7 +300,20 @@ Hotaru is built on a modular architecture:
 
 ## Changelog
 
-### 0.8.2 (Current)
+### 0.8.3 (Current)
+- **Core/backend split**: `hotaru_core` is now backend-neutral at the public type layer. Concrete Tokio runtime and TCP/IO implementations moved into sibling crates (`hotaru_rt_tokio`, `hotaru_io_tokio`), while the umbrella `hotaru` crate keeps the familiar Tokio defaults.
+- **IO adapter crates**: futures-io and embedded-io-async adapters moved out of core into `hotaru_io_futures` and `hotaru_io_embedded`. Each backend uses local wrapper types (`TokioIo<T>`, `FuturesIo<T>`, `EmbeddedIo<T>`) so adapter impls stay additive and avoid trait-coherence conflicts.
+- **Simpler `hotaru_core` features**: core no longer owns `io_*`, `rt_*`, `tokio`, or `embassy` feature flags. It now keeps only the platform axis (`std` / `embedded`) and task-mobility axis (`spawn_send` / `spawn_local`); runtime and IO backends are selected through backend crates or the `hotaru` facade.
+- **Runtime abstraction cleanup**: `RuntimeSpec` is the backend-neutral runtime trait, with Tokio implemented externally by `hotaru_rt_tokio::TokioRuntime`. Framework types (`Server`, `Client`, builders, and URL/protocol-entry types) now carry explicit transport/runtime parameters in core, while `hotaru` restores ergonomic defaults.
+- **`MaybeSend` task-mobility model**: async framework surfaces use `MaybeSend` so `spawn_send` builds keep real `Send` bounds and `spawn_local` builds can support local `!Send` futures. `hotaru_io_embedded` gates its actual embedded-io-async trait impls on `spawn_local`, not on the `embedded` platform flag.
+- **Framework-owned async IO traits**: `HotaruRead`, `HotaruWrite`, `HotaruBufRead`, `HotaruBufWrite`, `HotaruIOError`, `HotaruBufReader`, and `HotaruBufWriter` provide the common IO trait surface used by transports and protocols without hardcoding Tokio types in core.
+- **Native async trait surfaces**: core transport/protocol traits use return-position `impl Future` instead of `async-trait`, reducing proc-macro dependency surface and avoiding unnecessary boxed futures at trait boundaries.
+- **Protocol-agnostic endpoint outcomes**: `EndpointOutcome<C>` lets generated endpoints apply return values to any request context. HTTP keeps the existing `HttpResponse` endpoint style, while non-HTTP/inbound-only protocols can use `()` outcomes without placeholder responses.
+- **Per-protocol URL parsing hooks**: `Protocol` can customize URL tokenization/literal parsing, and URL parser internals such as `RawToken`, `TypeKind`, `tokenize`, and `tokens_to_patterns` are re-exported for protocol-specific routing work.
+- **Preferred-language middleware**: `htmstd` adds `PreferredLanguageMiddleware`, `PreferredLanguage`, settings, and request-extension helpers for parsing and negotiating the `Accept-Language` header.
+- **no_std preparation**: core continues moving toward `no_std` readiness with `alloc` usage, `core` imports, Akari `lite`/`no_std` alignment, generic IO errors, and backend-neutral abstractions. Real Embassy wiring remains deferred; embedded support is still experimental.
+
+### 0.8.2
 - **`http` (default-on) + `http_compression` (default-off) features**: HTTP and codecs are now optional; `default-features = false` drops HTTP entirely, `https`/`http_compression` imply `http`.
 - **HTTP re-exports moved to `hotaru::http`** (`use hotaru::http::*;`); clean builds ~35 % faster (20.5 s → 13.3 s) from dropping `tracing` and gating heavy codecs.
 - **Workspace + dep alignment**: five core crates pinned to 0.8.2; `regex` bumped 1.5.6 → 1.12.

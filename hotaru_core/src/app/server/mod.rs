@@ -212,7 +212,7 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
     /// be `pending()` forever.
     ///
     /// Example:
-    /// ```no_run
+    /// ```ignore
     /// use hotaru_core::app::server::Server;
     /// use hotaru_io_tokio::TcpTransport;
     /// use hotaru_rt_tokio::TokioRuntime;

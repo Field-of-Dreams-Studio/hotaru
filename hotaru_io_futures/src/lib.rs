@@ -18,18 +18,22 @@ pub struct FuturesIo<T> {
 }
 
 impl<T> FuturesIo<T> {
+    /// Wraps a `futures-io` value for use with Hotaru IO traits.
     pub fn new(inner: T) -> Self {
         Self { inner }
     }
 
+    /// Consumes the adapter and returns the wrapped IO value.
     pub fn into_inner(self) -> T {
         self.inner
     }
 
+    /// Returns a shared reference to the wrapped IO value.
     pub fn inner(&self) -> &T {
         &self.inner
     }
 
+    /// Returns a mutable reference to the wrapped IO value.
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }

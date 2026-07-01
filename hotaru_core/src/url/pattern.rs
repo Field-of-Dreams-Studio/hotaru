@@ -61,31 +61,41 @@ impl RegexSegment {
     }
 }
 
+/// A single URL path-segment matcher.
 #[derive(Clone, Debug)]
 pub enum PathPattern {
-    Literal(String),       // A literal path, e.g. "foo"
-    Regex(RegexSegment),   // A regex path, e.g. "\d+", compiled and anchored
-    Any,                   // A wildcard path, e.g. "*"
-    AnyPath,               // A wildcard path with a trailing slash, e.g. "**"
+    /// A literal path segment, such as `users`.
+    Literal(String),
+    /// A regex path segment, compiled and anchored to one segment.
+    Regex(RegexSegment),
+    /// A wildcard matching exactly one path segment.
+    Any,
+    /// A catch-all wildcard matching the rest of the path.
+    AnyPath,
 }
 
 impl PathPattern {
+    /// Creates a literal path pattern.
     pub fn literal_path<T: Into<String>>(path: T) -> Self {
         Self::Literal(path.into())
     }
 
+    /// Creates a regex path pattern.
     pub fn regex_path<T: Into<String>>(path: T) -> Self {
         Self::Regex(RegexSegment::new(path))
     }
 
+    /// Creates a single-segment wildcard pattern.
     pub fn any() -> Self {
         Self::Any
     }
 
+    /// Creates a catch-all wildcard pattern.
     pub fn any_path() -> Self {
         Self::AnyPath
     }
 
+    /// Returns whether this pattern is a catch-all wildcard.
     pub fn is_any_path(&self) -> bool {
         matches!(self, PathPattern::AnyPath)
     }
@@ -110,6 +120,7 @@ impl PathPattern {
     }
 }
 
+/// Convenience constructors for common path patterns.
 pub mod path_pattern_creator {
     use super::{PathPattern, RegexSegment};
 
@@ -120,6 +131,7 @@ pub mod path_pattern_creator {
         PathPattern::Literal(path.into())
     }
 
+    /// Creates a literal empty segment used for trailing slash registration.
     pub fn trailing_slash() -> PathPattern {
         PathPattern::Literal("".to_string())
     }

@@ -75,8 +75,8 @@ impl core::fmt::Display for PatternError {
 }
 
 /// Convert a token stream into:
-/// - Vec<PathPattern>: one entry per path segment (split on Slash tokens)
-/// - Vec<Option<String>>: optional parameter name associated with each segment
+/// - `Vec<PathPattern>`: one entry per path segment (split on Slash tokens)
+/// - `Vec<Option<String>>`: optional parameter name associated with each segment
 ///
 /// Returns Result to capture structural errors in the token stream.
 ///
@@ -85,12 +85,12 @@ impl core::fmt::Display for PatternError {
 ///   consecutive slashes or leading/trailing slash) are skipped.
 /// - A segment can be:
 ///   - Literal: only literal content, no angle patterns.
-///   - Any: produced by <str> or <name> with no other content in the segment.
-///   - Regex: produced by typed patterns (<int>, <uuid>, custom regex blocks), or any
+///   - Any: produced by `<str>` or `<name>` with no other content in the segment.
+///   - Regex: produced by typed patterns (`<int>`, `<uuid>`, custom regex blocks), or any
 ///     mixture of literal + dynamic parts inside a single segment. Literal parts are
 ///     regex-escaped when embedded.
-///   - AnyPath: produced by <**path>. It must be the only content of the segment.
-/// - Names: If a segment defines a name via <..:name> or <name>, it's captured as Some(name).
+///   - AnyPath: produced by `<**path>`. It must be the only content of the segment.
+/// - Names: If a segment defines a name via `<..:name>` or `<name>`, it's captured as Some(name).
 ///   If multiple names are specified in a single segment, the first one wins.
 pub fn tokens_to_patterns(
     tokens: &Vec<RawToken>,
