@@ -8,7 +8,7 @@ license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
 keywords = ["hotaru", "http", "http1", "web", "framework"]
-categories = ["network-programming", "web-programming::http-server"]
+categories = ["network-programming", "web-programming::http-server", "web-programming::http-client"]
 
 [dependencies]
 # Hotaru dependencies

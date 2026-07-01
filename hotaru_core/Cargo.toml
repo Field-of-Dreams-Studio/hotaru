@@ -3,12 +3,12 @@ name = "hotaru_core"
 version = "0.8.3"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
-description = "Small, sweet, easy framework for full-stack web application"
+description = "Protocol-neutral routing, runtime, and transport traits for the Hotaru web framework (no_std + alloc)"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
-categories = ["network-programming", "web-programming::http-server"]
-keywords = ["hotaru"]
+categories = ["network-programming", "web-programming", "asynchronous", "no-std"]
+keywords = ["web-framework", "hotaru", "async", "router", "no-std"]
 
 [dependencies]
 akari = { version = "0.2.8", default-features = false, features = ["dynamic", "extension", "object_macro"] }

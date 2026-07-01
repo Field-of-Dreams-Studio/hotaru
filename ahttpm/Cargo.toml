@@ -7,8 +7,8 @@ description = "Akari template / JSON helper macros for the Hotaru web framework"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
-categories = ["network-programming", "web-programming::http-server"]
-keywords = ["hotaru", "akari", "macros", "templates"]
+categories = ["template-engine", "development-tools::procedural-macro-helpers", "web-programming::http-server"]
+keywords = ["hotaru", "akari", "macros", "templates", "json"]
 
 [dependencies] 
 syn = { version = "2", features = ["full"] } 

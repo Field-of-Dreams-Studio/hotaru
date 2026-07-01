@@ -7,6 +7,8 @@ description = "futures-io adapter backend for Hotaru"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
+categories = ["asynchronous", "network-programming"]
+keywords = ["hotaru", "futures-io", "io", "async", "adapter"]
 
 [dependencies]
 hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = false }

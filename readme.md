@@ -6,11 +6,9 @@ The Hotaru 0.8 era starts from 23/May/2026.
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-> Small, sweet, easy framework for full-stack Rust web applications
+> Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
 
 ## Overview
-
-Hotaru is a lightweight, intuitive web framework focused on simplicity and productivity. It supports regex-based routing, tree-structured URLs, and integrates seamlessly with the Akari templating system.
 
 The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly.
 
@@ -20,13 +18,14 @@ MSRV: 1.86
 
 ## Key Features
 
-- **Multi-Protocol Support**: Handle HTTP/HTTPS, WebSocket, and custom TCP protocols
-- **Simple API**: Intuitive request/response handling with minimal boilerplate
-- **Full-Stack**: Built-in template rendering with Akari templates
-- **Flexible Routing**: Support for regex patterns, literal URLs, and nested routes
-- **Asynchronous**: Built with Tokio for efficient async handling
-- **Form Handling**: Easy processing of form data and file uploads
-- **Middleware Support**: Create reusable request processing chains
+- **Multi-Protocol**: HTTP/1.1, HTTPS (TLS), and custom TCP protocols on one server via the `Protocol` trait
+- **Server + Client**: Endpoints for inbound traffic, outpoints for outbound. Same protocol trait, same routing, same middleware
+- **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships by default via `hotaru_rt_tokio`; other backends plug in via sibling crates
+- **`no_std`-Ready Core**: `hotaru_core` builds bare-metal on Cortex-M4/M7 and RISC-V (with atomics) under `alloc`. CI verified on `thumbv7em-none-eabihf` and `riscv32imac-unknown-none-elf`
+- **Sync main**: `fn main() { run_server!(APP); }`. No `async fn main`, no `#[tokio::main]`
+- **Ergonomic Macros**: `endpoint!` / `outpoint!` / `middleware!` DSL in three flavors (`trans`, `semi-trans`, `attr`)
+- **Full-Stack**: Akari template rendering, form/URL-encoded body parsing, session cookies, HTTP body compression (gzip / deflate / brotli / zstd) all built in
+- **Flexible Routing**: Regex, literal, and pattern segments (`<int:id>`, `<uuid:token>`, `<**path>`) with a tree walker
 
 ## Quick Start
 
@@ -437,4 +436,4 @@ The understanding requirement is uniform across Author-Owned, Human-Led, and Co-
 
 MIT License — see [LICENSE.txt](LICENSE.txt).
 
-Copyright (c) 2024-2026 @ [Field of Dreams Studio (FDS)](https://fds.moe) & [Project-StarFall](https://sf.fds.moe) & [PMINE-FDS](https://pmine.fds.moe)
+Copyright (c) 2024-2026 @ [Field of Dreams Studio (FDS)](https://fds.moe) & [Project-StarFall](https://sf.fds.moe) & [PMINE-FDS](https://pmine.rs)

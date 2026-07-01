@@ -7,8 +7,8 @@ description = "Procedural macros for Hotaru framework"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
-categories = ["network-programming", "web-programming::http-server"]
-keywords = ["hotaru", "macros"]
+categories = ["development-tools::procedural-macro-helpers", "web-programming"]
+keywords = ["hotaru", "macros", "proc-macro", "web-framework", "dsl"]
 
 [dependencies]
 hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3" }

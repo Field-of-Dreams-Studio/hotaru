@@ -3,12 +3,12 @@ name = "hotaru"
 version = "0.8.3"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>", "JerrySu <jerrysu@fds.moe>"]
-description = "Small, sweet, easy framework for full-stack web application"
+description = "Small, sweet, easy framework with a protocol-neutral, no_std-ready core"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
-categories = ["network-programming", "web-programming::http-server" ]
-keywords = ["full-stack", "web-framework", "hotaru"]
+categories = ["network-programming", "web-programming::http-server", "web-programming::http-client", "asynchronous"]
+keywords = ["web-framework", "full-stack", "http", "async", "hotaru"]
 readme = "readme.md"
 
 [dependencies]
