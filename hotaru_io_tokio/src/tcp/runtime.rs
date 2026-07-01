@@ -25,7 +25,12 @@ impl Inbound for TcpInbound {
 
     async fn accept(&self) -> Result<Self::Wire, Self::Error> {
         let (tcp, _) = self.listener.accept().await?;
-        self.accepter.upgrade(tcp).await
+        // `TcpAccepter::upgrade` is infallible (its `Error = Infallible`);
+        // the `Err` arm exhausts the empty variant.
+        match self.accepter.upgrade(tcp).await {
+            Ok(wire) => Ok(wire),
+            Err(never) => match never {},
+        }
     }
 }
 

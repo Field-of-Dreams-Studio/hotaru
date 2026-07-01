@@ -46,7 +46,8 @@ impl Inbound for TlsInbound {
 
     async fn accept(&self) -> std::io::Result<Self::Wire> {
         let (tcp, _) = self.listener.accept().await?;
-        self.accepter.upgrade(tcp).await
+        // `TlsUpgradeError` -> `io::Error` via `From` (see accepter.rs).
+        Ok(self.accepter.upgrade(tcp).await?)
     }
 }
 
@@ -99,6 +100,7 @@ impl Outbound for TlsOutbound {
     }
 
     async fn connect(&self) -> std::io::Result<Self::Wire> {
-        self.connector.connect(self.target.clone()).await
+        // `TlsConnectError` -> `io::Error` via `From` (see connector.rs).
+        Ok(self.connector.connect(self.target.clone()).await?)
     }
 }

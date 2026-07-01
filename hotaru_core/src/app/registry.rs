@@ -19,6 +19,8 @@
 //! wrapper should shrink to just the enum + `from`/`into` + the two
 //! dispatchers + `default_connection_timeout`.
 
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use alloc::sync::Arc;
 use core::any::TypeId;
 use core::time::Duration;

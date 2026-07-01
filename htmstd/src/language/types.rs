@@ -54,7 +54,7 @@ impl LanguageRange {
         &self.tag
     }
 
-    /// The quality value in q-millis (thousandths). `q=1` → `1000`.
+    /// The quality value in q-millis (thousandths). `q=1` -> `1000`.
     pub fn quality_millis(&self) -> u16 {
         self.quality_millis
     }
@@ -358,7 +358,7 @@ mod tests {
             language.best_match(["en", "de"].iter().copied()),
             Some("en")
         );
-        // Fallback not in the supported list → no match.
+        // Fallback not in the supported list -> no match.
         assert_eq!(language.best_match(["de", "es"].iter().copied()), None);
     }
 

@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use akari::hash::HashMap;
 
 pub struct StepName {

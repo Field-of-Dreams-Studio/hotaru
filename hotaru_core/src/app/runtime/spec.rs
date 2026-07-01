@@ -14,12 +14,14 @@
 //! one file per associated-type wrapper plus one `runtime.rs` binding
 //! everything to `RuntimeSpec`.
 
+mod blocking;
 mod mutex;
 mod once_cell;
 mod runtime;
 mod select;
 
 pub use crate::marker::{BoxFuture, MaybeSendFuture};
+pub use blocking::BlockingRuntimeCap;
 pub use mutex::AsyncMutexCap;
 pub use once_cell::OnceCellCap;
 pub use runtime::RuntimeSpec;

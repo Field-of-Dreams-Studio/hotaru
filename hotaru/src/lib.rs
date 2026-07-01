@@ -88,6 +88,7 @@ pub use hrt::endpoint;
 pub use hrt::middleware;
 pub use hrt::outpoint;
 pub use hrt::run;
+pub use hrt::{run_server, run_server_no_block, run_server_no_block_until, run_server_until};
 pub use hrt::{LClient, LPattern, LServer, LUrl};
 
 #[cfg(not(feature = "external-ctor"))]

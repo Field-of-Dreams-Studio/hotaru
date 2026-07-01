@@ -52,26 +52,72 @@ impl TlsConnector {
 impl Connector for TlsConnector {
     type Stream = TlsStream;
     type Target = (String, u16); // (hostname, port)
+    type Error = TlsConnectError;
 
-    async fn connect(&self, target: Self::Target) -> std::io::Result<Self::Stream> {
+    async fn connect(&self, target: Self::Target) -> Result<Self::Stream, Self::Error> {
         let (host, port) = target;
 
-        let tcp = TcpStream::connect(format!("{}:{}", host, port)).await?;
+        // Three distinct failure paths — each gets its own variant so
+        // callers can tell whether to retry, fail over, or bail.
+        let tcp = TcpStream::connect(format!("{}:{}", host, port))
+            .await
+            .map_err(TlsConnectError::TcpConnect)?;
 
         let server_name = rustls::pki_types::ServerName::try_from(host.as_str())
-            .map_err(|_| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    format!("Invalid hostname: {}", host),
-                )
-            })?
+            .map_err(|_| TlsConnectError::InvalidHostname(host.clone()))?
             .to_owned();
 
         self.connector
             .connect(server_name, tcp)
             .await
             .map(TlsStream::Client)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            .map_err(TlsConnectError::Handshake)
+    }
+}
+
+/// Errors returned by [`TlsConnector::connect`].
+#[derive(Debug)]
+pub enum TlsConnectError {
+    /// TCP dial failed before TLS could begin.
+    TcpConnect(std::io::Error),
+    /// Target hostname could not be parsed as a valid SNI name.
+    InvalidHostname(String),
+    /// TLS handshake failed. Inner `io::Error` carries the rustls
+    /// diagnostic verbatim.
+    Handshake(std::io::Error),
+}
+
+impl std::fmt::Display for TlsConnectError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TcpConnect(e) => write!(f, "TCP connect failed: {}", e),
+            Self::InvalidHostname(h) => write!(f, "invalid hostname: {}", h),
+            Self::Handshake(e) => write!(f, "TLS handshake failed: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for TlsConnectError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::TcpConnect(e) | Self::Handshake(e) => Some(e),
+            Self::InvalidHostname(_) => None,
+        }
+    }
+}
+
+impl From<TlsConnectError> for std::io::Error {
+    /// Lets `TlsOutbound::connect` propagate via `?`. `TcpConnect` and
+    /// `Handshake` unwrap losslessly; `InvalidHostname` synthesises an
+    /// `ErrorKind::InvalidInput`.
+    fn from(err: TlsConnectError) -> Self {
+        match err {
+            TlsConnectError::TcpConnect(e) | TlsConnectError::Handshake(e) => e,
+            TlsConnectError::InvalidHostname(h) => std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("invalid hostname: {}", h),
+            ),
+        }
     }
 }
 

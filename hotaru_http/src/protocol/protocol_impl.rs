@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn test_is_keep_alive() {
         let mut request = HttpRequest::default();
-        // No Connection header → HTTP/1.1 default keep-alive
+        // No Connection header -> HTTP/1.1 default keep-alive
         assert!(is_keep_alive(&request));
 
         // Connection: close

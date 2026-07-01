@@ -1,10 +1,12 @@
 //! Resumable URL-tree traversal cursor.
 //!
 //! Parallel surface to `walk` / `walk_str`: drains every match in
-//! priority order (literal → regex → `*` → `**`) via repeated
+//! priority order (literal -> regex -> `*` -> `**`) via repeated
 //! [`WalkCursor::find_next`] calls. Built on [`Children::match_step`];
 //! existing walk paths are untouched.
 
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use alloc::sync::Arc;
 
 use crate::{

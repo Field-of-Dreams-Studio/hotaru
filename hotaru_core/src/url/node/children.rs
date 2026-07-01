@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use akari::hash::HashMap;
 use alloc::sync::Arc;
 use core::marker::PhantomData;

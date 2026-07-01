@@ -1,0 +1,91 @@
+name: hotaru-core
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: hotaru-core-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  default:
+    name: default features
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check hotaru_core default features
+        run: cargo check -p hotaru_core
+
+  feature-matrix:
+    name: ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - full,std,spawn_send
+          - full,std,spawn_local
+          - full,embedded,spawn_send
+          - full,embedded,spawn_local
+          - lite,std,spawn_send
+          - lite,std,spawn_local
+          - lite,embedded,spawn_send
+          - lite,embedded,spawn_local
+          # `dev-log` is an additive marker feature; verify it compiles on
+          # representative content/platform/mobility combinations.
+          - full,std,spawn_send,dev-log
+          - lite,embedded,spawn_local,dev-log
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check hotaru_core feature set
+        run: cargo check -p hotaru_core --no-default-features --features "${{ matrix.features }}"
+
+  # Bare-metal no_std builds — proves the crate actually links on a real
+  # embedded target, not just that it typechecks on the host where std is
+  # silently available. Each target requires:
+  #  - native atomic CAS (rules out Cortex-M0/M0+, RISC-V IMC-without-A)
+  #  - a working `alloc` allocator (user's board must supply one)
+  no-std-targets:
+    name: bare-metal ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          # ARM Cortex-M4/M7 with FPU. Covers the STM32F4/F7/H7/L4/L5/H5
+          # families, Nordic nRF52840, and most other Cortex-M4-class boards.
+          - thumbv7em-none-eabihf
+          # RISC-V with atomics (imac). Covers ESP32-C6/P4, most SiFive
+          # chips, BL616. The imc-only variant (no atomics) is deliberately
+          # out of scope — `spin` needs native CAS.
+          - riscv32imac-unknown-none-elf
+        features:
+          # The one canonical no_std flavour today.
+          - lite,embedded,spawn_local
+          # Same, with dev-log on — exercises the hollow-arm debug macros.
+          - lite,embedded,spawn_local,dev-log
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable + bare-metal target
+        run: |
+          rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+          rustup default stable
+      - name: Build hotaru_core for ${{ matrix.target }}
+        # `build` (not `check`) so the linker step actually runs — that's
+        # what caught `regex-lite`'s std dependency during development.
+        run: |
+          cargo build -p hotaru_core \
+            --target ${{ matrix.target }} \
+            --no-default-features \
+            --features "${{ matrix.features }}"

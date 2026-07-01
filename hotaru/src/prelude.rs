@@ -36,6 +36,11 @@ pub use crate::outpoint;
 pub use crate::run;
 pub use crate::{LClient, LPattern, LServer, LUrl};
 
+// Server-run macros. `run_server!` / `run_server_until!` are blocking
+// (sync main); `run_server_no_block!` / `run_server_no_block_until!`
+// fire-and-forget inside an async context.
+pub use crate::{run_server, run_server_no_block, run_server_no_block_until, run_server_until};
+
 // Template rendering (protocol-agnostic)
 pub use crate::AsyncMiddleware;
 #[cfg(feature = "http")]

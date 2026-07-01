@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use super::super::pattern::PathPattern;
 use super::lexer::{RawToken, TypeKind};
 

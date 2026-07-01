@@ -1,15 +1,35 @@
-//! Debug logging module for development-time diagnostics
+//! Debug logging module for development-time diagnostics.
 //!
-//! This module provides conditional compilation macros that enable detailed logging
-//! during development while ensuring zero runtime overhead in production builds.
-//! All macros are controlled by the `dev-log` feature flag.
+//! Provides conditional compilation macros that enable detailed logging
+//! during development while ensuring zero runtime overhead in production
+//! builds. All macros are controlled by the `dev-log` feature flag.
 //!
-//! # Features
+//! # Three-arm design (`dev-log` × `std` / `embedded`)
 //!
-//! - **Zero-cost abstraction**: Completely removed when `dev-log` is disabled
-//! - **Multiple log levels**: debug, error, warn, and trace
-//! - **Value inspection**: Similar to `dbg!` but feature-gated
-//! - **Type-safe formatting**: All macros use standard Rust formatting
+//! Each macro has three cfg-arms so no build ever pulls in std machinery
+//! it doesn't want:
+//!
+//! | `dev-log` | `std` / `embedded` | Expansion |
+//! |---|---|---|
+//! | off | either | *nothing* — arguments are not evaluated. |
+//! | on  | `std`  | `println!` / `eprintln!` with `[LEVEL]` prefix (the classic behaviour). |
+//! | on  | `embedded` | **Hollow expansion** — `let _ = core::format_args!(...)`. Arguments are still evaluated so `unused_variables` warnings at call sites stay quiet, but no formatting, allocation, or IO happens. |
+//!
+//! The hollow embedded arm exists because embedded builds are `#![no_std]`
+//! — `println!` / `eprintln!` are gone, and `format!` allocates via
+//! `alloc` (which is available but wasteful for a no-op). `format_args!`
+//! is `core::` and creates a stack-only `core::fmt::Arguments` value at
+//! zero allocation cost. Wrapping in `let _ = ...;` marks the resulting
+//! value as intentionally discarded.
+//!
+//! # Future: hooking a real embedded logger
+//!
+//! When HCR picks an embedded logger (defmt / semihosting / RTT / the
+//! `log` crate), route the hollow arm through a user-installed sink
+//! function — the macro body changes, call sites don't. Design sketch:
+//! a `static LOGGER: OnceCell<fn(core::fmt::Arguments<'_>)>` that the
+//! user's `#[entry]` installs once, and the embedded arm calls it if
+//! present. Deferred until an actual logger is chosen.
 //!
 //! # Usage
 //!
@@ -26,10 +46,13 @@
 //! debug_error!("Connection failed: {}", err);
 //! ```
 
-/// General-purpose debug logging macro
+// ---------------------------------------------------------------------------
+// debug_log! — general-purpose info logging (stdout under std)
+// ---------------------------------------------------------------------------
+
+/// General-purpose debug logging macro.
 ///
-/// Outputs informational messages prefixed with `[DEBUG]`.
-/// Use for general application state and flow information.
+/// See the module docs for the three-arm expansion rules.
 ///
 /// # Examples
 /// ```rust
@@ -39,11 +62,21 @@
 /// debug_log!("Processing {} requests", count);
 /// ```
 #[macro_export]
-#[cfg(feature = "dev-log")]
+#[cfg(all(feature = "dev-log", feature = "std"))]
 macro_rules! debug_log {
     ($($arg:tt)*) => {
-        println!("[DEBUG] {}", format!($($arg)*));
+        ::std::println!("[DEBUG] {}", ::std::format!($($arg)*));
     };
+}
+
+/// `dev-log + embedded` — hollow expansion. See the module docs for
+/// why we use `core::format_args!` here instead of a full no-op.
+#[macro_export]
+#[cfg(all(feature = "dev-log", feature = "embedded"))]
+macro_rules! debug_log {
+    ($($arg:tt)*) => {{
+        let _ = ::core::format_args!($($arg)*);
+    }};
 }
 
 #[macro_export]
@@ -52,23 +85,38 @@ macro_rules! debug_log {
     ($($arg:tt)*) => {};
 }
 
-/// Error logging macro for recoverable errors
+// ---------------------------------------------------------------------------
+// debug_error! — recoverable errors (stderr under std)
+// ---------------------------------------------------------------------------
+
+/// Error logging macro for recoverable errors.
 ///
-/// Outputs to stderr with `[ERROR]` prefix.
-/// Use for errors that don't terminate the application.
+/// See the module docs for the three-arm expansion rules.
 ///
 /// # Examples
 /// ```rust
+/// # let e = "boom";
+/// # #[derive(Debug)] struct Config;
+/// # let config = Config;
 /// use hotaru_core::debug_error;
 /// debug_error!("Failed to parse header: {}", e);
 /// debug_error!("Invalid configuration: {:?}", config);
 /// ```
 #[macro_export]
-#[cfg(feature = "dev-log")]
+#[cfg(all(feature = "dev-log", feature = "std"))]
 macro_rules! debug_error {
     ($($arg:tt)*) => {
-        eprintln!("[ERROR] {}", format!($($arg)*));
+        ::std::eprintln!("[ERROR] {}", ::std::format!($($arg)*));
     };
+}
+
+/// `dev-log + embedded` — hollow expansion.
+#[macro_export]
+#[cfg(all(feature = "dev-log", feature = "embedded"))]
+macro_rules! debug_error {
+    ($($arg:tt)*) => {{
+        let _ = ::core::format_args!($($arg)*);
+    }};
 }
 
 #[macro_export]
@@ -77,23 +125,36 @@ macro_rules! debug_error {
     ($($arg:tt)*) => {};
 }
 
-/// Warning logging macro for potentially problematic conditions
+// ---------------------------------------------------------------------------
+// debug_warn! — recoverable warnings (stderr under std)
+// ---------------------------------------------------------------------------
+
+/// Warning logging macro for potentially problematic conditions.
 ///
-/// Outputs to stderr with `[WARN]` prefix.
-/// Use for deprecations, performance issues, or recoverable problems.
+/// See the module docs for the three-arm expansion rules.
 ///
 /// # Examples
 /// ```rust
+/// # let duration = std::time::Duration::from_secs(1);
 /// use hotaru_core::debug_warn;
 /// debug_warn!("Connection timeout after {:?}", duration);
 /// debug_warn!("Using deprecated API");
 /// ```
 #[macro_export]
-#[cfg(feature = "dev-log")]
+#[cfg(all(feature = "dev-log", feature = "std"))]
 macro_rules! debug_warn {
     ($($arg:tt)*) => {
-        eprintln!("[WARN] {}", format!($($arg)*));
+        ::std::eprintln!("[WARN] {}", ::std::format!($($arg)*));
     };
+}
+
+/// `dev-log + embedded` — hollow expansion.
+#[macro_export]
+#[cfg(all(feature = "dev-log", feature = "embedded"))]
+macro_rules! debug_warn {
+    ($($arg:tt)*) => {{
+        let _ = ::core::format_args!($($arg)*);
+    }};
 }
 
 #[macro_export]
@@ -102,23 +163,37 @@ macro_rules! debug_warn {
     ($($arg:tt)*) => {};
 }
 
-/// Detailed trace logging for verbose debugging
+// ---------------------------------------------------------------------------
+// debug_trace! — verbose tracing (stdout under std)
+// ---------------------------------------------------------------------------
+
+/// Detailed trace logging for verbose debugging.
 ///
-/// Outputs with `[TRACE]` prefix.
-/// Use for detailed execution flow and state transitions.
+/// See the module docs for the three-arm expansion rules.
 ///
 /// # Examples
 /// ```rust
+/// # let fn_name = "";
+/// # let (i, state) = (0, ());
 /// use hotaru_core::debug_trace;
 /// debug_trace!("Entering function: {}", fn_name);
 /// debug_trace!("Loop iteration {}: state={:?}", i, state);
 /// ```
 #[macro_export]
-#[cfg(feature = "dev-log")]
+#[cfg(all(feature = "dev-log", feature = "std"))]
 macro_rules! debug_trace {
     ($($arg:tt)*) => {
-        println!("[TRACE] {}", format!($($arg)*));
+        ::std::println!("[TRACE] {}", ::std::format!($($arg)*));
     };
+}
+
+/// `dev-log + embedded` — hollow expansion.
+#[macro_export]
+#[cfg(all(feature = "dev-log", feature = "embedded"))]
+macro_rules! debug_trace {
+    ($($arg:tt)*) => {{
+        let _ = ::core::format_args!($($arg)*);
+    }};
 }
 
 #[macro_export]
@@ -127,32 +202,38 @@ macro_rules! debug_trace {
     ($($arg:tt)*) => {};
 }
 
-/// Value inspection macro similar to `dbg!`
+// ---------------------------------------------------------------------------
+// debug_value! — dbg!-style value inspection
+// ---------------------------------------------------------------------------
+
+/// Value inspection macro similar to `dbg!`.
 ///
-/// Prints file location and expression values.
-/// Returns the value, making it usable in expressions.
+/// Under `dev-log + std`, prints file location and expression values to
+/// stderr. Under `dev-log + embedded` and under `not(dev-log)`, the
+/// expression evaluates to itself with no output — semantic identity is
+/// preserved so `let x = debug_value!(compute());` keeps working.
 ///
 /// # Examples
 /// ```rust
+/// # fn calculate() -> i32 { 42 }
 /// use hotaru_core::debug_value;
 /// let result = debug_value!(calculate());
-/// debug_value!(x, y, z);  // Multiple values
 /// ```
 ///
-/// # Output Format
-/// ```
+/// # Output format (`dev-log + std` only)
+/// ```text
 /// [src/main.rs:42] calculate() = 42
 /// ```
 #[macro_export]
-#[cfg(feature = "dev-log")]
+#[cfg(all(feature = "dev-log", feature = "std"))]
 macro_rules! debug_value {
     () => {
-        eprintln!("[{}:{}]", file!(), line!())
+        ::std::eprintln!("[{}:{}]", file!(), line!())
     };
     ($val:expr $(,)?) => {
         match $val {
             tmp => {
-                eprintln!("[{}:{}] {} = {:#?}",
+                ::std::eprintln!("[{}:{}] {} = {:#?}",
                     file!(), line!(), stringify!($val), &tmp);
                 tmp
             }
@@ -161,6 +242,16 @@ macro_rules! debug_value {
     ($($val:expr),+ $(,)?) => {
         ($($crate::debug_value!($val)),+,)
     };
+}
+
+/// `dev-log + embedded` — identity on values, no-op on the marker form.
+/// No `Debug` bound is required so this compiles for any `T`.
+#[macro_export]
+#[cfg(all(feature = "dev-log", feature = "embedded"))]
+macro_rules! debug_value {
+    () => {};
+    ($val:expr $(,)?) => { $val };
+    ($($val:expr),+ $(,)?) => { ($($val),+,) };
 }
 
 #[macro_export]

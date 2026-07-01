@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 pub use crate::url::{PathPattern, parser::parser::PatternError};
 
 /// Tokenizer for URL pattern strings.

@@ -1,7 +1,7 @@
 use core::future::Future;
 use core::time::Duration;
 
-use hotaru_core::app::runtime::{Either, RuntimeSpec};
+use hotaru_core::app::runtime::{BlockingRuntimeCap, Either, RuntimeSpec};
 
 use super::{TokioMutex, TokioOnceCell};
 
@@ -77,4 +77,19 @@ impl RuntimeSpec for TokioRuntime {
 
     type OnceCell<T: Send + Sync + 'static> = TokioOnceCell<T>;
     type AsyncMutex<T: Send + 'static> = TokioMutex<T>;
+}
+
+impl BlockingRuntimeCap for TokioRuntime {
+    /// Builds a fresh multi-thread runtime and blocks on `future`.
+    /// Panics if invoked from inside an existing tokio runtime.
+    fn block_on<F>(future: F)
+    where
+        F: Future<Output = ()> + 'static,
+    {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("failed to build tokio runtime");
+        rt.block_on(future);
+    }
 }

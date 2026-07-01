@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use super::parser::PatternError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

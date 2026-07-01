@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use akari::extensions::ParamsClone;
 use alloc::sync::Arc;
 use core::any::TypeId;
@@ -317,4 +319,61 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
             })
             .await
     }
+}
+
+// ============================================================================
+// Sync-entry helpers behind the `run_server*!` macros.
+//
+// - `run_server` / `run_server_until` — build the runtime, block the current
+//   thread (require `BlockingRuntimeCap`).
+// - `run_server_no_block` / `run_server_no_block_until` — spawn detached on
+//   the *already-running* runtime.
+// ============================================================================
+
+use crate::app::runtime::BlockingRuntimeCap;
+
+/// Blocks until `Rt::default_stop()` fires (Ctrl+C under tokio).
+pub fn run_server<TS, Rt>(server: Arc<Server<TS, Rt>>)
+where
+    TS: TransportSpec,
+    Rt: BlockingRuntimeCap,
+{
+    Rt::block_on(async move {
+        server.run_until(Rt::default_stop()).await;
+    });
+}
+
+/// Blocks until user-supplied `stop` future resolves.
+pub fn run_server_until<TS, Rt, S>(server: Arc<Server<TS, Rt>>, stop: S)
+where
+    TS: TransportSpec,
+    Rt: BlockingRuntimeCap,
+    S: core::future::Future<Output = ()> + MaybeSend + 'static,
+{
+    Rt::block_on(async move {
+        server.run_until(stop).await;
+    });
+}
+
+/// Fire-and-forget on the active runtime; uses `Rt::default_stop()`.
+pub fn run_server_no_block<TS, Rt>(server: Arc<Server<TS, Rt>>)
+where
+    TS: TransportSpec,
+    Rt: RuntimeSpec,
+{
+    Rt::spawn_detached(async move {
+        server.run_until(Rt::default_stop()).await;
+    });
+}
+
+/// Fire-and-forget on the active runtime with user-supplied stop.
+pub fn run_server_no_block_until<TS, Rt, S>(server: Arc<Server<TS, Rt>>, stop: S)
+where
+    TS: TransportSpec,
+    Rt: RuntimeSpec,
+    S: core::future::Future<Output = ()> + MaybeSend + 'static,
+{
+    Rt::spawn_detached(async move {
+        server.run_until(stop).await;
+    });
 }

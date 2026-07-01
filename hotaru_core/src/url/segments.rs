@@ -65,7 +65,7 @@ impl<C: RequestContext, TS: TransportSpec> Children<C, TS> {
         self.inner.len()
     }
 
-    /// Insert a child in priority order (Literal → Regex → Any → AnyPath)
+    /// Insert a child in priority order (Literal -> Regex -> Any -> AnyPath)
     /// This is the only way to add children, ensuring proper ordering
     pub(crate) fn insert_ordered(&mut self, child: Arc<Url<C, TS>>) {
         // Find insertion position based on priority
@@ -178,7 +178,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
 
     /// Walk the URL tree based on the path segments.
     /// Returns Some(Arc<Self>) if a matching URL is found, otherwise None.
-    /// Uses backtracking with priority ordering: Literal → Regex → Any → AnyPath
+    /// Uses backtracking with priority ordering: Literal -> Regex -> Any -> AnyPath
     ///
     /// # Security Note: URL Depth Validation Not Required
     ///
@@ -247,7 +247,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
 
         // Async portion: iterate through pre-ordered children with backtracking
         Box::pin(async move {
-            // Children are already ordered by priority: Literal → Regex → Any → AnyPath
+            // Children are already ordered by priority: Literal -> Regex -> Any -> AnyPath
             for child_url in children.iter() {
                 debug_trace!("walk: Comparing child path {:?} with segment '{}'", child_url.path, this_segment);
 

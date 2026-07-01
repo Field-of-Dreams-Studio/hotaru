@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use core::{any::Any, time::Duration};
 use alloc::sync::Arc;
 

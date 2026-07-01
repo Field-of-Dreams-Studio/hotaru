@@ -1,6 +1,15 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use alloc::sync::Arc;
 
 use crate::debug_warn;
+
+// `regex` crate under all flavours. Under `full` the `regex/unicode`
+// feature adds Unicode tables (for `\p{...}` classes etc.); under
+// `lite`/`embedded` those are skipped for a smaller binary. Since
+// `regex` 1.9 the crate compiles as genuine `no_std + alloc` with
+// `default-features = false`, so no cfg-fork is needed.
+use regex::Regex as CompiledRegex;
 
 /// A regex segment paired with its compiled form.
 ///
@@ -18,7 +27,7 @@ use crate::debug_warn;
 #[derive(Clone, Debug)]
 pub struct RegexSegment {
     src: String,
-    re: Option<Arc<regex::Regex>>,
+    re: Option<Arc<CompiledRegex>>,
 }
 
 impl RegexSegment {
@@ -27,7 +36,7 @@ impl RegexSegment {
     pub fn new<T: Into<String>>(src: T) -> Self {
         let src = src.into();
         let anchored = format!("^(?:{})$", src);
-        let re = match regex::Regex::new(&anchored) {
+        let re = match CompiledRegex::new(&anchored) {
             Ok(re) => Some(Arc::new(re)),
             Err(_err) => {
                 debug_warn!(
@@ -122,6 +131,8 @@ impl PathPattern {
 
 /// Convenience constructors for common path patterns.
 pub mod path_pattern_creator {
+    use alloc::string::{String, ToString};
+
     use super::{PathPattern, RegexSegment};
 
     /// Creates a literal path pattern.

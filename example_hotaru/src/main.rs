@@ -1,9 +1,8 @@
 use hotaru::http::*;
 use hotaru::prelude::*;
 
-#[tokio::main]
-async fn main() {
-    APP.clone().run().await;
+fn main() {
+    run_server!(APP);
 }
 
 LServer!(

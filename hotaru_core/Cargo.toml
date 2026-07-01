@@ -2,8 +2,8 @@
 name = "hotaru_core"
 version = "0.8.3"
 edition = "2024"
-authors = ["Redstone <redstone@fds.moe>"] 
-description = "Small, sweet, easy framework for full-stack web application" 
+authors = ["Redstone <redstone@fds.moe>"]
+description = "Small, sweet, easy framework for full-stack web application"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
@@ -16,6 +16,12 @@ parking_lot = { version = "0.12", optional = true }
 spin = { version = "0.12", default-features = false, features = ["mutex", "spin_mutex", "rwlock"], optional = true }
 av = "0.1"
 
+# Regex — plain `regex` under both `full` and `lite`/`embedded`. Since
+# `regex` 1.9 the crate has genuine `no_std + alloc` support when
+# `default-features = false`. The `full` feature layer adds Unicode
+# tables on top (`regex/unicode` — larger binary, needed for `\p{...}`
+# style classes). `regex-lite` was tried but its 0.1.x line still
+# hard-requires `std` via a compile_error, so it can't run bare-metal.
 regex = { version = "1.12", default-features = false, features = [
     "perf-dfa",
     "perf-onepass",
@@ -29,8 +35,13 @@ tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread"] }
 
 [features]
 default = ["full", "std", "spawn_send"]
+
+# Feature-set flavour. Exactly one of `full` / `lite` should be active.
+# `full` layers `regex/unicode` on top for `\p{...}` support (larger
+# binary). `lite` skips unicode tables — the `regex` crate stays but
+# only its perf features + core matcher compile in.
 full = ["regex/unicode", "akari/full"]
-lite = ["regex/unicode-perl", "akari/no_std"]
+lite = ["akari/no_std"]
 dev-log = []
 
 # Platform/sync axis: choose exactly one (`std` uses parking_lot, `embedded` uses spin).

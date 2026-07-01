@@ -41,9 +41,8 @@ LServer!(
         .build()
 );
 
-#[tokio::main]
-async fn main() {
-    APP.clone().run().await;
+fn main() {
+    run_server!(APP);
 }
 
 endpoint! {
@@ -53,6 +52,8 @@ endpoint! {
     }
 }
 ```
+
+`run_server!(APP)` builds a tokio runtime, blocks the current thread, and shuts down on Ctrl+C. No `async fn main`, no `#[tokio::main]`. See [Core Concepts](#core-concepts) for the sibling macros (`run_server_until!`, `run_server_no_block!`, `run_server_no_block_until!`) when you need a custom stop source or multi-server orchestration.
 
 ## Installation
 
@@ -296,7 +297,7 @@ Hotaru is built on a modular architecture:
 - **[hotaru_tls](https://crates.io/crates/hotaru_tls)** - TLS/HTTPS implementation for Hotaru
 - **[hotaru_rt_tokio](https://crates.io/crates/hotaru_rt_tokio)** - Tokio runtime backend (`TokioRuntime`)
 - **[hotaru_io_tokio](https://crates.io/crates/hotaru_io_tokio)** - Tokio TCP/IO backend (`TcpTransport`, `TokioIo`)
-- **[hotaru_io_futures](https://crates.io/crates/hotaru_io_futures)** - `futures-io` adapter backend (`FuturesIo`)
+- **[hotaru_io_futures](https://crates.io/crates/hotaru_io_futures)** - `futures-io` adapter backend (`FuturesIo`, experimental)
 - **[hotaru_io_embedded](https://crates.io/crates/hotaru_io_embedded)** - `embedded-io-async` adapter backend (`EmbeddedIo`, experimental)
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
@@ -315,24 +316,24 @@ Hotaru is built on a modular architecture:
 - **Per-protocol URL parsing hooks**: `Protocol` can customize URL tokenization/literal parsing, and URL parser internals such as `RawToken`, `TypeKind`, `tokenize`, and `tokens_to_patterns` are re-exported for protocol-specific routing work.
 - **Preferred-language middleware**: `htmstd` adds `PreferredLanguageMiddleware`, `PreferredLanguage`, settings, and request-extension helpers for parsing and negotiating the `Accept-Language` header.
 - **no_std preparation**: core continues moving toward `no_std` readiness with `alloc` usage, `core` imports, Akari `lite`/`no_std` alignment, generic IO errors, and backend-neutral abstractions. Real Embassy wiring remains deferred; embedded support is still experimental.
+- **Sync-main entry macros**: `run_server!` / `run_server_until!` (blocking) and `run_server_no_block!` / `run_server_no_block_until!` (fire-and-forget) let users run a server from an ordinary `fn main()` — no `#[tokio::main]`, no `async fn main`. Backed by a new `BlockingRuntimeCap` capability trait implemented by `TokioRuntime`.
 
 ### 0.8.2
-- **`http` (default-on) + `http_compression` (default-off) features**: HTTP and codecs are now optional; `default-features = false` drops HTTP entirely, `https`/`http_compression` imply `http`.
-- **HTTP re-exports moved to `hotaru::http`** (`use hotaru::http::*;`); clean builds ~35 % faster (20.5 s → 13.3 s) from dropping `tracing` and gating heavy codecs.
-- **Workspace + dep alignment**: five core crates pinned to 0.8.2; `regex` bumped 1.5.6 → 1.12.
-- **`hotaru_core` access-point table no longer poisons**: `AccessPointTable` switched to `parking_lot::RwLock` via the existing `PRwLock` alias.
-- **`hotaru_trans` `..` middleware inheritance honors the URL's app ident**: was hardcoded to `APP`, breaking multi-app setups.
-- **`hotaru_trans` anonymous-fn `_` form actually works**: `_` was matched as `Punct` (it's an `Ident`), so the auto-name branch never fired.
-
-### 0.8.x
-- **Client / outpoint runtime**: new `Client<TS>` for outbound traffic, mirroring `Server<TS>`. Paired with the `outpoint!` macro (client-side counterpart to `endpoint!`) and `run!` / `call!` invocation-style sugar for one-shot and persistent outbound calls.
-- **Protocol trait reshape**: channel-based `open_channel` / `handle` / `send`, plus per-protocol `install_channel` bridge. `type Context: RequestContext<Channel = Self::Channel>` pins channel-type alignment. New `Channel` trait + `ProtocolFlow` give per-exchange close semantics (HTTP/1 closes the connection; multiplexed protocols may close only the stream).
-- **RequestContext rework**: `Default` supertrait; `type Channel` as a type anchor; `inject_request` / `into_response` added. `type Error: ProtocolError` is the single source of truth for chain errors, and now also requires `From<std::io::Error>` (since the client path surfaces transport-level I/O). Use the new `EmptyError` for prototypes / no-payload protocols.
-- **Result-typed execution chain**: middleware, final handlers, `ExecutionChain::run`, and `UrlNode::run` all return `Result<C, <C as RequestContext>::Error>` — no boxing at the chain boundary.
-- **Named access points**: every registered endpoint/outpoint has an explicit name. `ProtocolEntry::register(name, path, step_names, binding, config)` is the single canonical funnel; `Server::url(url, name, ...)` / `Client::url(url, name, ...)` are URL-first.
-- **Instance-based transports**: `TransportSpec::Inbound` / `Outbound` replace the old `Accepter` / `Connector` shape. `TcpInbound::bind(target)` and `TcpOutbound::build(target)` materialize once per `Server` / `Client`.
-- **HTTPS feature**: new `https` cargo feature on the umbrella `hotaru` crate forwards to `hotaru_http/tls`, surfacing `HTTPS`, `TlsTransport`, `TlsOutboundTarget`, `TlsClientConfig`. `HTTPS = Http1Protocol<TlsStream, TlsTransport>`.
-- **`LServer!` / `LClient!` / `LUrl!` / `LPattern!` macros**: replace the old `LApp!` for simplified lazy-static declarations. Default to `TcpTransport`.
+- `http` and `http_compression` moved to optional features (compression default-off)
+- HTTP re-exports relocated to `hotaru::http`
+- Clean builds ~35% faster (dropped `tracing`, gated heavy codecs)
+- `regex` bumped 1.5.6 -> 1.12
+- `AccessPointTable` switched to `PRwLock` (no more poisoning)
+- `hotaru_trans` `..` middleware inheritance now honors the URL's app ident
+- `hotaru_trans` anonymous-fn `_` form fixed 
+- Client / outpoint runtime paired with `Client<TS>`, the `outpoint!` macro, and `run!` / `call!` invocation sugar
+- Protocol trait reshape: channel-based `open_channel` / `handle` / `send`; new `Channel` trait + `ProtocolFlow`
+- `RequestContext` rework: `Default` supertrait, `type Channel` anchor, `inject_request` / `into_response`; new `EmptyError`
+- Result-typed execution chain — no boxing at chain boundaries
+- Named access points with a single canonical registration funnel
+- Instance-based transports: `TransportSpec::Inbound` / `Outbound` replace `Accepter` / `Connector`
+- HTTPS feature: `HTTPS = Http1Protocol<TlsStream, TlsTransport>`
+- New `LServer!` / `LClient!` / `LUrl!` / `LPattern!` macros replace `LApp!`
 
 ### 0.7.x
 - Multi-protocol support (HTTP, WebSocket, custom TCP)

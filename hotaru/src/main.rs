@@ -491,7 +491,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
         if ty.is_dir() {
             copy_dir_all(&entry.path(), &dest_path)?;
         } else {
-            println!("cargo:warning=Copying: {} → {}", entry.path().display(), dest_path.display());
+            println!("cargo:warning=Copying: {} -> {}", entry.path().display(), dest_path.display());
             fs::copy(entry.path(), dest_path)?;
         }
     }
