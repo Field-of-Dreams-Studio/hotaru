@@ -219,13 +219,20 @@ impl PreferredLanguage {
                 .then_with(|| left.order.cmp(&right.order))
         });
 
+        // Acceptance for each candidate is fixed for this request, so compute it
+        // once. `accepts` rescans every range, and calling it inside the loop
+        // below made negotiation O(ranges² · candidates) — a header full of
+        // subtag ranges plus one `q=0` override could burn seconds of CPU.
+        let accepted: Vec<bool> = supported
+            .iter()
+            .map(|language| self.accepts(language))
+            .collect();
+
         for range in ranges {
-            if let Some(language) = supported
-                .iter()
-                .copied()
-                .find(|language| language_matches(&range.tag, language) && self.accepts(language))
-            {
-                return Some(language);
+            for (index, &language) in supported.iter().enumerate() {
+                if accepted[index] && language_matches(&range.tag, language) {
+                    return Some(language);
+                }
             }
         }
 
@@ -432,5 +439,41 @@ mod tests {
         let range = LanguageRange::new("en", 5000, 0);
         assert_eq!(range.quality_millis(), MAX_QUALITY_MILLIS);
         assert!((range.quality() - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn best_match_is_bounded_for_pathological_headers() {
+        use crate::language::parser::MAX_LANGUAGE_RANGES;
+
+        // F2 regression: the attack shape is one `en;q=0` exact override (which
+        // defeats the early-return by making accepts("en") == false) followed by
+        // thousands of `en-N;q=0.5` subtag ranges that all match "en". Parsing
+        // now caps the range count, and best_match no longer rescans per range.
+        let mut header = String::from("en;q=0");
+        for n in 0..5000 {
+            header.push_str(&format!(", en-{n};q=0.5"));
+        }
+        let language = PreferredLanguage::parse(header);
+
+        assert!(language.ranges().len() <= MAX_LANGUAGE_RANGES);
+        // Behavior is unchanged: "en" is rejected by the q=0 override, so the
+        // fallback ("en") is returned via the fallback path — just cheaply now.
+        assert_eq!(language.best_match(["en"].iter().copied()), Some("en"));
+    }
+
+    #[test]
+    fn multibyte_accept_language_never_panics_and_does_not_match() {
+        // Regression for the char-boundary panic: an attacker-supplied header
+        // range like "eñ" (bytes 65 C3 B1) must be negotiated against candidate
+        // "en" without panicking, and must not spuriously match.
+        let language = PreferredLanguage::parse("eñ");
+        assert!(!language.accepts("en"));
+        assert_eq!(language.quality_millis_for("en"), 0);
+        assert_eq!(language.best_match(["en", "de"].iter().copied()), Some("en"));
+
+        // Multibyte on the candidate side is equally safe.
+        let english = PreferredLanguage::parse("en");
+        assert!(!english.accepts("eñ"));
+        assert_eq!(english.quality_millis_for("日本語"), 0);
     }
 }

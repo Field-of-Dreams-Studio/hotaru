@@ -3,10 +3,21 @@
 //! Everything here is side-effect free and independent of Hotaru request
 //! types, which keeps it easy to unit-test in isolation.
 
+use hotaru_core::debug_log;
+
 use super::types::{LanguageRange, MAX_QUALITY_MILLIS};
 
 /// Default language used when the request carries no acceptable preference.
 pub(crate) const DEFAULT_FALLBACK_LANGUAGE: &str = "en";
+
+/// Upper bound on the number of language ranges parsed from a single header.
+///
+/// Real clients send only a handful of ranges; this cap stops a pathological
+/// `Accept-Language` (thousands of comma-separated ranges) from feeding the
+/// downstream matching helpers a work-list large enough to become an
+/// algorithmic-complexity DoS. Ranges beyond the cap are dropped, keeping the
+/// earliest ones — i.e. the client's stated preference order.
+pub(crate) const MAX_LANGUAGE_RANGES: usize = 64;
 
 /// Trim a fallback tag and substitute the default when it is empty.
 pub(crate) fn normalize_fallback(mut fallback: String) -> String {
@@ -19,12 +30,27 @@ pub(crate) fn normalize_fallback(mut fallback: String) -> String {
 }
 
 /// Parse a full `Accept-Language` header into ordered [`LanguageRange`]s.
+///
+/// At most [`MAX_LANGUAGE_RANGES`] ranges are returned; any excess is dropped
+/// and logged, so a hostile header cannot inflate downstream matching cost.
 pub(crate) fn parse_accept_language(header: &str) -> Vec<LanguageRange> {
-    header
+    let mut items = header
         .split(',')
         .enumerate()
-        .filter_map(|(order, item)| parse_language_range(item, order))
-        .collect()
+        .filter_map(|(order, item)| parse_language_range(item, order));
+
+    let ranges: Vec<LanguageRange> = items.by_ref().take(MAX_LANGUAGE_RANGES).collect();
+
+    // Pull one more only to detect (and log) truncation; the remaining ranges
+    // are never parsed, so this stays linear in the header length.
+    if items.next().is_some() {
+        debug_log!(
+            "PreferredLanguage: Accept-Language exceeded {} ranges; excess dropped",
+            MAX_LANGUAGE_RANGES
+        );
+    }
+
+    ranges
 }
 
 /// Parse a single `tag;q=value` item. Returns `None` for empty tags.
@@ -116,10 +142,17 @@ pub(crate) fn language_matches(range: &str, language: &str) -> bool {
 }
 
 /// Whether `value` begins with `prefix` followed by a `-` subtag boundary.
+///
+/// Compares on raw bytes rather than string slices so that untrusted,
+/// non-ASCII input can never trigger a char-boundary panic. BCP-47 language
+/// tags are ASCII, so a byte-level `eq_ignore_ascii_case` is exactly the
+/// intended comparison; any multibyte range simply fails to match.
 fn starts_with_language_boundary(value: &str, prefix: &str) -> bool {
-    value.len() > prefix.len()
-        && value[..prefix.len()].eq_ignore_ascii_case(prefix)
-        && value.as_bytes().get(prefix.len()) == Some(&b'-')
+    let (value_bytes, prefix_bytes) = (value.as_bytes(), prefix.as_bytes());
+    value_bytes.len() > prefix_bytes.len()
+        // In-bounds by the length guard above; never a char-boundary slice.
+        && value_bytes[prefix_bytes.len()] == b'-'
+        && value_bytes[..prefix_bytes.len()].eq_ignore_ascii_case(prefix_bytes)
 }
 
 /// Higher is more specific: exact match beats subtag match, which beats `*`.
@@ -225,6 +258,33 @@ mod tests {
     }
 
     #[test]
+    fn language_matches_never_panics_on_multibyte_input() {
+        // Regression: a range whose byte length exceeds the candidate but whose
+        // boundary byte falls mid-char (e.g. "eñ" = 65 C3 B1) used to slice the
+        // str at a non-char-boundary and panic. It must now simply not match.
+        assert!(!language_matches("eñ", "en"));
+        assert!(!language_matches("en", "eñ"));
+        // Multibyte on the boundary byte itself and longer multibyte tails.
+        assert!(!language_matches("en日本語", "en"));
+        assert!(!language_matches("en", "en日本語"));
+        assert!(!language_matches("café", "caf"));
+        assert!(!language_matches("Ω", "en"));
+        // A genuine ASCII subtag boundary still matches after the fix.
+        assert!(language_matches("en-US", "en"));
+    }
+
+    #[test]
+    fn starts_with_language_boundary_is_boundary_safe() {
+        // Direct exercise of the helper across the tricky byte layouts.
+        assert!(!starts_with_language_boundary("eñ", "en"));
+        assert!(!starts_with_language_boundary("enñ", "en")); // boundary byte is C3
+        assert!(starts_with_language_boundary("en-US", "en"));
+        assert!(starts_with_language_boundary("EN-us", "en")); // case-insensitive
+        assert!(!starts_with_language_boundary("english", "en")); // no boundary
+        assert!(!starts_with_language_boundary("en", "en")); // equal length
+    }
+
+    #[test]
     fn specificity_orders_exact_over_subtag_over_wildcard() {
         assert_eq!(language_match_specificity("*", "en-US"), 0);
         assert_eq!(language_match_specificity("en-US", "en-US"), usize::MAX);
@@ -238,6 +298,22 @@ mod tests {
     fn primary_subtag_strips_region() {
         assert_eq!(primary_subtag("en-US"), "en");
         assert_eq!(primary_subtag("zh"), "zh");
+    }
+
+    #[test]
+    fn parse_accept_language_caps_range_count() {
+        // F2 regression: a pathological header must be bounded so downstream
+        // matching cannot be driven into quadratic blowup.
+        let mut header = String::from("en");
+        for n in 0..(MAX_LANGUAGE_RANGES * 8) {
+            header.push_str(&format!(", en-{n};q=0.5"));
+        }
+        let ranges = parse_accept_language(&header);
+
+        assert_eq!(ranges.len(), MAX_LANGUAGE_RANGES);
+        // The earliest (highest-preference) ranges are the ones retained.
+        assert_eq!(ranges[0].tag(), "en");
+        assert_eq!(ranges[1].tag(), "en-0");
     }
 
     #[test]
