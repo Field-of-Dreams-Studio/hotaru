@@ -54,6 +54,7 @@ pub use hotaru_core::app::server::ProtocolRegistryKind;
 pub use hotaru_core::executable::ProtocolRegistryBuilder;
 pub use hotaru_core::executable::middleware::AsyncMiddleware;
 
+#[cfg(feature = "full")]
 pub use hotaru_core::TemplateManager;
 pub use hotaru_core::Value;
 pub use hotaru_core::object;

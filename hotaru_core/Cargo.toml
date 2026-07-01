@@ -40,13 +40,18 @@ default = ["full", "std", "spawn_send"]
 # `full` layers `regex/unicode` on top for `\p{...}` support (larger
 # binary). `lite` skips unicode tables — the `regex` crate stays but
 # only its perf features + core matcher compile in.
-full = ["regex/unicode", "akari/full"]
+# `full` is purely a regex/unicode size choice. It deliberately does NOT
+# pull `akari/full`, because that enables akari's std-only template engine
+# (`hotaru_core` never uses `TemplateManager`), which breaks no_std builds.
+full = ["regex/unicode"]
 lite = ["akari/no_std"]
 dev-log = []
 
 # Platform/sync axis: choose exactly one (`std` uses parking_lot, `embedded` uses spin).
 std = ["dep:parking_lot"]
-embedded = ["dep:spin"]
+# `embedded` is the no_std platform; akari must go no_std with it so its
+# `alloc` prelude (`String`/`format!`/…) is available regardless of `full`/`lite`.
+embedded = ["dep:spin", "akari/no_std"]
 
 # Task-mobility axis: multi-thread/executor-moving tasks use `spawn_send`; single-thread/local tasks use `spawn_local`.
 spawn_send = []

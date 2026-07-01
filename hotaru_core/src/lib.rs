@@ -21,12 +21,18 @@
 #[macro_use]
 extern crate alloc;
 
+// Platform/sync selection is a global mode, not an additive capability.
+// If both are enabled, fail early instead of silently choosing between
+// `parking_lot`/std assumptions and `spin`/embedded assumptions.
 #[cfg(all(feature = "std", feature = "embedded"))]
 compile_error!("hotaru_core: features `std` and `embedded` are mutually exclusive");
 
 #[cfg(not(any(feature = "std", feature = "embedded")))]
 compile_error!("hotaru_core: one of `std` or `embedded` must be enabled");
 
+// Task-mobility selection is a global mode. `spawn_send` requires movable
+// `Send` futures, while `spawn_local` permits local `!Send` futures; choosing
+// one silently would hide backend/runtime configuration mistakes.
 #[cfg(all(feature = "spawn_send", feature = "spawn_local"))]
 compile_error!("hotaru_core: features `spawn_send` and `spawn_local` are mutually exclusive");
 

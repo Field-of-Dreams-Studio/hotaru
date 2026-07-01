@@ -16,11 +16,26 @@ The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represe
 
 MSRV: 1.86
 
+### Stability in 0.8.x
+
+The **tokio + HTTP** stack (default features `trans`, `http`, `tokio`) is the tested, supported path and is safe for production use today.
+
+Everything else is **experimental** and will stabilize by 0.8.7:
+
+- `RuntimeSpec` trait surface (currently only `hotaru_rt_tokio` implements it; other runtime backends are planned, not shipped)
+- `no_std` builds of `hotaru_core` (Cortex-M / RISC-V bare-metal, CI-verified but not yet exercised by a real embedded backend)
+- IO adapter crates `hotaru_io_futures` and `hotaru_io_embedded` (ship as crates but have had limited real-world use)
+- Embassy runtime backend (planned)
+
+If you are shipping something now, stick with the `tokio` default and revisit the experimental paths as they land.
+
 ## Key Features
 
-- **Multi-Protocol**: HTTP/1.1, HTTPS (TLS), and custom TCP protocols on one server via the `Protocol` trait
+<!--TODO: Make sure change this in 0.8.7-->
+
+- **Multi-Protocol**: HTTP/1.1 and HTTPS (TLS) ship out of the box. The `Protocol` trait is an open extension point for custom TCP-based protocols (WebSocket, MQTT, and other frames), though no non-HTTP protocol ships in this workspace today
 - **Server + Client**: Endpoints for inbound traffic, outpoints for outbound. Same protocol trait, same routing, same middleware
-- **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships by default via `hotaru_rt_tokio`; other backends plug in via sibling crates
+- **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships today via `hotaru_rt_tokio` (the only runtime backend so far); other runtimes can plug in via the same sibling-crate pattern. IO adapters are further along, with `hotaru_io_tokio`, `hotaru_io_futures`, and `hotaru_io_embedded` already shipping
 - **`no_std`-Ready Core**: `hotaru_core` builds bare-metal on Cortex-M4/M7 and RISC-V (with atomics) under `alloc`. CI verified on `thumbv7em-none-eabihf` and `riscv32imac-unknown-none-elf`
 - **Sync main**: `fn main() { run_server!(APP); }`. No `async fn main`, no `#[tokio::main]`
 - **Ergonomic Macros**: `endpoint!` / `outpoint!` / `middleware!` DSL in three flavors (`trans`, `semi-trans`, `attr`)
