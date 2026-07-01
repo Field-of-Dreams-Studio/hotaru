@@ -98,4 +98,5 @@ pub use hrt::ctor as hrt_ctor;
 #[cfg(feature = "http")]
 pub use ahttpm;
 
+#[cfg(feature = "lib")]
 pub use hotaru_lib;
