@@ -1,18 +1,18 @@
 [package]
 name = "ahttpm"
-version = "0.7.0" 
+version = "0.7.1" 
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"] 
 description = "Akari template / JSON helper macros for the Hotaru web framework"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
-categories = ["network-programming", "web-programming::http-server"]
-keywords = ["hotaru", "akari", "macros", "templates"]
+categories = ["template-engine", "development-tools::procedural-macro-helpers", "web-programming::http-server"]
+keywords = ["hotaru", "akari", "macros", "templates", "json"]
 
 [dependencies] 
-syn = { version = "2.0", features = ["full"] } 
-proc-macro2 = "1.0.89" 
+syn = { version = "2", features = ["full"] } 
+proc-macro2 = "1" 
 ctor = "0.4.0" 
 quote = "1.0" 
 

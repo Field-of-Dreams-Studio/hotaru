@@ -5,12 +5,13 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf, ReadHalf, WriteHalf};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream as ClientTlsStream;
 use tokio_rustls::server::TlsStream as ServerTlsStream;
 
-use hotaru_core::connection::{ConnMeta, ConnStream};
+use hotaru_core::connection::{ConnMeta, ConnStream, HotaruRead, HotaruWrite};
+use hotaru_io_tokio::TokioIo;
 
 /// Connection metadata captured at split-time for TLS streams.
 pub struct TlsMeta {
@@ -99,9 +100,51 @@ impl AsyncWrite for TlsStream {
     }
 }
 
+impl HotaruRead for TlsStream {
+    type Error = std::io::Error;
+    type Buffered = TokioIo<tokio::io::BufReader<Self>>;
+
+    fn into_buf(self) -> Self::Buffered {
+        TokioIo::new(tokio::io::BufReader::new(self))
+    }
+
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        AsyncReadExt::read(self, buf).await
+    }
+
+    async fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        AsyncReadExt::read_exact(self, buf).await.map(|_| ())
+    }
+}
+
+impl HotaruWrite for TlsStream {
+    type Error = std::io::Error;
+    type Buffered = TokioIo<tokio::io::BufWriter<Self>>;
+
+    fn into_buf_write(self) -> Self::Buffered {
+        TokioIo::new(tokio::io::BufWriter::new(self))
+    }
+
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        AsyncWriteExt::write(self, buf).await
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        AsyncWriteExt::flush(self).await
+    }
+
+    async fn shutdown(&mut self) -> Result<(), Self::Error> {
+        AsyncWriteExt::shutdown(self).await
+    }
+
+    async fn write_all(&mut self, buf: &[u8]) -> Result<(), Self::Error> {
+        AsyncWriteExt::write_all(self, buf).await
+    }
+}
+
 impl ConnStream for TlsStream {
-    type ReadHalf = ReadHalf<TlsStream>;
-    type WriteHalf = WriteHalf<TlsStream>;
+    type ReadHalf = TokioIo<tokio::io::ReadHalf<TlsStream>>;
+    type WriteHalf = TokioIo<tokio::io::WriteHalf<TlsStream>>;
     type Meta = TlsMeta;
 
     fn split(self) -> (Self::ReadHalf, Self::WriteHalf, Self::Meta) {
@@ -114,25 +157,27 @@ impl ConnStream for TlsStream {
                 .map(|certs| Arc::from(certs.to_vec().into_boxed_slice())),
         };
         let meta = TlsMeta {
-            local: self.local_addr().ok(),
-            remote: self.peer_addr().ok(),
+            local: self.local_addr(),
+            remote: self.peer_addr(),
             peer_certificates,
         };
         let (r, w) = tokio::io::split(self);
-        (r, w, meta)
+        (TokioIo::new(r), TokioIo::new(w), meta)
     }
 
-    fn peer_addr(&self) -> std::io::Result<SocketAddr> {
+    fn peer_addr(&self) -> Option<SocketAddr> {
         match self {
             TlsStream::Client(s) => s.get_ref().0.peer_addr(),
             TlsStream::Server(s) => s.get_ref().0.peer_addr(),
         }
+        .ok()
     }
 
-    fn local_addr(&self) -> std::io::Result<SocketAddr> {
+    fn local_addr(&self) -> Option<SocketAddr> {
         match self {
             TlsStream::Client(s) => s.get_ref().0.local_addr(),
             TlsStream::Server(s) => s.get_ref().0.local_addr(),
         }
+        .ok()
     }
 }

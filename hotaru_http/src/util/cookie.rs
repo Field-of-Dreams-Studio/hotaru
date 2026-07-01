@@ -140,6 +140,48 @@ impl IntoIterator for CookieMap {
     }
 }
 
+/// The SameSite attribute of a cookie, controlling whether it is sent
+/// with cross-site requests.
+///
+/// Note: per the spec, `SameSite=None` is only honored by browsers when
+/// the cookie is also marked `Secure`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SameSite {
+    Strict,
+    Lax,
+    None,
+}
+
+impl SameSite {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SameSite::Strict => "Strict",
+            SameSite::Lax => "Lax",
+            SameSite::None => "None",
+        }
+    }
+
+    /// Parses a SameSite attribute value case-insensitively.
+    /// Returns `Option::None` for unrecognized values.
+    pub fn parse(s: &str) -> Option<Self> {
+        if s.eq_ignore_ascii_case("strict") {
+            Some(SameSite::Strict)
+        } else if s.eq_ignore_ascii_case("lax") {
+            Some(SameSite::Lax)
+        } else if s.eq_ignore_ascii_case("none") {
+            Some(SameSite::None)
+        } else {
+            None
+        }
+    }
+}
+
+impl std::fmt::Display for SameSite {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cookie {
     pub value: String,
@@ -149,6 +191,7 @@ pub struct Cookie {
     pub max_age: Option<String>,
     pub secure: Option<bool>,
     pub http_only: Option<bool>,
+    pub same_site: Option<SameSite>,
 }
 
 impl Cookie {
@@ -170,6 +213,7 @@ impl Cookie {
             max_age: None,
             secure: None,
             http_only: None,
+            same_site: None,
         }
     }
 
@@ -247,6 +291,13 @@ impl Cookie {
                     "domain" => cookie.set_domain(attr_value),
                     "expires" => cookie.set_expires(attr_value),
                     "max-age" => cookie.set_max_age(attr_value),
+                    "samesite" => {
+                        // Unrecognized SameSite values are ignored, matching
+                        // the treatment of unknown attributes below.
+                        if let Some(same_site) = SameSite::parse(attr_value) {
+                            cookie.set_same_site(same_site);
+                        }
+                    }
                     _ => {} // Ignore unknown attributes
                 }
             }
@@ -378,6 +429,27 @@ impl Cookie {
         self.http_only = None;
     }
 
+    /// Sets the SameSite attribute, controlling whether the cookie is
+    /// sent with cross-site requests.
+    pub fn same_site(self, same_site: SameSite) -> Self {
+        Self {
+            same_site: Some(same_site),
+            ..self
+        }
+    }
+
+    pub fn get_same_site(&self) -> Option<SameSite> {
+        self.same_site
+    }
+
+    pub fn set_same_site(&mut self, same_site: SameSite) {
+        self.same_site = Some(same_site);
+    }
+
+    pub fn clear_same_site(&mut self) {
+        self.same_site = None;
+    }
+
     /// Returns a string formatted for a Set-Cookie header including all attributes.
     ///
     /// # Returns
@@ -405,6 +477,9 @@ impl Cookie {
         }
         if let Some(ref max_age) = self.max_age {
             result.push_str(&format!("; Max-Age={}", max_age));
+        }
+        if let Some(ref same_site) = self.same_site {
+            result.push_str(&format!("; SameSite={}", same_site));
         }
         if let Some(ref secure) = self.secure {
             if *secure {

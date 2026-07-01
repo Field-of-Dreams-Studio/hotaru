@@ -1,0 +1,20 @@
+[package]
+name = "hotaru_io_futures"
+version = "0.8.3"
+edition = "2024"
+authors = ["Redstone <redstone@fds.moe>"]
+description = "futures-io adapter backend for Hotaru"
+license = "MIT"
+repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
+homepage = "https://hotaru.rs"
+categories = ["asynchronous", "network-programming"]
+keywords = ["hotaru", "futures-io", "io", "async", "adapter"]
+
+[dependencies]
+hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = false }
+futures-io = { version = "0.3", default-features = false }
+futures-util = { version = "0.3", default-features = false, features = ["io"] }
+
+[features]
+default = ["std"]
+std = ["hotaru_core/std", "hotaru_core/spawn_send"]

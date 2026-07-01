@@ -1,18 +1,23 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use akari::extensions::ParamsClone;
+use alloc::sync::Arc;
 use core::any::TypeId;
+use core::marker::PhantomData;
 use core::panic;
 use core::time::Duration;
-use std::sync::Arc;
 
+use crate::app::runtime::{Either, OnceCellCap, RuntimeSpec};
 use crate::executable::ExecutableBinding;
+use crate::marker::MaybeSend;
 use crate::{debug_error, debug_log, debug_warn};
 
 use crate::connection::{Inbound, TransportSpec};
 use crate::protocol::{Protocol, RequestContext};
 use crate::url::{PathPattern, UrlError, node::StepName};
 
-pub use crate::executable::ProtocolRegistryBuilder;
 pub use crate::app::registry::ProtocolRegistryKind;
+pub use crate::executable::ProtocolRegistryBuilder;
 
 // use super::middleware::AsyncMiddleware;
 pub use super::common::builder::AppBuilder;
@@ -22,17 +27,18 @@ use super::common::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
 // type Job = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 /// Server runtime for inbound protocol traffic.
-pub struct Server<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
-    pub registry: ProtocolRegistryKind<TS>, 
+pub struct Server<TS: TransportSpec, Rt: RuntimeSpec> {
+    pub registry: ProtocolRegistryKind<TS>,
     pub binding: <TS::Inbound as Inbound>::BindTarget,
-    pub inbound: tokio::sync::OnceCell<Arc<TS::Inbound>>,
+    pub inbound: <Rt as RuntimeSpec>::OnceCell<Arc<TS::Inbound>>,
     pub runtime: Arc<RuntimeConfig>,
     pub config: OperationalConfig,
+    pub(crate) _rt: PhantomData<fn() -> Rt>,
 }
 
-impl<TS: TransportSpec> Server<TS> {
+impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
     /// Creates a server builder whose terminal method is `build()`.
-    pub fn new() -> AppBuilder<ServerRole, TS> {
+    pub fn new() -> AppBuilder<ServerRole, TS, Rt> {
         AppBuilder::new()
     }
 
@@ -126,7 +132,8 @@ impl<TS: TransportSpec> Server<TS> {
         } else {
             url.split('/').map(PathPattern::literal_path).collect()
         };
-        self.registry.register::<P, _>(name, path, StepName::default(), executable, config)?;
+        self.registry
+            .register::<P, _>(name, path, StepName::default(), executable, config)?;
         Ok(())
     }
 
@@ -149,8 +156,10 @@ impl<TS: TransportSpec> Server<TS> {
         if executable.has_no_middlewares() {
             executable.set_middlewares(self.registry.get_protocol_middlewares::<P>());
         }
-        let (path, step_names) = crate::url::parser::parse(url.as_ref())?;
-        self.registry.register::<P, _>(name, path, step_names.into(), executable, config)?;
+        let tokens = P::tokenize_url(url.as_ref())?;
+        let (path, step_names) = crate::url::tokens_to_patterns(&tokens)?;
+        self.registry
+            .register::<P, _>(name, path, step_names.into(), executable, config)?;
         Ok(())
     }
 
@@ -174,15 +183,20 @@ impl<TS: TransportSpec> Server<TS> {
             TimeoutSetting::Fixed(d) => Some(d),
         };
         let app = self.clone();
-        tokio::spawn(async move {
+        Rt::spawn_detached(async move {
             match timeout {
                 None => {
                     self.registry.serve(app.runtime.clone(), conn).await;
                 }
                 Some(duration) => {
-                    tokio::select! {
-                        _ = self.registry.serve(app.runtime.clone(), conn) => {},
-                        _ = tokio::time::sleep(duration) => {
+                    match Rt::select2(
+                        self.registry.serve(app.runtime.clone(), conn),
+                        Rt::sleep(duration),
+                    )
+                    .await
+                    {
+                        Either::Left(_) => {}
+                        Either::Right(_) => {
                             debug_warn!("⚠️ Connection timed out after {:?}", duration);
                         }
                     }
@@ -191,49 +205,72 @@ impl<TS: TransportSpec> Server<TS> {
         });
     }
 
-    /// Run the application with its own dedicated tokio runtime
+    /// Run the application until this runtime's default stop condition fires.
     ///
-    /// This method creates a new multi-threaded tokio runtime with the number of worker threads
-    /// specified by the `worker` field (set via `AppBuilder::worker()`). Each Server instance
-    /// runs with its own independent runtime and thread pool.
-    ///
-    /// Note: This can be called from within an async context. The worker thread configuration
-    /// of any outer runtime does not affect the Server's internal worker thread count.
+    /// `run()` is executor-neutral: it does not create a Tokio runtime or any
+    /// other executor. The caller (or a future `hotaru::main` macro) is
+    /// responsible for driving this future. For Tokio, the default stop
+    /// condition is Ctrl+C; for runtimes without a default stop source it may
+    /// be `pending()` forever.
     ///
     /// Example:
-    /// ```no_run
+    /// ```ignore
     /// use hotaru_core::app::server::Server;
-    /// use hotaru_core::connection::tcp::TcpTransport;
+    /// use hotaru_io_tokio::TcpTransport;
+    /// use hotaru_rt_tokio::TokioRuntime;
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let app = Server::<TcpTransport>::new()
+    ///     let app = Server::<TcpTransport, TokioRuntime>::new()
     ///         .worker(4)  // Server will use 4 worker threads
     ///         .build();
     ///     app.run().await;
     /// }
     /// ```
     pub async fn run(self: Arc<Self>) {
-        let worker_count = self.config.worker();
-        let app = self.clone();
+        self.run_until(Rt::default_stop()).await;
+    }
 
-        println!("Starting Hotaru server");
+    /// Run the application until `stop` resolves.
+    ///
+    /// This is the runtime-neutral accept loop. It uses `Rt::select2`,
+    /// `Rt::sleep`, and `Rt::spawn_detached`; no Tokio APIs are referenced.
+    /// Provide any stop source you want: OS signal, board interrupt, supervisor
+    /// message, deadline, or `core::future::pending()` for never-stop service.
+    pub async fn run_until<S>(self: Arc<Self>, stop: S)
+    where
+        S: core::future::Future<Output = ()> + MaybeSend,
+    {
+        let inbound = self
+            .ensure_inbound()
+            .await
+            .unwrap_or_else(|_| panic!("Failed to bind inbound transport"))
+            .clone();
 
-        // Spawn a blocking task to create and run the runtime
-        // This allows the runtime to be created from within an async context
-        tokio::task::spawn_blocking(move || {
-            // Create a new multi-threaded runtime with the specified worker threads
-            let runtime = tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(worker_count)
-                .enable_all()
-                .build()
-                .expect("Failed to create tokio runtime");
+        debug_log!("Inbound transport bound");
 
-            // Run the actual server logic within this runtime
-            runtime.block_on(app.run_app_loop());
-        })
-        .await
-        .expect("Runtime task panicked");
+        let mut stop = core::pin::pin!(stop);
+
+        loop {
+            match Rt::select2(inbound.accept(), &mut stop).await {
+                Either::Left(Ok(conn)) => {
+                    debug_log!("Accepted inbound wire");
+                    Arc::clone(&self).handle_wire(conn);
+                }
+                Either::Left(Err(_e)) => {
+                    if self.get_mode() == RunMode::Build {
+                        debug_error!("Failed to accept connection: {_e}");
+                    }
+                }
+                Either::Right(()) => {
+                    debug_log!("Shutting down server...");
+                    break;
+                }
+            }
+        }
+
+        Rt::sleep(Duration::from_secs(1)).await;
+        debug_log!("Server shutdown complete");
     }
 
     /// Synthetically invoke a registered endpoint by name. Builds a fresh
@@ -275,58 +312,68 @@ impl<TS: TransportSpec> Server<TS> {
     }
 
     /// Returns the `TS::Inbound` instance, binding on first use.
-    pub async fn ensure_inbound(&self) -> std::io::Result<&Arc<TS::Inbound>> {
+    pub async fn ensure_inbound(&self) -> Result<&Arc<TS::Inbound>, TS::IoError> {
         self.inbound
             .get_or_try_init(|| async {
                 Ok(Arc::new(TS::Inbound::bind(self.binding.clone()).await?))
             })
             .await
     }
+}
 
-    /// Internal application loop - listens for and handles connections
-    async fn run_app_loop(self: Arc<Self>) {
-        let inbound = self
-            .ensure_inbound()
-            .await
-            .unwrap_or_else(|_| panic!("Failed to bind inbound transport"))
-            .clone();
+// ============================================================================
+// Sync-entry helpers behind the `run_server*!` macros.
+//
+// - `run_server` / `run_server_until` — build the runtime, block the current
+//   thread (require `BlockingRuntimeCap`).
+// - `run_server_no_block` / `run_server_no_block_until` — spawn detached on
+//   the *already-running* runtime.
+// ============================================================================
 
-        debug_log!("Inbound transport bound");
+use crate::app::runtime::BlockingRuntimeCap;
 
-        // Create a signal handler for clean shutdown
-        let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+/// Blocks until `Rt::default_stop()` fires (Ctrl+C under tokio).
+pub fn run_server<TS, Rt>(server: Arc<Server<TS, Rt>>)
+where
+    TS: TransportSpec,
+    Rt: BlockingRuntimeCap,
+{
+    Rt::block_on(async move {
+        server.run_until(Rt::default_stop()).await;
+    });
+}
 
-        // Handle Ctrl+C for clean shutdown
-        tokio::spawn(async move {
-            if let Ok(_) = tokio::signal::ctrl_c().await {
-                debug_log!("Received shutdown signal");
-                let _ = shutdown_tx.send(());
-            }
-        });
+/// Blocks until user-supplied `stop` future resolves.
+pub fn run_server_until<TS, Rt, S>(server: Arc<Server<TS, Rt>>, stop: S)
+where
+    TS: TransportSpec,
+    Rt: BlockingRuntimeCap,
+    S: core::future::Future<Output = ()> + MaybeSend + 'static,
+{
+    Rt::block_on(async move {
+        server.run_until(stop).await;
+    });
+}
 
-        loop {
-            tokio::select! {
-                accept_result = inbound.accept() => {
-                    match accept_result {
-                        Ok(conn) => {
-                            debug_log!("Accepted inbound wire");
-                            Arc::clone(&self).handle_wire(conn);
-                        }
-                        Err(_e) => {
-                            if self.get_mode() == RunMode::Build{
-                                debug_error!("Failed to accept connection: {_e}");
-                            }
-                        }
-                    }
-                }
-                _ = &mut shutdown_rx => {
-                    debug_log!("Shutting down server...");
-                    break;
-                }
-            }
-        }
+/// Fire-and-forget on the active runtime; uses `Rt::default_stop()`.
+pub fn run_server_no_block<TS, Rt>(server: Arc<Server<TS, Rt>>)
+where
+    TS: TransportSpec,
+    Rt: RuntimeSpec,
+{
+    Rt::spawn_detached(async move {
+        server.run_until(Rt::default_stop()).await;
+    });
+}
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
-        debug_log!("Server shutdown complete");
-    }
+/// Fire-and-forget on the active runtime with user-supplied stop.
+pub fn run_server_no_block_until<TS, Rt, S>(server: Arc<Server<TS, Rt>>, stop: S)
+where
+    TS: TransportSpec,
+    Rt: RuntimeSpec,
+    S: core::future::Future<Output = ()> + MaybeSend + 'static,
+{
+    Rt::spawn_detached(async move {
+        server.run_until(stop).await;
+    });
 }

@@ -21,17 +21,15 @@ pub trait RequestContext: Default + Send + 'static {
     /// The error type produced by middleware, handlers, and the protocol
     /// that owns this context.
     ///
-    /// The `From<std::io::Error>` bound is universal: the client path
-    /// touches transport-level I/O (`Outbound::build`, `Outbound::connect`)
-    /// which surfaces `std::io::Error`, and every protocol's error type
-    /// has to absorb that to propagate cleanly through the chain. Making
-    /// the bound part of the trait keeps it off every Client method's
-    /// where-clause.
+    /// The transport-IO conversion bound (`From<<TS as TransportSpec>::IoError>`)
+    /// lives on `Protocol`, not here — `RequestContext` doesn't know which
+    /// `TransportSpec` it'll be paired with. Standalone uses (middleware,
+    /// tests, dyn-erased handlers) carry just `ProtocolError`.
     ///
     /// If you don't want to define your own error type, use
     /// [`EmptyError`](crate::protocol::EmptyError) — a zero-payload
     /// stand-in that already satisfies every bound.
-    type Error: ProtocolError + From<std::io::Error>;
+    type Error: ProtocolError;
 
     /// Type-system anchor for the channel of the current exchange. No
     /// accessor is exposed on this trait; the matching `Protocol` impl
@@ -52,4 +50,34 @@ pub trait RequestContext: Default + Send + 'static {
     /// Consume the context and return its response. Called by
     /// `Client::request_fn` / `Server::request_fn` after the chain finishes.
     fn into_response(self) -> Self::Response;
+}
+
+// ----------------------------------------------------------------------------
+// EndpointOutcome Trait
+// ----------------------------------------------------------------------------
+
+/// Normalizes whatever an `endpoint!` body evaluates to into an effect on the
+/// context. Endpoint's type-directed counterpart to `Protocol::send`:
+/// implementations are per `(context, body-return-type)` pair, so each protocol
+/// decides which endpoint return values it accepts.
+pub trait EndpointOutcome<C: RequestContext> {
+    fn apply_to(self, ctx: &mut C) -> Result<(), C::Error>;
+}
+
+/// Inbound / no-response endpoints: nothing to store.
+impl<C: RequestContext> EndpointOutcome<C> for () {
+    fn apply_to(self, _ctx: &mut C) -> Result<(), C::Error> {
+        Ok(())
+    }
+}
+
+/// Fallible endpoints: short-circuit on `Err`, otherwise apply the inner value.
+impl<C, O> EndpointOutcome<C> for Result<O, C::Error>
+where
+    C: RequestContext,
+    O: EndpointOutcome<C>,
+{
+    fn apply_to(self, ctx: &mut C) -> Result<(), C::Error> {
+        self?.apply_to(ctx)
+    }
 }

@@ -7,15 +7,15 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use hotaru_core::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, Outbound, TransportSpec},
-    protocol::{Channel, CtxError, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext},
+    connection::{ConnStream, HotaruRead, HotaruWrite, Outbound, TransportSpec},
+    protocol::{
+        Channel, CtxError, Protocol, ProtocolError, ProtocolFlow, ProtocolRole, RequestContext,
+    },
     url::UrlRoot,
 };
-use tokio::io::BufReader;
-use tokio::net::TcpStream;
+use hotaru_io_tokio::TcpStream;
 
 use crate::{
     channel::{Http1Channel, HttpChannel},
@@ -32,7 +32,7 @@ use crate::{
 // ============================================================================
 
 /// Default transport spec used by HTTP when callers don't specify one.
-pub type DefaultHttpTransport = hotaru_core::connection::tcp::TcpTransport;
+pub type DefaultHttpTransport = hotaru_io_tokio::TcpTransport;
 
 /// Default HTTP protocol (currently HTTP/1.1)
 /// This provides a simpler name for user-facing code while maintaining
@@ -58,16 +58,15 @@ pub type HTTPS = Http1TlsProtocol;
 
 /// HTTP/1.1 protocol handler.
 ///
-/// Implements the Protocol trait for HTTP/1.1, handling both
-/// server and client roles.
-///
-/// Generic over the concrete wire stream type so the same logic can be used
-/// for TCP and TLS transports without duplicating protocol code.
+/// Generic over the concrete wire stream type so the same logic serves TCP
+/// and TLS transports. Owns the per-instance `HttpSafety` baseline as an
+/// `Arc` so per-connection clones are an atomic bump.
 pub struct Http1Protocol<
     W: ConnStream = TcpStream,
     TS: TransportSpec<Wire = W> = DefaultHttpTransport,
 > {
     role: ProtocolRole,
+    safety: Arc<HttpSafety>,
     _wire: PhantomData<fn() -> W>,
     _ts: PhantomData<fn() -> TS>,
 }
@@ -76,6 +75,7 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Clone for Http1Protocol<W, TS> 
     fn clone(&self) -> Self {
         Self {
             role: self.role,
+            safety: self.safety.clone(),
             _wire: PhantomData,
             _ts: PhantomData,
         }
@@ -83,27 +83,29 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Clone for Http1Protocol<W, TS> 
 }
 
 impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
-    /// Creates a new HTTP/1.1 protocol handler for server role.
-    ///
-    /// The `_safety` parameter is accepted for API compatibility; the live
-    /// `HttpSafety` used per request comes from `RuntimeConfig`.
-    pub fn server(_safety: HttpSafety) -> Self {
+    /// Server role with `safety` as the per-connection baseline.
+    pub fn server(safety: HttpSafety) -> Self {
         Self {
             role: ProtocolRole::Server,
+            safety: Arc::new(safety),
             _wire: PhantomData,
             _ts: PhantomData,
         }
     }
 
-    /// Creates a new HTTP/1.1 protocol handler for client role.
-    ///
-    /// See [`server`](Self::server) regarding `_safety`.
-    pub fn client(_safety: HttpSafety) -> Self {
+    /// Client role with `safety` as the per-connection baseline.
+    pub fn client(safety: HttpSafety) -> Self {
         Self {
             role: ProtocolRole::Client,
+            safety: Arc::new(safety),
             _wire: PhantomData,
             _ts: PhantomData,
         }
+    }
+
+    /// Borrows this protocol's safety baseline.
+    pub fn safety(&self) -> &HttpSafety {
+        &self.safety
     }
 }
 
@@ -111,8 +113,12 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Http1Protocol<W, TS> {
 // Protocol trait implementation
 // ============================================================================
 
-#[async_trait]
-impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, TS> {
+impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, TS>
+where
+    HttpError: From<<TS as TransportSpec>::IoError>,
+    W::ReadHalf: HotaruRead<Error = std::io::Error>,
+    W::WriteHalf: HotaruWrite<Error = std::io::Error>,
+{
     type Wire = W;
     type TS = TS;
     type Channel = Http1Channel<W>;
@@ -126,6 +132,19 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
 
     fn role(&self) -> ProtocolRole {
         self.role
+    }
+
+    fn lit_parser<'a>(input: &'a str) -> Vec<&'a str> {
+        // Mirrors UrlRoot::walk_str: empty input goes to the root
+        // endpoint slot (returned via an empty segment vec), everything
+        // else splits on '/' preserving empties so "/foo" walks as
+        // ["", "foo"] and matches the leading Literal("") that the
+        // pattern parser emits for a leading '/'.
+        if input.is_empty() {
+            Vec::new()
+        } else {
+            input.split('/').collect()
+        }
     }
 
     fn detect(initial_bytes: &[u8]) -> bool {
@@ -142,11 +161,12 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
 
     fn open_channel(
         self,
-        reader: BufReader<<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf>,
-        writer: <<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf,
+        reader: <<<Self::TS as TransportSpec>::Wire as ConnStream>::ReadHalf as HotaruRead>::Buffered,
+        writer: <<<Self::TS as TransportSpec>::Wire as ConnStream>::WriteHalf as HotaruWrite>::Buffered,
         meta: <<Self::TS as TransportSpec>::Wire as ConnStream>::Meta,
     ) -> Self::Channel {
-        Http1Channel::new(reader, writer, meta)
+        let safety = self.safety.clone();
+        Http1Channel::new(reader, writer, meta, safety)
     }
 
     async fn handle(
@@ -154,10 +174,9 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         runtime: Arc<RuntimeConfig>,
         root: Arc<UrlRoot<Self::Context, Self::TS>>,
     ) -> Result<ProtocolFlow, <Self::Context as RequestContext>::Error> {
-        let safety = runtime.get_config::<HttpSafety>().unwrap_or_default();
-
-        // 1. Parse one request.
-        let request = channel.parse_request(&safety).await?;
+        // 1. Parse one request using the channel-stored safety baseline
+        //    (no per-request HashMap lookup against RuntimeConfig).
+        let request = channel.parse_request(channel.safety()).await?;
         let keep_alive = is_keep_alive(&request);
 
         // 2. Walk URL tree.
@@ -167,29 +186,44 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
             None => {
                 // No route: send 404 and decide based on keep-alive.
                 channel.send_response(not_found_response()).await?;
-                return Ok(if keep_alive { ProtocolFlow::Continue } else { ProtocolFlow::Close });
+                return Ok(if keep_alive {
+                    ProtocolFlow::Continue
+                } else {
+                    ProtocolFlow::Close
+                });
             }
         };
 
         // 3. Build context, run chain. Addresses come from the channel's meta.
+        //    Seed ctx.safety from the protocol baseline so endpoint overrides
+        //    overlay on top of it instead of falling back to defaults.
         let mut ctx = HttpContext::new_server(
             runtime.clone(),
             endpoint.clone(),
             request,
             channel.remote_addr(),
             channel.local_addr(),
+            channel.safety().clone(),
         );
         ctx.install_channel(channel.clone());
 
         match endpoint.run(ctx).await {
             Ok(ctx) => {
                 channel.send_response(ctx.response).await?;
-                Ok(if keep_alive { ProtocolFlow::Continue } else { ProtocolFlow::Close })
+                Ok(if keep_alive {
+                    ProtocolFlow::Continue
+                } else {
+                    ProtocolFlow::Close
+                })
             }
             Err(err) if err.can_continue() => {
                 // Recoverable: map error to a response and keep going.
                 channel.send_response(error_response_from(&err)).await?;
-                Ok(if keep_alive { ProtocolFlow::Continue } else { ProtocolFlow::Close })
+                Ok(if keep_alive {
+                    ProtocolFlow::Continue
+                } else {
+                    ProtocolFlow::Close
+                })
             }
             Err(_) => Ok(ProtocolFlow::Close),
         }
@@ -204,31 +238,28 @@ impl<W: ConnStream, TS: TransportSpec<Wire = W>> Protocol for Http1Protocol<W, T
         // `self.pool` field without changing this signature.
         let wire = outbound.connect().await?;
         let (read, write, meta) = wire.split();
-        let reader = BufReader::new(read);
-        Ok(self.clone().open_channel(reader, write, meta))
+        let reader = read.into_buf();
+        let writer = write.into_buf_write();
+        Ok(Http1Channel::new(reader, writer, meta, self.safety.clone()))
     }
 
     async fn send(
         mut ctx: Self::Context,
     ) -> Result<Self::Context, <Self::Context as RequestContext>::Error> {
-        let channel = ctx
-            .channel()
-            .cloned()
-            .ok_or_else(|| HttpError::ProtocolViolation("outpoint channel is not installed".to_string()))?;
+        let channel = ctx.channel().cloned().ok_or_else(|| {
+            HttpError::ProtocolViolation("outpoint channel is not installed".to_string())
+        })?;
 
         let safety = ctx.safety.clone();
 
-        if ctx.request.meta.get_host().is_none() {
-            if let Some(host) = ctx.host.clone() {
-                ctx.request.meta.set_host(Some(host));
-            }
-        }
-
-        let request = std::mem::take(&mut ctx.request);
+        let request = ctx.take_request();
         channel.send_request(request).await?;
-        ctx.response = channel.parse_response(&safety).await?;
 
-        if !is_response_keep_alive(&ctx.response) {
+        let response = channel.parse_response(&safety).await?;
+        let keep_alive = is_response_keep_alive(&response);
+        ctx.set_response(response);
+
+        if !keep_alive {
             channel.close();
         }
         Ok(ctx)
@@ -262,15 +293,21 @@ mod tests {
     #[test]
     fn test_is_keep_alive() {
         let mut request = HttpRequest::default();
-        // No Connection header → HTTP/1.1 default keep-alive
+        // No Connection header -> HTTP/1.1 default keep-alive
         assert!(is_keep_alive(&request));
 
         // Connection: close
-        request.meta.header.insert("connection".to_string(), HeaderValue::Single("close".to_string()));
+        request.meta.header.insert(
+            "connection".to_string(),
+            HeaderValue::Single("close".to_string()),
+        );
         assert!(!is_keep_alive(&request));
 
         // Connection: keep-alive
-        request.meta.header.insert("connection".to_string(), HeaderValue::Single("keep-alive".to_string()));
+        request.meta.header.insert(
+            "connection".to_string(),
+            HeaderValue::Single("keep-alive".to_string()),
+        );
         assert!(is_keep_alive(&request));
     }
 
@@ -278,5 +315,42 @@ mod tests {
     fn test_not_found_response() {
         let resp = not_found_response();
         assert_eq!(resp.meta.start_line.status_code(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn pattern_and_literal_sides_align() {
+        use hotaru_core::url::tokens_to_patterns;
+
+        let tokens = HTTP::tokenize_url("/users/<int:id>").unwrap();
+        let (patterns, _names) = tokens_to_patterns(&tokens).unwrap();
+        let segments = HTTP::lit_parser("/users/42");
+
+        assert_eq!(
+            patterns.len(),
+            segments.len(),
+            "leading-slash arity mismatch"
+        );
+        for (pat, seg) in patterns.iter().zip(segments.iter()) {
+            assert!(
+                pat.matches(seg),
+                "pattern {:?} did not match segment {:?}",
+                pat,
+                seg
+            );
+        }
+    }
+
+    #[test]
+    fn root_slash_aligns() {
+        use hotaru_core::url::tokens_to_patterns;
+
+        let tokens = HTTP::tokenize_url("/").unwrap();
+        let (patterns, _) = tokens_to_patterns(&tokens).unwrap();
+        let segments = HTTP::lit_parser("/");
+
+        assert_eq!(patterns.len(), segments.len());
+        for (pat, seg) in patterns.iter().zip(segments.iter()) {
+            assert!(pat.matches(seg));
+        }
     }
 }

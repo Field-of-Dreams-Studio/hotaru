@@ -1,9 +1,12 @@
 pub mod cookie_session;
+pub mod cookie_session_settings;
 pub mod session;
 pub mod session_counter;
 
 pub use self::cookie_session::CSessionRW;
 pub use self::cookie_session::CookieSession;
+pub use self::cookie_session::SessionSecret;
+pub use self::cookie_session_settings::{CookieSecurity, CookieSessionSettings};
 
 pub use self::session::Session;
 pub use self::session::SessionCont;

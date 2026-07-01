@@ -1,5 +1,7 @@
-use core::{future::Future, pin::Pin, slice::Iter};
-use std::sync::Arc;
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
+use alloc::sync::Arc;
+use core::slice::Iter;
 
 use akari::extensions::ParamsClone;
 
@@ -8,6 +10,7 @@ use crate::{
     connection::TransportSpec,
     debug_log,
     executable::ExecutableBinding,
+    marker::MaybeSendBoxFuture,
     protocol::RequestContext,
     url::{Children, PathPattern, UrlError},
 };
@@ -27,7 +30,7 @@ use super::{
 /// HTTP `"/"` is NOT the root endpoint. It is registered as a two-level
 /// `[Literal(""), Literal("")]` tree node so that `"/"` and `""` remain
 /// distinct routes.
-pub struct RootNode<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct RootNode<C: RequestContext, TS: TransportSpec> {
     children: Children<C, TS>,
     endpoint: PRwLock<Option<Arc<UrlNode<C, TS>>>>,
 }
@@ -54,7 +57,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
     }
 
     /// Returns a cloned `Arc` of the current root endpoint node, if the
-    /// slot is populated. Used by [`AccessPoint::resolve`] to follow the
+    /// slot is populated. Used by [`AccessPoint::resolve`](crate::executable::access::access_point::AccessPoint::resolve) to follow the
     /// `PRwLock` indirection for `UrlRegistration::Root` entries — every
     /// call reads the current slot, so root-endpoint rebinds are picked
     /// up automatically without explicit `refresh_path` notifications.
@@ -68,7 +71,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
     fn walk<'a>(
         self: Arc<Self>,
         mut path: Iter<'a, &str>,
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<UrlNode<C, TS>>>> + Send + 'a>> {
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
         let this_segment = match path.next() {
             Some(s) => *s,
             None => {
@@ -89,7 +92,11 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
                 };
 
                 if path.len() >= 1 && !child.path().is_any_path() {
-                    if let Some(result) = child.clone().walk(path.clone(), PartialState::NotStart).await {
+                    if let Some(result) = child
+                        .clone()
+                        .walk(path.clone(), PartialState::NotStart)
+                        .await
+                    {
                         return Some(result);
                     }
                 } else {
@@ -108,22 +115,19 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> RootNode<C, TS> {
 ///   segmentless root endpoint slot.  Only protocols that have a meaningful
 ///   empty-path concept (e.g. MQTT) use this variant.
 /// - `Node` — the path resolved to a tree node (includes HTTP `"/"`).
-pub enum UrlRegistration<
-    C: RequestContext,
-    TS: TransportSpec = crate::connection::tcp::TcpTransport,
-> {
+pub enum UrlRegistration<C: RequestContext, TS: TransportSpec> {
     Root(Arc<RootNode<C, TS>>),
     Node(Arc<UrlNode<C, TS>>),
-} 
+}
 
-impl<C: RequestContext + Send + 'static, TS: TransportSpec> Clone for UrlRegistration<C, TS> { 
+impl<C: RequestContext + Send + 'static, TS: TransportSpec> Clone for UrlRegistration<C, TS> {
     fn clone(&self) -> Self {
         match self {
             UrlRegistration::Root(root) => UrlRegistration::Root(root.clone()),
             UrlRegistration::Node(node) => UrlRegistration::Node(node.clone()),
         }
     }
-} 
+}
 
 /// Root wrapper for a URL tree.
 ///
@@ -136,7 +140,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> Clone for UrlRegistr
 /// `walk_str("")` returns the root endpoint (registered via `literal_url("")`).
 /// `walk_str("/")` walks the tree as `["", ""]` — it is a distinct node, never
 /// the root endpoint. Only the literal empty-string path maps to the root.
-pub struct UrlRoot<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct UrlRoot<C: RequestContext, TS: TransportSpec> {
     root: Arc<RootNode<C, TS>>,
 }
 
@@ -152,7 +156,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
     pub fn walk<'a>(
         &self,
         path: Iter<'a, &str>,
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<UrlNode<C, TS>>>> + Send + 'a>> {
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
         self.root.clone().walk(path)
     }
 
@@ -161,7 +165,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         &self,
         path: Iter<'a, &str>,
         max_depth: u32,
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<UrlNode<C, TS>>>> + Send + 'a>> {
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<UrlNode<C, TS>>>> {
         if path.len() > max_depth as usize {
             Box::pin(async { None })
         } else {
@@ -188,7 +192,12 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
     /// empty cursor; use `walk_str("")` for the root endpoint slot.
     //
     // TODO: `futures::Stream` wrapper once a fan-out protocol needs it.
-    #[av::ver(unstable, since = "0.8.1", note = "Resumable URL traversal — surface may change", date = "2026-05-25")]
+    #[av::ver(
+        unstable,
+        since = "0.8.1",
+        note = "Resumable URL traversal — surface may change",
+        date = "2026-05-25"
+    )]
     pub fn walk_cursor(&self, path: &str) -> super::node::WalkCursor<C, TS> {
         if path.is_empty() {
             return super::node::WalkCursor::empty();
@@ -283,7 +292,11 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
             .map(UrlRegistration::Node)
     }
 
-    #[av::ver(deprecated, since = "0.8.0", note = "Use `register` directly. Use url::parser::parse to parse patterns before calling `register`.")]
+    #[av::ver(
+        deprecated,
+        since = "0.8.0",
+        note = "Use `register` directly. Use url::parser::parse to parse patterns before calling `register`."
+    )]
     /// Registers a literal URL path and returns a [`UrlRegistration`].
     ///
     /// Only the empty string `""` maps to the root endpoint (`Root` variant).
@@ -309,7 +322,11 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
         self.register(path_vec, binding, params, StepName::default())
     }
 
-    #[av::ver(deprecated, since = "0.8.0", note = "Use `register` directly. Use url::parser::parse to parse patterns before calling `register`.")] 
+    #[av::ver(
+        deprecated,
+        since = "0.8.0",
+        note = "Use `register` directly. Use url::parser::parse to parse patterns before calling `register`."
+    )]
     /// Registers a URL using Hotaru pattern syntax and returns a [`UrlRegistration`].
     ///
     /// Accepts the full Hotaru pattern language (literals, `<name>`, `<type:name>`,
@@ -337,15 +354,16 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> Default for UrlRoot<
     fn default() -> Self {
         Self::new()
     }
-} 
+}
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use alloc::sync::Arc;
 
     use akari::extensions::ParamsClone;
 
     use crate::{
+        connection::test_support::TestTransport,
         executable::{ExecutableBinding, middleware::AsyncFinalHandler},
         protocol::{Channel, ProtocolRole},
         url::PathPattern,
@@ -357,7 +375,9 @@ mod tests {
     struct TestChannel;
 
     impl Channel for TestChannel {
-        fn is_open(&self) -> bool { true }
+        fn is_open(&self) -> bool {
+            true
+        }
         fn close(&self) {}
     }
 
@@ -380,6 +400,8 @@ mod tests {
         fn into_response(self) -> Self::Response {}
     }
 
+    type TestUrlRoot = UrlRoot<TestContext, TestTransport>;
+
     fn binding_with_handler() -> ExecutableBinding<TestContext> {
         let handler: Arc<dyn AsyncFinalHandler<TestContext>> =
             Arc::new(|ctx: TestContext| async move { Ok(ctx) });
@@ -388,7 +410,7 @@ mod tests {
 
     #[tokio::test]
     async fn literal_url_registers_direct_child() {
-        let root = Arc::new(UrlRoot::<TestContext>::new());
+        let root = Arc::new(TestUrlRoot::new());
         let reg = root
             .literal_url("/users", binding_with_handler(), ParamsClone::default())
             .unwrap();
@@ -405,7 +427,7 @@ mod tests {
 
     #[tokio::test]
     async fn literal_url_creates_empty_parents_for_deep_child() {
-        let root = Arc::new(UrlRoot::<TestContext>::new());
+        let root = Arc::new(TestUrlRoot::new());
         root.literal_url("/api/users", binding_with_handler(), ParamsClone::default())
             .unwrap();
 
@@ -419,7 +441,7 @@ mod tests {
 
     #[tokio::test]
     async fn later_registration_rebinds_existing_parent_and_preserves_children() {
-        let root = Arc::new(UrlRoot::<TestContext>::new());
+        let root = Arc::new(TestUrlRoot::new());
 
         root.literal_url(
             "/api/users/profile",
@@ -437,7 +459,7 @@ mod tests {
 
     #[tokio::test]
     async fn root_endpoint_is_empty_string_only() {
-        let root = Arc::new(UrlRoot::<TestContext>::new());
+        let root = Arc::new(TestUrlRoot::new());
 
         // Registering "" stores the handler in the root endpoint slot.
         let result = root
@@ -473,7 +495,7 @@ mod tests {
 
     #[tokio::test]
     async fn literal_empty_segment_route_wins_over_wildcard() {
-        let root = Arc::new(UrlRoot::<TestContext>::new());
+        let root = Arc::new(TestUrlRoot::new());
 
         root.literal_url("/", binding_with_handler(), ParamsClone::default())
             .unwrap();
@@ -491,7 +513,7 @@ mod tests {
 
     #[tokio::test]
     async fn walk_str_with_limit_rejects_deep_paths() {
-        let root = Arc::new(UrlRoot::<TestContext>::new());
+        let root = Arc::new(TestUrlRoot::new());
         root.literal_url(
             "/api/users/profile",
             binding_with_handler(),
@@ -514,7 +536,7 @@ mod tests {
 
     #[tokio::test]
     async fn sub_url_registers_pattern_path() {
-        let root = Arc::new(UrlRoot::<TestContext>::new());
+        let root = Arc::new(TestUrlRoot::new());
         let reg = root
             .sub_url(
                 "/users/<str:id>",
@@ -535,10 +557,13 @@ mod tests {
 
     #[tokio::test]
     async fn walk_cursor_yields_priority_ordered_matches() {
-        let root = Arc::new(UrlRoot::<TestContext>::new());
-        root.literal_url("/literal", binding_with_handler(), ParamsClone::default()).unwrap();
-        root.sub_url("/<slug>", binding_with_handler(), ParamsClone::default()).unwrap();
-        root.sub_url("/<**path>", binding_with_handler(), ParamsClone::default()).unwrap();
+        let root = Arc::new(TestUrlRoot::new());
+        root.literal_url("/literal", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+        root.sub_url("/<slug>", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+        root.sub_url("/<**path>", binding_with_handler(), ParamsClone::default())
+            .unwrap();
 
         let path = "/literal";
         let segments: Vec<&str> = path.split('/').collect();

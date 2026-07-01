@@ -2,6 +2,10 @@
 members = [
     "hotaru",
     "hotaru_core",
+    "hotaru_rt_tokio",
+    "hotaru_io_tokio",
+    "hotaru_io_futures",
+    "hotaru_io_embedded",
     "hotaru_trans",
     
     "hotaru_tls",
@@ -17,8 +21,33 @@ members = [
     # "multi_protocol_example",
     "example_hotaru",
     # "example_hotaru_2",
-    # "hyper_hotaru_example", 
+    # "hyper_hotaru_example",
     # "hotaru_style_guide",
-    # "tutorial_examples" 
-] 
-resolver = "3" 
+    # "tutorial_examples"
+]
+
+# `hotaru_io_embedded` now defaults to the `embedded`/`no_std` flavour, which
+# pulls `hotaru_core` + `akari` in a mode that is mutually exclusive with the
+# `std` crates. A single `cargo build`/`cargo check` unifies features across all
+# selected members, so co-building it with the std crates trips their
+# `std`-vs-`no_std` `compile_error!`s. Excluding it from the default build set
+# keeps a plain `cargo build` at the root green; build the embedded backend on
+# its own bare-metal target instead:
+#   cargo build -p hotaru_io_embedded --target thumbv7em-none-eabihf
+# (`--workspace` still co-selects everything and will conflict — that is
+# inherent to a mixed std/no_std workspace.)
+default-members = [
+    "hotaru",
+    "hotaru_core",
+    "hotaru_rt_tokio",
+    "hotaru_io_tokio",
+    "hotaru_io_futures",
+    "hotaru_trans",
+    "hotaru_tls",
+    "hotaru_http",
+    "hotaru_lib",
+    "ahttpm",
+    "htmstd",
+    "example_hotaru",
+]
+resolver = "3"

@@ -1,16 +1,18 @@
 //! Plain TCP transport policy.
 
-use tokio::net::TcpStream;
+use hotaru_core::connection::{Inbound, Outbound, TransportSpec};
 
-use crate::connection::{Inbound, Outbound, TransportSpec};
+use super::{
+    runtime::{TcpInbound, TcpOutbound},
+    stream::TcpStream,
+};
 
-use super::runtime::{TcpInbound, TcpOutbound};
-
-/// Plain TCP transport.
+/// Plain Tokio TCP transport.
 pub struct TcpTransport;
 
 impl TransportSpec for TcpTransport {
     type Wire = TcpStream;
+    type IoError = std::io::Error;
     type Inbound = TcpInbound;
     type Outbound = TcpOutbound;
 

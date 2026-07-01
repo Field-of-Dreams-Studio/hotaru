@@ -1,11 +1,10 @@
 use crate::extensions::{ParamValue, ParamsClone};
 use crate::{debug_log, debug_trace};
 use crate::connection::{RequestContext, TransportSpec};
+use crate::marker::MaybeSendBoxFuture;
 use crate::url::parser::parse;
-use core::future::Future;
-use core::pin::Pin;
 use core::slice::Iter;
-use std::sync::Arc;
+use alloc::sync::Arc;
 use crate::alias::PRwLock; 
 // pub static ROOT_URL: OnceLock<Url> = OnceLock::new();
 use crate::executable::{middleware::*, ExecutableBinding};
@@ -13,7 +12,7 @@ use super::{node::StepName, pattern::PathPattern};
 
 /// Represents a URL in the application.
 /// This struct holds the various components of a URL, including its path, query parameters, and more.
-pub struct Url<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct Url<C: RequestContext, TS: TransportSpec> {
     // The last segment of the URL path
     path: PathPattern,
 
@@ -40,7 +39,7 @@ pub struct Url<C: RequestContext, TS: TransportSpec = crate::connection::tcp::Tc
     // app_cache: PRwLock<Option<Arc<App<TS>>>>,
 }
 
-pub struct Children<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct Children<C: RequestContext, TS: TransportSpec> {
     // Private vec - only accessible through methods
     inner: Vec<Arc<Url<C, TS>>>,
 }
@@ -66,7 +65,7 @@ impl<C: RequestContext, TS: TransportSpec> Children<C, TS> {
         self.inner.len()
     }
 
-    /// Insert a child in priority order (Literal → Regex → Any → AnyPath)
+    /// Insert a child in priority order (Literal -> Regex -> Any -> AnyPath)
     /// This is the only way to add children, ensuring proper ordering
     pub(crate) fn insert_ordered(&mut self, child: Arc<Url<C, TS>>) {
         // Find insertion position based on priority
@@ -103,7 +102,7 @@ impl<C: RequestContext, TS: TransportSpec> Children<C, TS> {
     }
 }
 
-pub enum Ancestor<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub enum Ancestor<C: RequestContext, TS: TransportSpec> {
     Nil,
     // App(Arc<App<TS>>),
     Some(Arc<Url<C, TS>>),
@@ -179,7 +178,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
 
     /// Walk the URL tree based on the path segments.
     /// Returns Some(Arc<Self>) if a matching URL is found, otherwise None.
-    /// Uses backtracking with priority ordering: Literal → Regex → Any → AnyPath
+    /// Uses backtracking with priority ordering: Literal -> Regex -> Any -> AnyPath
     ///
     /// # Security Note: URL Depth Validation Not Required
     ///
@@ -214,7 +213,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
     pub fn walk<'a>(
         self: Arc<Self>,
         mut path: Iter<'a, &str>,
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<Self>>> + Send + 'a>> {
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<Self>>> {
 
         // Get the current segment to match
         let this_segment = match path.next() {
@@ -248,7 +247,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
 
         // Async portion: iterate through pre-ordered children with backtracking
         Box::pin(async move {
-            // Children are already ordered by priority: Literal → Regex → Any → AnyPath
+            // Children are already ordered by priority: Literal -> Regex -> Any -> AnyPath
             for child_url in children.iter() {
                 debug_trace!("walk: Comparing child path {:?} with segment '{}'", child_url.path, this_segment);
 
@@ -320,7 +319,7 @@ impl<C: RequestContext + 'static, TS: TransportSpec> Url<C, TS> {
     pub fn run_child(
         self: Arc<Self>,
         mut rc: C,
-    ) -> Pin<Box<dyn Future<Output = C> + Send>> {
+    ) -> MaybeSendBoxFuture<'static, C> {
         Box::pin(async move {
             let chain = {
                 let guard = self.binding.read();

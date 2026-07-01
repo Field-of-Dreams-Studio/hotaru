@@ -10,8 +10,8 @@ Proc-macro crate for the [Hotaru](../hotaru) web framework. Provides the macros 
 - `middleware!` — define an `AsyncMiddleware<C>` impl from a body that uses `req` + `next(req).await`.
 
 **Invocation (use at call sites):**
-- `run!(APP<P>::name, request)` → `APP.request_fn::<P>("name", request)` — one-shot outpoint request.
-- `call!(APP<P>::name)` → `APP.call_fn::<P>("name")` — spawn persistent outpoint loop. Also accepts `call!(APP<P>: "/path")` for the URL form.
+- `run!(APP<P>::name, request)` -> `APP.request_fn::<P>("name", request)` — one-shot outpoint request.
+- `call!(APP<P>::name)` -> `APP.call_fn::<P>("name")` — spawn persistent outpoint loop. Also accepts `call!(APP<P>: "/path")` for the URL form.
 
 **Lazy statics (one-line declarations):**
 - `LServer!(APP = Server::new()...build())` — `pub static APP: SServer = Lazy::new(...);`.

@@ -285,8 +285,9 @@ impl ConnectionBuilder {
 
     async fn try_connect(&self) -> Result<TcpOrTlsStream> {
         let addr = format!("{}:{}", self.host, self.port);
-        let tcp =
-            tokio::time::timeout(self.max_connection_time, TcpStream::connect(&addr)).await??;
+        let tcp = tokio::time::timeout(self.max_connection_time, TcpStream::connect(&addr))
+            .await
+            .map_err(|_| ConnectionError::ConnectionTimeout)??;
 
         if !self.use_tls {
             return Ok(TcpOrTlsStream::Tcp(tcp));

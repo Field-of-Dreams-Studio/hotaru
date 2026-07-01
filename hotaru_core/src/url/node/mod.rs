@@ -1,10 +1,13 @@
-use core::{future::Future, pin::Pin, slice::Iter};
-use std::sync::Arc;
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
+use alloc::sync::Arc;
+use core::slice::Iter;
 
 use crate::{
     connection::TransportSpec,
     executable::{ExecutableBinding, ExecutionChain},
     extensions::{ParamValue, ParamsClone},
+    marker::MaybeSendBoxFuture,
     protocol::RequestContext,
     url::PathPattern,
 };
@@ -21,7 +24,7 @@ pub use self::stepname::StepName;
 
 /// Represents a URL in the application.
 /// This struct holds the various components of a URL, including its path, query parameters, and more.
-pub struct UrlNode<C: RequestContext, TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct UrlNode<C: RequestContext, TS: TransportSpec> {
     // The last segment of the URL path
     path: PathPattern,
 
@@ -181,14 +184,14 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
     pub fn walk<'a>(
         self: Arc<Self>,
         mut path: Iter<'a, &str>,
-        mut state: PartialState 
-    ) -> Pin<Box<dyn Future<Output = Option<Arc<Self>>> + Send + 'a>> {
+        mut state: PartialState,
+    ) -> MaybeSendBoxFuture<'a, Option<Arc<Self>>> {
         let this_segment = match path.next() {
             Some(segment) => *segment,
             None => return Box::pin(async move { Some(self) }),
         };
 
-        Box::pin(async move { 
+        Box::pin(async move {
             while !state.is_end() {
                 let (matched_child, next_state) = self.children.match_step(this_segment, state);
                 state = next_state;
@@ -198,7 +201,11 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
                 };
 
                 if path.len() >= 1 && !child.path().is_any_path() {
-                    if let Some(result) = child.clone().walk(path.clone(), PartialState::NotStart).await {
+                    if let Some(result) = child
+                        .clone()
+                        .walk(path.clone(), PartialState::NotStart)
+                        .await
+                    {
                         return Some(result);
                     }
                 } else {
@@ -305,16 +312,16 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
         } else {
             ctx.handle_error();
             Ok(ctx)
-        } 
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use alloc::sync::Arc;
 
     use crate::{
-        connection::tcp::TcpTransport,
+        connection::test_support::TestTransport,
         protocol::{Channel, ProtocolRole},
         url::PathPattern,
     };
@@ -325,7 +332,9 @@ mod tests {
     struct TestChannel;
 
     impl Channel for TestChannel {
-        fn is_open(&self) -> bool { true }
+        fn is_open(&self) -> bool {
+            true
+        }
         fn close(&self) {}
     }
 
@@ -348,7 +357,7 @@ mod tests {
         fn into_response(self) -> Self::Response {}
     }
 
-    type TestNode = UrlNode<TestContext, TcpTransport>;
+    type TestNode = UrlNode<TestContext, TestTransport>;
 
     fn empty_node(pattern: PathPattern) -> Arc<TestNode> {
         Arc::new(TestNode::empty(pattern))
@@ -365,7 +374,10 @@ mod tests {
         root.insert_child(a.clone());
 
         let path = segments(&["a"]);
-        let matched = root.walk(path.iter(), PartialState::NotStart).await.expect("literal child should match");
+        let matched = root
+            .walk(path.iter(), PartialState::NotStart)
+            .await
+            .expect("literal child should match");
 
         assert!(Arc::ptr_eq(&matched, &a));
     }
@@ -379,7 +391,10 @@ mod tests {
         a.insert_child(b.clone());
 
         let path = segments(&["a", "b"]);
-        let matched = root.walk(path.iter(), PartialState::NotStart).await.expect("nested literal child should match");
+        let matched = root
+            .walk(path.iter(), PartialState::NotStart)
+            .await
+            .expect("nested literal child should match");
 
         assert!(Arc::ptr_eq(&matched, &b));
     }
@@ -391,12 +406,15 @@ mod tests {
         root.insert_child(rest.clone());
 
         let path = segments(&["a"]);
-        let matched = root.walk(path.iter(), PartialState::NotStart).await.expect("AnyPath currently matches one segment");
+        let matched = root
+            .walk(path.iter(), PartialState::NotStart)
+            .await
+            .expect("AnyPath currently matches one segment");
 
         assert!(Arc::ptr_eq(&matched, &rest));
     }
 
-    #[tokio::test] 
+    #[tokio::test]
     async fn walk_any_path_should_catch_multiple_remaining_segments() {
         let root = empty_node(PathPattern::literal_path("files"));
         let rest = empty_node(PathPattern::AnyPath);

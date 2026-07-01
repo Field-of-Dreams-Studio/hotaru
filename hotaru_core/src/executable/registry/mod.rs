@@ -1,11 +1,11 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use core::any::TypeId;
-use std::sync::Arc;
-
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use alloc::sync::Arc;
 
 use crate::{
     app::common::RuntimeConfig,
-    connection::{ConnStream, TransportSpec},
+    connection::{ConnStream, HotaruBufRead, HotaruRead, HotaruWrite, TransportSpec},
     debug_log,
     executable::{
         ExecutableBinding,
@@ -17,6 +17,7 @@ use crate::{
     url::{UrlError, UrlRegistration, UrlRoot},
 };
 
+/// Builder for protocol entry registries.
 pub mod builder;
 
 pub use builder::ProtocolRegistryBuilder;
@@ -49,7 +50,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
 
     pub async fn serve(&self, runtime: Arc<RuntimeConfig>, conn: TS::Wire) {
         let (read_half, mut writer, meta) = conn.split();
-        let mut reader = BufReader::new(read_half);
+        let mut reader = read_half.into_buf();
         let selected = {
             let buf = reader.fill_buf().await.unwrap_or(&[]);
             let _n = buf.len();
@@ -62,7 +63,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         };
 
         if let Some(handler) = selected {
-            handler.serve(runtime, reader, writer, meta).await;
+            handler.serve(runtime, reader, writer.into_buf_write(), meta).await;
         } else {
             let _ = writer.shutdown().await;
         }
@@ -70,7 +71,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
 
     pub async fn request(&self, runtime: Arc<RuntimeConfig>, conn: TS::Wire) {
         let (read_half, mut writer, meta) = conn.split();
-        let mut reader = BufReader::new(read_half);
+        let mut reader = read_half.into_buf();
         let selected = {
             let buf = reader.fill_buf().await.unwrap_or(&[]);
             let _n = buf.len();
@@ -83,7 +84,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         };
 
         if let Some(handler) = selected {
-            handler.request(runtime, reader, writer, meta).await;
+            handler.request(runtime, reader, writer.into_buf_write(), meta).await;
         } else {
             let _ = writer.shutdown().await;
         }
@@ -98,7 +99,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
             }
         }
         None
-    } 
+    }
 
     pub fn entry<P: Protocol<Wire = TS::Wire, TS = TS> + 'static>(
         &self,
@@ -109,7 +110,7 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
             }
         }
         None
-    } 
+    }
 
     pub fn lit_url<P: Protocol<Wire = TS::Wire, TS = TS> + 'static, T: Into<String>>(
         &self,

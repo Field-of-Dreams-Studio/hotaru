@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_http"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "HTTP/1.1 implementation for the Hotaru web framework"
@@ -8,17 +8,17 @@ license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
 keywords = ["hotaru", "http", "http1", "web", "framework"]
-categories = ["network-programming", "web-programming::http-server"]
+categories = ["network-programming", "web-programming::http-server", "web-programming::http-client"]
 
 [dependencies]
 # Hotaru dependencies
-hotaru_core = { path = "../hotaru_core", version = "0.8.2" }
-hotaru_lib = { path = "../hotaru_lib", version = "0.8.2", features = ["url_encoding"] }
-hotaru_tls = { path = "../hotaru_tls", version = "0.8.1", optional = true }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.3" }
+hotaru_io_tokio = { path = "../hotaru_io_tokio", version = "=0.8.3" }
+hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3", features = ["url_encoding"] }
+hotaru_tls = { path = "../hotaru_tls", version = "=0.8.2", optional = true }
 
-akari = { version = "0.2.7", features = ["full"] }
+akari = { version = "0.2.8", features = ["full"] }
 once_cell = "1.19"
-async-trait = "0.1.88"
 bytes = "1"
 futures = "0.3"
 
@@ -28,6 +28,15 @@ tokio = { version = "1.28", features = ["full"] }
 default = []
 tls = ["dep:hotaru_tls"]
 compression = ["hotaru_lib/compression"]
+
+tokio = ["hotaru_core/std", "hotaru_core/spawn_send", "hotaru_io_tokio/std"]
+std = ["hotaru_core/std"]
+embedded = ["hotaru_core/embedded"]
+io_futures = []
+io_tokio = ["hotaru_io_tokio/std"]
+io_embedded = []
+spawn_send = ["hotaru_core/spawn_send"]
+spawn_local = ["hotaru_core/spawn_local"]
 
 [dev-dependencies]
 tokio-test = "0.4"

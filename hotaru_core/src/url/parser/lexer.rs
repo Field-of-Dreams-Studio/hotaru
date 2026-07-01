@@ -1,3 +1,7 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
+use super::parser::PatternError;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RawToken {
     // Plain URL literals (outside <...> or free-form content inside).
@@ -57,15 +61,28 @@ impl TypeKind {
 
     // Convert to a regex snippet if applicable. Path is special and returns None.
     // These are intended for composing a full route regex later.
+    //
+    // # ASCII-only by design (no_std / `lite` / `embedded`)
+    //
+    // These snippets deliberately use ASCII classes (`[0-9]`, explicit
+    // `[0-9a-fA-F]`) instead of `\d` or the `(?i)` flag. Under the
+    // `lite`/`embedded` flavour the `regex` crate is built without its
+    // `unicode-perl` / `unicode-case` tables, so `\d` and `(?i)` fail to
+    // compile — and because `RegexSegment::new` swallows a compile error into
+    // `re = None`, a `\d`-based typed route would *silently never match*.
+    // ASCII classes compile under every flavour and also match exactly the
+    // input the downstream `i64` / `u64` / `f64` / UUID parsers accept, so the
+    // patterns are both portable and stricter (e.g. non-ASCII digits are
+    // rejected at the route rather than accepted and then failing to parse).
     pub fn to_regex(&self) -> Option<&'static str> {
         match self {
-            TypeKind::Int => Some(r"-?\d+"),
-            TypeKind::UInt => Some(r"\d+"),
-            TypeKind::Decimal => Some(r"-?\d+(?:\.\d+)?"),
+            TypeKind::Int => Some(r"-?[0-9]+"),
+            TypeKind::UInt => Some(r"[0-9]+"),
+            TypeKind::Decimal => Some(r"-?[0-9]+(?:\.[0-9]+)?"),
             TypeKind::Str => Some(r"[^/]+"),
-            TypeKind::Uuid => {
-                Some(r"(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-            }
+            TypeKind::Uuid => Some(
+                r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            ),
             TypeKind::Path => None, // special: handled outside regex-building (e.g., greedy capture)
         }
     }
@@ -74,7 +91,7 @@ impl TypeKind {
 impl RawToken {
     fn push_literal(buf: &mut String, out: &mut Vec<RawToken>) {
         if !buf.is_empty() {
-            out.push(RawToken::Literal(std::mem::take(buf)));
+            out.push(RawToken::Literal(core::mem::take(buf)));
         }
     }
 }
@@ -119,7 +136,7 @@ fn count_pipes(chars: &[char], mut i: usize) -> usize {
 //
 // This function only performs tokenization (string chopping + escape handling). It does not validate
 // the grammar beyond simple classification of idents/types.
-pub fn tokenize(input: &str) -> Vec<RawToken> {
+pub fn tokenize(input: &str) -> Result<Vec<RawToken>, PatternError> {
     let chars: Vec<char> = input.chars().collect();
     let mut i = 0usize;
     let mut out = Vec::new();
@@ -361,7 +378,7 @@ pub fn tokenize(input: &str) -> Vec<RawToken> {
         RawToken::push_literal(&mut lit_buf, &mut out);
     }
 
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -373,7 +390,7 @@ mod tests {
         // <||\d+||:name> =>
         // AngleStart, Pipe, Pipe, Literal(\d+), Pipe, Pipe, Colon, Ident(name), AngleClose
         let input = "<||\\d+||:name>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             Pipe,
@@ -391,7 +408,7 @@ mod tests {
     #[test]
     fn root_url() {
         let input = "/";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![Slash];
         assert_eq!(tokens, expected);
     }
@@ -399,7 +416,7 @@ mod tests {
     #[test]
     fn any_ident() {
         let input = "<id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![AngleStart, super::RawToken::Ident("id".into()), AngleClose];
         assert_eq!(tokens, expected);
     }
@@ -407,7 +424,7 @@ mod tests {
     #[test]
     fn type_without_name() {
         let input = "<int>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![AngleStart, super::RawToken::Type(TypeKind::Int), AngleClose];
         assert_eq!(tokens, expected);
     }
@@ -415,7 +432,7 @@ mod tests {
     #[test]
     fn special_type_and_name_int() {
         let input = "<int:id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Int),
@@ -429,7 +446,7 @@ mod tests {
     #[test]
     fn special_type_and_name_uint() {
         let input = "<uint:id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::UInt),
@@ -443,7 +460,7 @@ mod tests {
     #[test]
     fn special_type_decimal() {
         let input = "<decimal:price>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Decimal),
@@ -457,7 +474,7 @@ mod tests {
     #[test]
     fn special_type_str() {
         let input = "<str:slug>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Str),
@@ -471,7 +488,7 @@ mod tests {
     #[test]
     fn uuid_type_with_name() {
         let input = "<uuid:order_id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Uuid),
@@ -485,7 +502,7 @@ mod tests {
     #[test]
     fn any_path() {
         let input = "<**path>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             super::RawToken::Type(TypeKind::Path),
@@ -497,7 +514,7 @@ mod tests {
     #[test]
     fn outside_literals_and_angle_with_slash_separators() {
         let input = "/users/<id>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             Slash,
             Literal("users".into()),
@@ -512,7 +529,7 @@ mod tests {
     #[test]
     fn trailing_slash() {
         let input = "/users/<id>/";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             Slash,
             Literal("users".into()),
@@ -527,17 +544,17 @@ mod tests {
 
     #[test]
     fn root_only_slash_and_double_slash() {
-        let tokens = tokenize("/");
+        let tokens = tokenize("/").unwrap();
         assert_eq!(tokens, vec![Slash]);
 
-        let tokens = tokenize("//");
+        let tokens = tokenize("//").unwrap();
         assert_eq!(tokens, vec![Slash, Slash]);
     }
 
     #[test]
     fn escape_angles_with_backslash() {
         let input = "foo\\<bar\\>baz";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![Literal("foo<bar>baz".into())];
         assert_eq!(tokens, expected);
     }
@@ -545,7 +562,7 @@ mod tests {
     #[test]
     fn triple_pipe_regex_with_internal_pipe() {
         let input = "<|||a|b|||:name>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             Pipe,
@@ -565,7 +582,7 @@ mod tests {
     #[test]
     fn freeform_regex_without_block_allows_single_pipes() {
         let input = "<a|b:c>";
-        let tokens = tokenize(input);
+        let tokens = tokenize(input).unwrap();
         let expected = vec![
             AngleStart,
             Ident("a".into()),
@@ -580,13 +597,13 @@ mod tests {
 
     #[test]
     fn typekind_to_regex_contract() {
-        assert_eq!(TypeKind::Int.to_regex(), Some(r"-?\d+"));
-        assert_eq!(TypeKind::UInt.to_regex(), Some(r"\d+"));
-        assert_eq!(TypeKind::Decimal.to_regex(), Some(r"-?\d+(?:\.\d+)?"));
+        assert_eq!(TypeKind::Int.to_regex(), Some(r"-?[0-9]+"));
+        assert_eq!(TypeKind::UInt.to_regex(), Some(r"[0-9]+"));
+        assert_eq!(TypeKind::Decimal.to_regex(), Some(r"-?[0-9]+(?:\.[0-9]+)?"));
         assert_eq!(TypeKind::Str.to_regex(), Some(r"[^/]+"));
         assert_eq!(
             TypeKind::Uuid.to_regex(),
-            Some(r"(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+            Some(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
         );
         assert_eq!(TypeKind::Path.to_regex(), None);
     }

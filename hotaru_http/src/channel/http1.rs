@@ -12,10 +12,8 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use hotaru_core::connection::{ConnMeta, ConnStream};
+use hotaru_core::connection::{ConnMeta, ConnStream, HotaruRead, HotaruWrite};
 use hotaru_core::protocol::Channel;
-use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::sync::Mutex;
 
 use crate::channel::http_channel::HttpChannel;
@@ -28,17 +26,15 @@ use crate::security::safety::HttpSafety;
 
 /// HTTP/1 channel for the Protocol trait.
 ///
-/// Exposes shared I/O handles that can be used by the protocol-level
-/// `handle` implementation. All I/O logic lives in the channel methods.
-///
-/// `meta` is the connection metadata captured at `ConnStream::split` time;
-/// it is the canonical source for `local_addr` / `remote_addr` and any
-/// transport-specific extension data (ALPN, peer cert, proxy headers).
+/// Carries the per-connection safety baseline (`Arc<HttpSafety>`) injected
+/// at `open_channel` / `acquire_channel` time, so per-request I/O does not
+/// hit `RuntimeConfig`.
 pub struct Http1Channel<W: ConnStream> {
-    reader: Arc<Mutex<BufReader<W::ReadHalf>>>,
-    writer: Arc<Mutex<W::WriteHalf>>,
+    reader: Arc<Mutex<<W::ReadHalf as HotaruRead>::Buffered>>,
+    writer: Arc<Mutex<<W::WriteHalf as HotaruWrite>::Buffered>>,
     meta: Arc<W::Meta>,
     open: Arc<AtomicBool>,
+    safety: Arc<HttpSafety>,
 }
 
 impl<W: ConnStream> Clone for Http1Channel<W> {
@@ -48,6 +44,7 @@ impl<W: ConnStream> Clone for Http1Channel<W> {
             writer: self.writer.clone(),
             meta: self.meta.clone(),
             open: self.open.clone(),
+            safety: self.safety.clone(),
         }
     }
 }
@@ -62,8 +59,12 @@ impl<W: ConnStream> Channel for Http1Channel<W> {
     }
 }
 
-#[async_trait]
-impl<W: ConnStream> HttpChannel for Http1Channel<W> {
+impl<W> HttpChannel for Http1Channel<W>
+where
+    W: ConnStream,
+    W::ReadHalf: HotaruRead<Error = std::io::Error>,
+    W::WriteHalf: HotaruWrite<Error = std::io::Error>,
+{
     async fn parse_request(&self, safety: &HttpSafety) -> Result<HttpRequest, HttpError> {
         let mut reader = self.reader.lock().await;
         let request = HttpRequest::parse_lazy(&mut *reader, safety, false).await;
@@ -128,18 +129,36 @@ impl<W: ConnStream> HttpChannel for Http1Channel<W> {
     }
 }
 
-impl<W: ConnStream> Http1Channel<W> {
-    /// Creates a new HTTP/1 channel from a split wire and its meta.
+impl<W> Http1Channel<W>
+where
+    W: ConnStream,
+    W::ReadHalf: HotaruRead<Error = std::io::Error>,
+    W::WriteHalf: HotaruWrite<Error = std::io::Error>,
+{
+    /// Creates a new HTTP/1 channel from a split wire, its meta, and the
+    /// per-connection safety baseline.
     pub fn new(
-        reader: BufReader<W::ReadHalf>,
-        writer: W::WriteHalf,
+        reader: <W::ReadHalf as HotaruRead>::Buffered,
+        writer: <W::WriteHalf as HotaruWrite>::Buffered,
         meta: W::Meta,
+        safety: Arc<HttpSafety>,
     ) -> Self {
         Self {
             reader: Arc::new(Mutex::new(reader)),
             writer: Arc::new(Mutex::new(writer)),
             meta: Arc::new(meta),
             open: Arc::new(AtomicBool::new(true)),
+            safety,
         }
+    }
+
+    /// Borrows the per-connection safety baseline.
+    pub fn safety(&self) -> &HttpSafety {
+        &self.safety
+    }
+
+    /// Cheap `Arc` clone of the per-connection safety baseline.
+    pub fn safety_arc(&self) -> Arc<HttpSafety> {
+        self.safety.clone()
     }
 }

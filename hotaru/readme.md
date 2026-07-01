@@ -2,31 +2,45 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.2-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.3-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-> Small, sweet, easy framework for full-stack Rust web applications 
+> Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
 
 ## Overview
 
-Hotaru is a lightweight, intuitive web framework focused on simplicity and productivity. It supports regex-based routing, tree-structured URLs, and integrates seamlessly with the Akari templating system.
+The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly.
 
-**[Official Website](https://hotaru.rs)**
-
-**[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
+**[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
 
 MSRV: 1.86
 
+### Stability in 0.8.x
+
+The **tokio + HTTP** stack (default features `trans`, `http`, `tokio`) is the tested, supported path and is safe for production use today.
+
+Everything else is **experimental** and will stabilize by 0.8.7:
+
+- `RuntimeSpec` trait surface (currently only `hotaru_rt_tokio` implements it; other runtime backends are planned, not shipped)
+- `no_std` builds of `hotaru_core` (Cortex-M / RISC-V bare-metal, CI-verified but not yet exercised by a real embedded backend)
+- IO adapter crates: `hotaru_io_futures` ships as a standalone crate (limited real-world use). `hotaru_io_embedded` is **not published in 0.8.3** — it stays in-repo until embedded stabilizes (targeted 0.8.5+). The `hotaru` umbrella is **std-only**; once the embedded backend ships, bare-metal projects will depend on `hotaru_core` + `hotaru_io_embedded` directly.
+- Embassy runtime backend (planned)
+
+If you are shipping something now, stick with the `tokio` default and revisit the experimental paths as they land.
+
 ## Key Features
 
-- **Multi-Protocol Support**: Handle HTTP/HTTPS, WebSocket, and custom TCP protocols 
-- **Simple API**: Intuitive request/response handling with minimal boilerplate
-- **Full-Stack**: Built-in template rendering with Akari templates
-- **Flexible Routing**: Support for regex patterns, literal URLs, and nested routes
-- **Asynchronous**: Built with Tokio for efficient async handling
-- **Form Handling**: Easy processing of form data and file uploads
-- **Middleware Support**: Create reusable request processing chains
+<!--TODO: Make sure change this in 0.8.7-->
+
+- **Multi-Protocol**: HTTP/1.1 and HTTPS (TLS) ship out of the box. The `Protocol` trait is an open extension point for custom TCP-based protocols (WebSocket, MQTT, and other frames), though no non-HTTP protocol ships in this workspace today
+- **Server + Client**: Endpoints for inbound traffic, outpoints for outbound. Same protocol trait, same routing, same middleware
+- **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships today via `hotaru_rt_tokio` (the only runtime backend so far); other runtimes can plug in via the same sibling-crate pattern. IO adapters are further along, with `hotaru_io_tokio`, `hotaru_io_futures`, and `hotaru_io_embedded` already shipping
+- **`no_std`-Ready Core**: `hotaru_core` builds bare-metal on Cortex-M4/M7 and RISC-V (with atomics) under `alloc`. CI verified on `thumbv7em-none-eabihf` and `riscv32imac-unknown-none-elf`
+- **Sync main**: `fn main() { run_server!(APP); }`. No `async fn main`, no `#[tokio::main]`
+- **Ergonomic Macros**: `endpoint!` / `outpoint!` / `middleware!` DSL in three flavors (`trans`, `semi-trans`, `attr`)
+- **Full-Stack**: Akari template rendering, form/URL-encoded body parsing, session cookies, HTTP body compression (gzip / deflate / brotli / zstd) all built in
+- **Flexible Routing**: Regex, literal, and pattern segments (`<int:id>`, `<uuid:token>`, `<**path>`) with a tree walker
 
 ## Quick Start
 
@@ -41,9 +55,8 @@ LServer!(
         .build()
 );
 
-#[tokio::main]
-async fn main() {
-    APP.clone().run().await;
+fn main() {
+    run_server!(APP);
 }
 
 endpoint! {
@@ -53,6 +66,8 @@ endpoint! {
     }
 }
 ```
+
+`run_server!(APP)` builds a tokio runtime, blocks the current thread, and shuts down on Ctrl+C. No `async fn main`, no `#[tokio::main]`. See [Core Concepts](#core-concepts) for the sibling macros (`run_server_until!`, `run_server_no_block!`, `run_server_no_block_until!`) when you need a custom stop source or multi-server orchestration.
 
 ## Installation
 
@@ -78,17 +93,18 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hotaru = "0.8.2"
+hotaru = "0.8.3"
 tokio = { version = "1", features = ["full"] }
 ```
 
 ### Optional Features
 
-Default features: `trans`, `http`. Cargo's additive feature unification means sub-features pull in their prerequisites automatically — you never have to enable a base feature by hand.
+Default features: `trans`, `http`, `tokio`. Cargo's additive feature unification means sub-features pull in their prerequisites automatically — you never have to enable a base feature by hand.
 
 **Protocol stack**
 
 - **`http`** *(default-on)*: HTTP/1.1 stack (`hotaru_http` + `ahttpm`). Opt out with `default-features = false` for protocol-only builds (e.g. gRPC-only deployments) — `hotaru::http::*`, `HTTP`, `HttpContext`, `HttpRequest`, `HttpResponse`, etc. then disappear from the crate surface.
+- **`tokio`** *(default-on)*: Tokio runtime + TCP/IO defaults for the umbrella crate (`Server`, `Client`, `Url`, `S*` aliases, `TcpTransport`, `TokioRuntime`). If you disable default features but still use those defaults, re-enable `tokio`.
 - **`https`**: TLS/HTTPS support — surfaces `HTTPS`, `TlsTransport`, `TlsOutboundTarget`, `TlsClientConfig`. Implies `http`.
 - **`http_compression`**: HTTP body codecs for `Content-Encoding` (gzip / deflate / brotli / zstd). Off by default because `brotli` + `zstd` together add ~7 s to a clean build. Implies `http`. Without this feature, `ContentCoding::decode_compressed` / `encode_compressed` return `io::ErrorKind::Unsupported` for compressed bodies.
 
@@ -104,7 +120,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 - **`external-ctor`**: Use the external [`ctor`](https://crates.io/crates/ctor) crate instead of Hotaru's built-in constructor implementation. When enabling, you must also add `ctor` to your dependencies:
   ```toml
   [dependencies]
-  hotaru = { version = "0.8.2", features = ["external-ctor"] }
+  hotaru = { version = "0.8.3", features = ["external-ctor"] }
   ctor = "0.4.0"
   tokio = { version = "1", features = ["full"] }
   ```
@@ -113,7 +129,7 @@ Default features: `trans`, `http`. Cargo's additive feature unification means su
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.2", features = ["https", "http_compression"] }
+hotaru = { version = "0.8.3", features = ["https", "http_compression"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -121,7 +137,7 @@ tokio = { version = "1", features = ["full"] }
 
 ```toml
 [dependencies]
-hotaru = { version = "0.8.2", default-features = false, features = ["trans"] }
+hotaru = { version = "0.8.3", default-features = false, features = ["trans", "tokio"] }
 hotaru_grpc = "..."
 tokio = { version = "1", features = ["full"] }
 ```
@@ -197,7 +213,7 @@ pub fn get_user<HTTP>() {
 
 - Endpoints and middleware auto-register at startup — no manual `router.register()`.
 - `trans` form: brace syntax `{}` with doc comments inside the block; angle-bracket body defaults to `req`. Optional fn-style `pub fn name(req: HTTP) { ... }` is also accepted.
-- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.2", default-features = false, features = ["semi-trans", "http"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` since `default-features = false` also drops the default HTTP stack.
+- Remaining readme examples use `trans`. To switch, set `default-features = false` on the `hotaru` dependency and turn on the flavor you want, e.g. `hotaru = { version = "0.8.3", default-features = false, features = ["semi-trans", "http", "tokio"] }`. Cargo feature unification would otherwise keep `trans` on alongside it; remember to re-add `http` and `tokio` since `default-features = false` also drops the default HTTP stack and Tokio facade defaults.
 - See `macro_ra.md` for syntax details. Analyzer support is planned.
 
 ### Middleware
@@ -205,7 +221,7 @@ pub fn get_user<HTTP>() {
 Attach a middleware to a protocol via the `ProtocolBuilder`. Add `htmstd = "0.8"` to your `Cargo.toml` for the bundled middleware library:
 
 ```rust
-use htmstd::session::CookieSession;
+use htmstd::CookieSession;
 
 LServer!(
     APP = Server::new()
@@ -217,6 +233,31 @@ LServer!(
         .build()
 );
 ```
+
+`CookieSession` writes encrypted session cookies. By default, those cookies are
+production-safe (`Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`). If you are
+running a plain-HTTP development environment, configure the cookie safety policy
+explicitly through the app config:
+
+```rust
+use htmstd::{CookieSecurity, CookieSession, CookieSessionSettings};
+
+LServer!(
+    APP = Server::new()
+        .binding("127.0.0.1:3003")
+        .mode(RunMode::Development)
+        .set_config(CookieSessionSettings::new().security(CookieSecurity::Auto))
+        .single_protocol(
+            ProtocolBuilder::new(HTTP::server(HttpSafety::default()))
+                .append_middleware::<CookieSession>(),
+        )
+        .build()
+);
+```
+
+`CookieSecurity::Auto` follows `RunMode`: `Production`/`Beta` keep `Secure`
+cookies, while `Development`/`Build` allow plain HTTP cookies. For production,
+also configure a stable `SessionSecret` so sessions survive process restarts.
 
 Middleware can also be attached per-endpoint via `middleware = [...]` inside the `endpoint!` block — see `example_hotaru` for the pattern.
 
@@ -265,31 +306,49 @@ Hotaru is built on a modular architecture:
 
 - **[hotaru](https://crates.io/crates/hotaru)** - Main framework with convenient API
 - **[hotaru_core](https://crates.io/crates/hotaru_core)** - Core protocol and routing engine
-- **[hotaru_trans](https://crates.io/crates/hotaru_trans)** - Procedural macros for endpoint! and middleware! 
-- **[hotaru_http](https://crates.io/crates/hotaru_http)** - HTTP implementation for Hotaru 
-- **[hotaru_tls](https://crates.io/crates/hotaru_tls)** - TLS/HTTPS implementation for Hotaru 
+- **[hotaru_trans](https://crates.io/crates/hotaru_trans)** - Procedural macros for endpoint! and middleware!
+- **[hotaru_http](https://crates.io/crates/hotaru_http)** - HTTP implementation for Hotaru
+- **[hotaru_tls](https://crates.io/crates/hotaru_tls)** - TLS/HTTPS implementation for Hotaru
+- **[hotaru_rt_tokio](https://crates.io/crates/hotaru_rt_tokio)** - Tokio runtime backend (`TokioRuntime`)
+- **[hotaru_io_tokio](https://crates.io/crates/hotaru_io_tokio)** - Tokio TCP/IO backend (`TcpTransport`, `TokioIo`)
+- **[hotaru_io_futures](https://crates.io/crates/hotaru_io_futures)** - `futures-io` adapter backend (`FuturesIo`, experimental)
+- **hotaru_io_embedded** - `embedded-io-async` adapter backend (`EmbeddedIo`) — *experimental; not published in 0.8.3, planned for 0.8.5+*
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
 ## Changelog
 
-### 0.8.2 (Current)
-- **`http` (default-on) + `http_compression` (default-off) features**: HTTP and codecs are now optional; `default-features = false` drops HTTP entirely, `https`/`http_compression` imply `http`.
-- **HTTP re-exports moved to `hotaru::http`** (`use hotaru::http::*;`); clean builds ~35 % faster (20.5 s → 13.3 s) from dropping `tracing` and gating heavy codecs.
-- **Workspace + dep alignment**: five core crates pinned to 0.8.2; `regex` bumped 1.5.6 → 1.12.
-- **`hotaru_core` access-point table no longer poisons**: `AccessPointTable` switched to `parking_lot::RwLock` via the existing `PRwLock` alias.
-- **`hotaru_trans` `..` middleware inheritance honors the URL's app ident**: was hardcoded to `APP`, breaking multi-app setups.
-- **`hotaru_trans` anonymous-fn `_` form actually works**: `_` was matched as `Punct` (it's an `Ident`), so the auto-name branch never fired.
+### 0.8.3 (Current)
+- **Core/backend split**: `hotaru_core` is now backend-neutral at the public type layer. Concrete Tokio runtime and TCP/IO implementations moved into sibling crates (`hotaru_rt_tokio`, `hotaru_io_tokio`), while the umbrella `hotaru` crate keeps the familiar Tokio defaults.
+- **IO adapter crates**: futures-io and embedded-io-async adapters moved out of core into `hotaru_io_futures` and `hotaru_io_embedded`. Each backend uses local wrapper types (`TokioIo<T>`, `FuturesIo<T>`, `EmbeddedIo<T>`) so adapter impls stay additive and avoid trait-coherence conflicts.
+- **Simpler `hotaru_core` features**: core no longer owns `io_*`, `rt_*`, `tokio`, or `embassy` feature flags. It now keeps only the platform axis (`std` / `embedded`) and task-mobility axis (`spawn_send` / `spawn_local`); runtime and IO backends are selected through backend crates, or through the std-only `hotaru` umbrella (Tokio and futures backends only — the embedded backend is consumed directly).
+- **`hotaru` umbrella is std-only**: the umbrella no longer re-exports `hotaru_io_embedded` or exposes `embedded` / `io_embedded` features (its prelude pulls std-only items such as `std::thread::sleep` and `once_cell::sync::Lazy`). `hotaru_io_embedded` is **not published in 0.8.3** (targeted 0.8.5+); once it ships, `no_std` / bare-metal projects will depend on `hotaru_core` + `hotaru_io_embedded` directly.
+- **Runtime abstraction cleanup**: `RuntimeSpec` is the backend-neutral runtime trait, with Tokio implemented externally by `hotaru_rt_tokio::TokioRuntime`. Framework types (`Server`, `Client`, builders, and URL/protocol-entry types) now carry explicit transport/runtime parameters in core, while `hotaru` restores ergonomic defaults.
+- **`MaybeSend` task-mobility model**: async framework surfaces use `MaybeSend` so `spawn_send` builds keep real `Send` bounds and `spawn_local` builds can support local `!Send` futures. `hotaru_io_embedded` gates its actual embedded-io-async trait impls on `spawn_local`, not on the `embedded` platform flag.
+- **Framework-owned async IO traits**: `HotaruRead`, `HotaruWrite`, `HotaruBufRead`, `HotaruBufWrite`, `HotaruIOError`, `HotaruBufReader`, and `HotaruBufWriter` provide the common IO trait surface used by transports and protocols without hardcoding Tokio types in core.
+- **Native async trait surfaces**: core transport/protocol traits use return-position `impl Future` instead of `async-trait`, reducing proc-macro dependency surface and avoiding unnecessary boxed futures at trait boundaries.
+- **Protocol-agnostic endpoint outcomes**: `EndpointOutcome<C>` lets generated endpoints apply return values to any request context. HTTP keeps the existing `HttpResponse` endpoint style, while non-HTTP/inbound-only protocols can use `()` outcomes without placeholder responses.
+- **Per-protocol URL parsing hooks**: `Protocol` can customize URL tokenization/literal parsing, and URL parser internals such as `RawToken`, `TypeKind`, `tokenize`, and `tokens_to_patterns` are re-exported for protocol-specific routing work.
+- **Preferred-language middleware**: `htmstd` adds `PreferredLanguageMiddleware`, `PreferredLanguage`, settings, and request-extension helpers for parsing and negotiating the `Accept-Language` header.
+- **no_std preparation**: core continues moving toward `no_std` readiness with `alloc` usage, `core` imports, Akari `lite`/`no_std` alignment, generic IO errors, and backend-neutral abstractions. Real Embassy wiring remains deferred; embedded support is still experimental.
+- **Sync-main entry macros**: `run_server!` / `run_server_until!` (blocking) and `run_server_no_block!` / `run_server_no_block_until!` (fire-and-forget) let users run a server from an ordinary `fn main()` — no `#[tokio::main]`, no `async fn main`. Backed by a new `BlockingRuntimeCap` capability trait implemented by `TokioRuntime`.
 
-### 0.8.x
-- **Client / outpoint runtime**: new `Client<TS>` for outbound traffic, mirroring `Server<TS>`. Paired with the `outpoint!` macro (client-side counterpart to `endpoint!`) and `run!` / `call!` invocation-style sugar for one-shot and persistent outbound calls.
-- **Protocol trait reshape**: channel-based `open_channel` / `handle` / `send`, plus per-protocol `install_channel` bridge. `type Context: RequestContext<Channel = Self::Channel>` pins channel-type alignment. New `Channel` trait + `ProtocolFlow` give per-exchange close semantics (HTTP/1 closes the connection; multiplexed protocols may close only the stream).
-- **RequestContext rework**: `Default` supertrait; `type Channel` as a type anchor; `inject_request` / `into_response` added. `type Error: ProtocolError` is the single source of truth for chain errors, and now also requires `From<std::io::Error>` (since the client path surfaces transport-level I/O). Use the new `EmptyError` for prototypes / no-payload protocols.
-- **Result-typed execution chain**: middleware, final handlers, `ExecutionChain::run`, and `UrlNode::run` all return `Result<C, <C as RequestContext>::Error>` — no boxing at the chain boundary.
-- **Named access points**: every registered endpoint/outpoint has an explicit name. `ProtocolEntry::register(name, path, step_names, binding, config)` is the single canonical funnel; `Server::url(url, name, ...)` / `Client::url(url, name, ...)` are URL-first.
-- **Instance-based transports**: `TransportSpec::Inbound` / `Outbound` replace the old `Accepter` / `Connector` shape. `TcpInbound::bind(target)` and `TcpOutbound::build(target)` materialize once per `Server` / `Client`.
-- **HTTPS feature**: new `https` cargo feature on the umbrella `hotaru` crate forwards to `hotaru_http/tls`, surfacing `HTTPS`, `TlsTransport`, `TlsOutboundTarget`, `TlsClientConfig`. `HTTPS = Http1Protocol<TlsStream, TlsTransport>`.
-- **`LServer!` / `LClient!` / `LUrl!` / `LPattern!` macros**: replace the old `LApp!` for simplified lazy-static declarations. Default to `TcpTransport`.
+### 0.8.2
+- `http` and `http_compression` moved to optional features (compression default-off)
+- HTTP re-exports relocated to `hotaru::http`
+- Clean builds ~35% faster (dropped `tracing`, gated heavy codecs)
+- `regex` bumped 1.5.6 -> 1.12
+- `AccessPointTable` switched to `PRwLock` (no more poisoning)
+- `hotaru_trans` `..` middleware inheritance now honors the URL's app ident
+- `hotaru_trans` anonymous-fn `_` form fixed 
+- Client / outpoint runtime paired with `Client<TS>`, the `outpoint!` macro, and `run!` / `call!` invocation sugar
+- Protocol trait reshape: channel-based `open_channel` / `handle` / `send`; new `Channel` trait + `ProtocolFlow`
+- `RequestContext` rework: `Default` supertrait, `type Channel` anchor, `inject_request` / `into_response`; new `EmptyError`
+- Result-typed execution chain — no boxing at chain boundaries
+- Named access points with a single canonical registration funnel
+- Instance-based transports: `TransportSpec::Inbound` / `Outbound` replace `Accepter` / `Connector`
+- HTTPS feature: `HTTPS = Http1Protocol<TlsStream, TlsTransport>`
+- New `LServer!` / `LClient!` / `LUrl!` / `LPattern!` macros replace `LApp!`
 
 ### 0.7.x
 - Multi-protocol support (HTTP, WebSocket, custom TCP)
@@ -314,26 +373,26 @@ Hotaru is built on a modular architecture:
 - Akari templating integration
 - Cookie manipulation APIs
 - File upload handling
-- Form data processing improvements 
+- Form data processing improvements
 
 ## Learn More
 
 - **Akari Template Engine**: https://crates.io/crates/akari
-- **Homepage**: https://hotaru.rs 
+- **Homepage**: https://hotaru.rs
 - **Documentation Home Page**: https://fds.rs
 - **GitHub**: https://github.com/Field-of-Dreams-Studio/hotaru
-- **Documentation**: https://docs.rs/hotaru 
+- **Documentation**: https://docs.rs/hotaru
 
-| Video Resources | URL | 
-| --- | --- | 
-| Quick Tutorial | Youtube: https://www.youtube.com/watch?v=8pV-o04GuKk&t=6s <br> Bilibili: https://www.bilibili.com/video/BV1BamFB7E8n/ | 
+| Video Resources | URL |
+| --- | --- |
+| Quick Tutorial | Youtube: https://www.youtube.com/watch?v=8pV-o04GuKk&t=6s <br> Bilibili: https://www.bilibili.com/video/BV1BamFB7E8n/ |
 
 ## AI Declaration of each Mod
 
 We believe in transparency about AI-assisted development. The framework is governed jointly by two maintainer groups using a shared four-tier system that prioritizes understanding over line counts.
 
-<details> 
-<summary><b>Click for more details</b></summary> 
+<details>
+<summary><b>Click for more details</b></summary>
 
 ### Maintained by: PMINE/Research
 
@@ -386,11 +445,11 @@ The understanding requirement is uniform across Author-Owned, Human-Led, and Co-
 3. **Reviewer-driven understanding check.** Any reviewer may flag a PR with "this doesn't feel author-owned" — regardless of the module's tier. The author clears the flag by demonstrating understanding in PR comments or a short walkthrough. Flags are requests for evidence, not accusations.
 4. **Smell-test threshold scales with tier.** Author-Owned code is flagged if any section visibly reads as AI-generated. Human-Led is flagged if the structural code reads as AI-generated or AI's hand pervades rather than appearing locally. Co-Authored is flagged only if the author cannot defend the code in review.
 5. **Tier reflects the work, not preferences.** Maintainers set tiers based on the nature of the module. If the character of a module changes, the tier is re-set rather than stretched.
-6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked. 
-</details> 
+6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked.
+</details>
 
 ## 📄 License
 
 MIT License — see [LICENSE.txt](LICENSE.txt).
 
-Copyright (c) 2024-2026 @ [Field of Dreams Studio (FDS)](https://fds.moe) & [Project-StarFall](https://sf.fds.moe) & [PMINE-FDS](https://pmine.fds.moe) 
+Copyright (c) 2024-2026 @ [Field of Dreams Studio (FDS)](https://fds.moe) & [Project-StarFall](https://sf.fds.moe) & [PMINE-FDS](https://pmine.rs)

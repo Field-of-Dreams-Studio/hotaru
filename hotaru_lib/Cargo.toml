@@ -1,14 +1,14 @@
 [package]
 name = "hotaru_lib"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"] 
-description = "Small, sweet, easy framework for full-stack web application" 
+description = "Utilities for the Hotaru web framework: URL encoding, compression codecs, random helpers"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
-categories = ["network-programming", "web-programming::http-server"]
-keywords = ["hotaru"]
+categories = ["web-programming", "network-programming"]
+keywords = ["hotaru", "web", "utilities", "url-encoding", "helpers"]
 
 [features]
 default = ["url_encoding", "random"]

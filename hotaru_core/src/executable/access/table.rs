@@ -1,5 +1,7 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
+use alloc::sync::Arc;
+use akari::hash::HashMap;
 
 use crate::{
     alias::PRwLock,
@@ -53,7 +55,7 @@ pub struct AccessPointTable<C: RequestContext, TS: TransportSpec> {
 
 impl<C: RequestContext, TS: TransportSpec> AccessPointTable<C, TS> {
     pub fn new() -> Self {
-        Self { inner: PRwLock::new(HashMap::new()) }
+        Self { inner: PRwLock::new(HashMap::default()) }
     }
 
     /// Insert a named access point, returning the previous entry under that

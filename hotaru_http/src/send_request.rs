@@ -23,9 +23,10 @@
 //! The caller is responsible for setting the `Host` header on `request` —
 //! the helper does not know the hostname (only the `Outbound` does).
 
-use hotaru_core::connection::{ConnStream, Outbound};
+use std::sync::Arc;
+
+use hotaru_core::connection::{ConnStream, HotaruRead, HotaruWrite, Outbound};
 use hotaru_core::protocol::Channel;
-use tokio::io::BufReader;
 
 use crate::channel::Http1Channel;
 use crate::channel::HttpChannel;
@@ -48,14 +49,22 @@ pub async fn send_request<O>(
 ) -> Result<HttpResponse, HttpError>
 where
     O: Outbound,
+    HttpError: From<O::Error>,
+    <O::Wire as ConnStream>::ReadHalf: HotaruRead<Error = std::io::Error>,
+    <O::Wire as ConnStream>::WriteHalf: HotaruWrite<Error = std::io::Error>,
 {
-    let wire = outbound.connect().await.map_err(HttpError::Io)?;
+    let wire = outbound.connect().await?;
     let (read, write, meta) = wire.split();
-    let channel = Http1Channel::<O::Wire>::new(BufReader::new(read), write, meta);
+    let channel = Http1Channel::<O::Wire>::new(
+        read.into_buf(),
+        write.into_buf_write(),
+        meta,
+        Arc::new(safety),
+    );
 
     let result = async {
         channel.send_request(request).await?;
-        channel.parse_response(&safety).await
+        channel.parse_response(channel.safety()).await
     }
     .await;
 
@@ -66,7 +75,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hotaru_core::connection::tcp::TcpOutbound;
+    use hotaru_io_tokio::TcpOutbound;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
 
@@ -103,11 +112,8 @@ mod tests {
         let outbound = TcpOutbound::build(addr.to_string()).await.unwrap();
 
         let mut request = HttpRequest::default();
-        request.meta.start_line = HttpStartLine::new_request(
-            HttpVersion::Http11,
-            HttpMethod::GET,
-            "/ping".to_string(),
-        );
+        request.meta.start_line =
+            HttpStartLine::new_request(HttpVersion::Http11, HttpMethod::GET, "/ping".to_string());
         request.meta.set_host(Some(addr.to_string()));
 
         let response = send_request(&outbound, request, HttpSafety::default())

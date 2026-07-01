@@ -1,38 +1,58 @@
 [package]
 name = "hotaru_core"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
-authors = ["Redstone <redstone@fds.moe>"] 
-description = "Small, sweet, easy framework for full-stack web application" 
+authors = ["Redstone <redstone@fds.moe>"]
+description = "Protocol-neutral routing, runtime, and transport traits for the Hotaru web framework (no_std + alloc)"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
-categories = ["network-programming", "web-programming::http-server"]
-keywords = ["hotaru"]
+categories = ["network-programming", "web-programming", "asynchronous", "no-std"]
+keywords = ["web-framework", "hotaru", "async", "router", "no-std"]
 
 [dependencies]
-akari = { version = "0.2.6", features = ["full"] }
-tokio = { version = "1.28", features = ["full"] }
-parking_lot = "0.12" 
-av = "0.1" 
+akari = { version = "0.2.8", default-features = false, features = ["dynamic", "extension", "object_macro"] }
+parking_lot = { version = "0.12", optional = true }
+spin = { version = "0.12", default-features = false, features = ["mutex", "spin_mutex", "rwlock"], optional = true }
+av = "0.1"
 
-hotaru_lib = { version = "0.8.2", path = "../hotaru_lib" , features = ["url_encoding"] }
-regex = "1.12"
-futures = "0.3"
-futures-core = "0.3"
-futures-util = "0.3"
-tokio-util = { version = "0.7", features = ["codec"] } 
-once_cell = "1.17" 
-async-trait = "0.1.88"
+# Regex — plain `regex` under both `full` and `lite`/`embedded`. Since
+# `regex` 1.9 the crate has genuine `no_std + alloc` support when
+# `default-features = false`. The `full` feature layer adds Unicode
+# tables on top (`regex/unicode` — larger binary, needed for `\p{...}`
+# style classes). `regex-lite` was tried but its 0.1.x line still
+# hard-requires `std` via a compile_error, so it can't run bare-metal.
+regex = { version = "1.12", default-features = false, features = [
+    "perf-dfa",
+    "perf-onepass",
+    "perf-backtrack",
+    "perf-inline",
+    "perf-cache",
+] }
 
 [dev-dependencies]
-hex = "0.4"
-serde_json = "1.0"
-rand = "0.8"
-quickcheck = "1.0"
-env_logger = "0.10"
+tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread"] }
 
-[features] 
-default = [] 
+[features]
+default = ["full", "std", "spawn_send"]
 
-dev-log = [] # Feature for debugging hotaru 
+# Feature-set flavour. Exactly one of `full` / `lite` should be active.
+# `full` layers `regex/unicode` on top for `\p{...}` support (larger
+# binary). `lite` skips unicode tables — the `regex` crate stays but
+# only its perf features + core matcher compile in.
+# `full` is purely a regex/unicode size choice. It deliberately does NOT
+# pull `akari/full`, because that enables akari's std-only template engine
+# (`hotaru_core` never uses `TemplateManager`), which breaks no_std builds.
+full = ["regex/unicode"]
+lite = ["akari/no_std"]
+dev-log = []
+
+# Platform/sync axis: choose exactly one (`std` uses parking_lot, `embedded` uses spin).
+std = ["dep:parking_lot"]
+# `embedded` is the no_std platform; akari must go no_std with it so its
+# `alloc` prelude (`String`/`format!`/…) is available regardless of `full`/`lite`.
+embedded = ["dep:spin", "akari/no_std"]
+
+# Task-mobility axis: multi-thread/executor-moving tasks use `spawn_send`; single-thread/local tasks use `spawn_local`.
+spawn_send = []
+spawn_local = []

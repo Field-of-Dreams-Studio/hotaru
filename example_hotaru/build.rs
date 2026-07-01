@@ -157,7 +157,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
             copy_dir_all(&entry.path(), &dest_path)?;
         } else {
             println!(
-                "cargo:warning=Copying: {} → {}",
+                "cargo:warning=Copying: {} -> {}",
                 entry.path().display(),
                 dest_path.display()
             );

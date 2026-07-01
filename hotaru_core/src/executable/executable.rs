@@ -1,4 +1,6 @@
-use std::sync::Arc;
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
+use alloc::sync::Arc;
 
 use crate::protocol::RequestContext;
 

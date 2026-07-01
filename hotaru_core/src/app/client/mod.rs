@@ -1,4 +1,7 @@
-use std::sync::Arc;
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
+use alloc::sync::Arc;
+use core::marker::PhantomData;
 
 use akari::extensions::ParamsClone;
 
@@ -6,25 +9,30 @@ use crate::{
     app::common::{
         AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
     },
-    connection::{Outbound, TransportSpec}, executable::ExecutableBinding, protocol::{Channel, RequestContext}, url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
+    app::runtime::{Either, OnceCellCap, RuntimeSpec},
+    connection::{Outbound, TransportSpec},
+    executable::ExecutableBinding,
     protocol::Protocol,
+    protocol::{Channel, RequestContext},
+    url::{PathPattern, UrlError, UrlNode, UrlRoot, node::StepName},
 };
 
 pub use crate::app::registry::ProtocolRegistryKind;
 
 /// Outbound runtime for protocol-routed requests.
-pub struct Client<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct Client<TS: TransportSpec, Rt: RuntimeSpec> {
     pub registry: ProtocolRegistryKind<TS>,
     pub target: <TS::Outbound as Outbound>::ConnectTarget,
     /// Built `TS::Outbound`, materialized on first `ensure_outbound`.
-    pub outbound: tokio::sync::OnceCell<Arc<TS::Outbound>>,
+    pub outbound: <Rt as RuntimeSpec>::OnceCell<Arc<TS::Outbound>>,
     pub runtime: Arc<RuntimeConfig>,
     pub config: OperationalConfig,
+    pub(crate) _rt: PhantomData<fn() -> Rt>,
 }
 
-impl<TS: TransportSpec> Client<TS> {
+impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
     /// Creates a client builder whose terminal method is `build()`.
-    pub fn new() -> AppBuilder<ClientRole, TS> {
+    pub fn new() -> AppBuilder<ClientRole, TS, Rt> {
         AppBuilder::new()
     }
 
@@ -57,7 +65,8 @@ impl<TS: TransportSpec> Client<TS> {
         } else {
             url.split('/').map(PathPattern::literal_path).collect()
         };
-        self.registry.register::<P, _>(name, path, StepName::default(), executable, config)?;
+        self.registry
+            .register::<P, _>(name, path, StepName::default(), executable, config)?;
         Ok(())
     }
 
@@ -76,8 +85,10 @@ impl<TS: TransportSpec> Client<TS> {
         T: AsRef<str>,
         N: Into<String>,
     {
-        let (path, step_names) = crate::url::parser::parse(url.as_ref())?;
-        self.registry.register::<P, _>(name, path, step_names.into(), executable, config)?;
+        let tokens = P::tokenize_url(url.as_ref())?;
+        let (path, step_names) = crate::url::tokens_to_patterns(&tokens)?;
+        self.registry
+            .register::<P, _>(name, path, step_names.into(), executable, config)?;
         Ok(())
     }
 
@@ -140,16 +151,16 @@ impl<TS: TransportSpec> Client<TS> {
     }
 
     /// Returns the `TS::Outbound` instance, building on first use.
-    pub async fn ensure_outbound(self: &Arc<Self>) -> std::io::Result<&Arc<TS::Outbound>> {
+    pub async fn ensure_outbound(self: &Arc<Self>) -> Result<&Arc<TS::Outbound>, TS::IoError> {
         self.outbound
             .get_or_try_init(|| async {
                 Ok(Arc::new(TS::Outbound::build(self.target.clone()).await?))
             })
             .await
-    } 
+    }
 
     /// Opens one outbound wire to this client's configured target.
-    pub async fn connect(self: &Arc<Self>) -> std::io::Result<TS::Wire> {
+    pub async fn connect(self: &Arc<Self>) -> Result<TS::Wire, TS::IoError> {
         self.ensure_outbound().await?.connect().await
     }
 
@@ -194,7 +205,7 @@ impl<TS: TransportSpec> Client<TS> {
         ctx: P::Context,
     ) -> Result<Result<P::Context, <P::Context as RequestContext>::Error>, UrlError> {
         let outpoint = self.resolve::<P>(path).await?;
-        Ok(outpoint.run(ctx).await) 
+        Ok(outpoint.run(ctx).await)
     }
 
     /// Executes one outbound route by path with an explicit depth limit.
@@ -260,12 +271,10 @@ impl<TS: TransportSpec> Client<TS> {
     pub async fn call_fn<P>(
         self: &Arc<Self>,
         name: &str,
-    ) -> Result<
-        tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
-        UrlError,
-    >
+    ) -> Result<Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>, UrlError>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: Send + 'static,
     {
         let entry = self
             .registry
@@ -287,12 +296,10 @@ impl<TS: TransportSpec> Client<TS> {
     pub async fn call_url<P>(
         self: &Arc<Self>,
         path: &str,
-    ) -> Result<
-        tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>,
-        UrlError,
-    >
+    ) -> Result<Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>, UrlError>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: Send + 'static,
     {
         let node = self.resolve::<P>(path).await?;
         let entry = self
@@ -309,36 +316,35 @@ impl<TS: TransportSpec> Client<TS> {
         self: &Arc<Self>,
         protocol: P,
         node: Arc<UrlNode<P::Context, TS>>,
-    ) -> tokio::task::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>
+    ) -> Rt::JoinHandle<Result<(), <P::Context as RequestContext>::Error>>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        <P::Context as RequestContext>::Error: Send + 'static,
     {
         let this = self.clone();
         let deadline_setting = self.config.max_connection_time();
 
-        tokio::spawn(async move {
+        Rt::spawn(async move {
             // Acquire the channel inside the task so I/O errors fall into
             // the join handle's inner result, not the outer UrlError.
             let outbound = this.ensure_outbound().await?.clone();
-            let channel = protocol
-                .acquire_channel(&this.runtime, outbound)
-                .await?;
+            let channel = protocol.acquire_channel(&this.runtime, outbound).await?;
 
             // One ctx, reused across iterations; channel stays installed.
             let mut ctx = <P::Context as Default>::default();
             P::install_channel(&mut ctx, channel.clone());
 
             let deadline = match deadline_setting {
-                TimeoutSetting::Fixed(d) => Some(tokio::time::Instant::now() + d),
+                TimeoutSetting::Fixed(d) => Some(Rt::instant_plus(Rt::now(), d)),
                 _ => None,
             };
 
             while channel.is_open() {
                 let iter = node.run(ctx);
                 ctx = match deadline {
-                    Some(d) => tokio::select! {
-                        result = iter => result?,
-                        _ = tokio::time::sleep_until(d) => {
+                    Some(d) => match Rt::select2(iter, Rt::sleep_until(d)).await {
+                        Either::Left(result) => result?,
+                        Either::Right(_) => {
                             channel.close();
                             break;
                         }

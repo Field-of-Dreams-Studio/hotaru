@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 // ----------------------------------------------------------------------------
 // Protocol error trait — minimal, protocol-defined.
 // ----------------------------------------------------------------------------
@@ -37,6 +39,7 @@ impl<T> ProtocolError for T where
 /// `ProtocolError` impl and don't need custom `can_continue` logic.
 pub trait DefaultProtocolError {}
 
+#[cfg(feature = "std")]
 impl DefaultProtocolError for std::io::Error {}
 
 /// Template error type for `RequestContext::Error`.
@@ -47,8 +50,8 @@ impl DefaultProtocolError for std::io::Error {}
 /// beyond "something went wrong."
 ///
 /// Satisfies all bounds required by `RequestContext::Error`:
-/// `core::error::Error + Send + Sync + 'static + ProtocolError +
-/// From<std::io::Error>`.
+/// `core::error::Error + Send + Sync + 'static + ProtocolError`
+/// (plus `From<std::io::Error>` under `feature = "std"`).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct EmptyError;
 
@@ -62,6 +65,7 @@ impl core::error::Error for EmptyError {}
 
 impl DefaultProtocolError for EmptyError {}
 
+#[cfg(feature = "std")]
 impl From<std::io::Error> for EmptyError {
     fn from(_: std::io::Error) -> Self {
         EmptyError

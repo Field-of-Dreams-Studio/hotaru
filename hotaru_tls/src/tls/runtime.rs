@@ -1,6 +1,5 @@
 //! TLS inbound and outbound runtime objects.
 
-use async_trait::async_trait;
 use hotaru_core::connection::{Accepter, Connector, Inbound, Outbound};
 use tokio::net::TcpListener;
 
@@ -32,10 +31,10 @@ pub struct TlsInbound {
     accepter: TlsAccepter,
 }
 
-#[async_trait]
 impl Inbound for TlsInbound {
     type Wire = TlsStream;
     type BindTarget = TlsInboundTarget;
+    type Error = std::io::Error;
 
     async fn bind(target: Self::BindTarget) -> std::io::Result<Self> {
         let listener = TcpListener::bind(target.addr).await?;
@@ -47,7 +46,8 @@ impl Inbound for TlsInbound {
 
     async fn accept(&self) -> std::io::Result<Self::Wire> {
         let (tcp, _) = self.listener.accept().await?;
-        self.accepter.upgrade(tcp).await
+        // `TlsUpgradeError` -> `io::Error` via `From` (see accepter.rs).
+        Ok(self.accepter.upgrade(tcp).await?)
     }
 }
 
@@ -84,10 +84,10 @@ impl TlsOutbound {
     }
 }
 
-#[async_trait]
 impl Outbound for TlsOutbound {
     type Wire = TlsStream;
     type ConnectTarget = TlsOutboundTarget;
+    type Error = std::io::Error;
 
     async fn build(target: Self::ConnectTarget) -> std::io::Result<Self> {
         let connector = TlsConnector::new(target.config)
@@ -100,6 +100,7 @@ impl Outbound for TlsOutbound {
     }
 
     async fn connect(&self) -> std::io::Result<Self::Wire> {
-        self.connector.connect(self.target.clone()).await
+        // `TlsConnectError` -> `io::Error` via `From` (see connector.rs).
+        Ok(self.connector.connect(self.target.clone()).await?)
     }
 }

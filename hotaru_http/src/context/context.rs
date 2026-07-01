@@ -1,32 +1,34 @@
+use akari::Value;
 use hotaru_core::app::common::{RunMode, RuntimeConfig};
-use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::connection::TransportSpec;
+use hotaru_core::connection::error::ConnectionError;
 use hotaru_core::debug_log;
 use hotaru_core::extensions::{Locals, Params};
+use hotaru_core::protocol::{
+    BoxProtocolError, EndpointOutcome, ProtocolError, ProtocolRole, RequestContext,
+};
 use hotaru_core::url::UrlNode;
-use akari::Value;
-use hotaru_core::protocol::{BoxProtocolError, ProtocolError, ProtocolRole, RequestContext};
 
+use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use tokio::io::{AsyncBufRead, AsyncWrite};
 
 use crate::channel::Http1Channel;
 use crate::message::body::HttpBody;
 use crate::message::http_value::{HttpMethod, StatusCode};
-use crate::protocol::HttpError;
 use crate::message::meta::HttpMeta;
 use crate::message::request::HttpRequest;
 use crate::message::response::{HttpResponse, response_templates};
+use crate::protocol::HttpError;
 use crate::security::safety::HttpSafety;
 
 use crate::util::cookie::{Cookie, CookieMap};
 use crate::util::form::{MultiForm, UrlEncodedForm};
 
 /// Executable context - determines what's available for execution
-pub enum Executable<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub enum Executable<TS: TransportSpec = hotaru_io_tokio::TcpTransport> {
     /// Server context with runtime config and matched endpoint.
     Request {
         runtime: Arc<RuntimeConfig>,
@@ -40,7 +42,7 @@ pub enum Executable<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
 ///
 /// This context flows through handlers and middleware, supporting both
 /// server-side request handling and client-side response processing.
-pub struct HttpContext<TS: TransportSpec = crate::connection::tcp::TcpTransport> {
+pub struct HttpContext<TS: TransportSpec = hotaru_io_tokio::TcpTransport> {
     pub request: HttpRequest,
     pub response: HttpResponse,
 
@@ -64,7 +66,7 @@ pub struct HttpContext<TS: TransportSpec = crate::connection::tcp::TcpTransport>
 }
 
 // Type alias for backward compatibility
-pub type HttpReqCtx<TS = crate::connection::tcp::TcpTransport> = HttpContext<TS>;
+pub type HttpReqCtx<TS = hotaru_io_tokio::TcpTransport> = HttpContext<TS>;
 
 /// Placeholder address for uninitialized or unknown connections.
 /// `0.0.0.0:0` indicates that no socket address information is available.
@@ -73,19 +75,24 @@ const UNSET_ADDR: SocketAddr =
 
 impl<TS: TransportSpec> HttpContext<TS> {
     /// Creates a new server context with socket addresses.
+    ///
+    /// `safety` is the per-connection baseline supplied by the protocol;
+    /// per-endpoint overrides overlay on top of it in `request_check` /
+    /// `parse_body`.
     pub fn new_server(
         runtime: Arc<RuntimeConfig>,
         endpoint: Arc<UrlNode<HttpContext<TS>, TS>>,
         request: HttpRequest,
         remote_addr: Option<SocketAddr>,
         local_addr: Option<SocketAddr>,
+        safety: HttpSafety,
     ) -> Self {
         Self {
             request,
             response: HttpResponse::default(),
             executable: Executable::Request { runtime, endpoint },
             host: None,
-            safety: HttpSafety::default(),
+            safety,
             remote_addr,
             local_addr,
             params: Default::default(),
@@ -94,13 +101,17 @@ impl<TS: TransportSpec> HttpContext<TS> {
         }
     }
 
-    /// Creates a new client context
+    /// Creates a new client context.
+    ///
+    /// An empty `host` is normalized to `None` so downstream Host auto-fill
+    /// never emits a `Host:` header with an empty value (which nginx and
+    /// other strict servers reject with 400).
     pub fn new_client(host: String, safety: HttpSafety) -> Self {
         Self {
             request: HttpRequest::default(),
             response: HttpResponse::default(),
             executable: Executable::<TS>::Response,
-            host: Some(host),
+            host: if host.is_empty() { None } else { Some(host) },
             safety,
             remote_addr: None,
             local_addr: None,
@@ -215,7 +226,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
         reader: &mut R,
     ) -> Result<HttpRequest, ConnectionError>
     where
-        R: AsyncBufRead + Unpin,
+        R: HotaruBufRead<Error = std::io::Error> + Unpin + Send,
     {
         Ok(HttpRequest::parse_lazy(
             reader,
@@ -228,7 +239,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// Sends the response
     pub async fn send_response<W>(response: HttpResponse, writer: &mut W)
     where
-        W: AsyncWrite + Unpin,
+        W: HotaruWrite<Error = std::io::Error> + Unpin + Send,
     {
         let _ = response.send(writer).await;
     }
@@ -252,14 +263,12 @@ impl<TS: TransportSpec> HttpContext<TS> {
             let result = endpoint.run(self).await.map_err(|e| e.boxed());
             debug_log!("HTTP Context: Handler completed");
             result
-
         } else {
             debug_log!("HTTP Context: No endpoint available (client context)");
             // No endpoint available (client context)
             Ok(self)
         }
     }
-
 
     /// Checks whether the request fulfills the endpoint's security requirements.
     ///
@@ -269,10 +278,12 @@ impl<TS: TransportSpec> HttpContext<TS> {
         &mut self,
         endpoint: &Arc<UrlNode<HttpContext<TS>, TS>>,
     ) -> Result<(), HttpError> {
-        let config = endpoint.get_params::<HttpSafety>().unwrap_or_default();
-        // println!(
-        //     "Checking request: {:?} {}{} ",config,self.request.meta.method(),config.check_method(&self.request.meta.method())
-        // );
+        // Start from the protocol baseline (`self.safety`); overlay any
+        // per-endpoint override on top.
+        let mut config = self.safety.clone();
+        if let Some(ep) = endpoint.get_params::<HttpSafety>() {
+            config.update(&ep);
+        }
         if !config.check_body_size(self.request.meta.get_content_length().unwrap_or(0)) {
             return Err(HttpError::PayloadTooLarge);
         }
@@ -311,17 +322,19 @@ impl<TS: TransportSpec> HttpContext<TS> {
     /// The automatic parsing is not recommended, as it can lead to performance issues and security vulnerabilities.
     /// If you didn't parse body, the body will be `HttpBody::Unparsed`.
     pub async fn parse_body(&mut self) {
-        let safety_settings = if let Some(endpoint) = self.endpoint() {
-            let mut settings = endpoint.get_params::<HttpSafety>().unwrap_or_default();
-            settings.update(&endpoint.get_params::<HttpSafety>().unwrap_or_default());
-            settings
-        } else {
-            self.safety.clone()
-        };
+        // Start from the protocol baseline (`self.safety`); overlay any
+        // per-endpoint override on top. (The prior implementation fetched
+        // `endpoint.get_params::<HttpSafety>()` twice — the second call was
+        // a no-op clone, and the baseline was ignored entirely.)
+        let mut settings = self.safety.clone();
+        if let Some(endpoint) = self.endpoint() {
+            if let Some(ep) = endpoint.get_params::<HttpSafety>() {
+                settings.update(&ep);
+            }
+        }
 
-        // Take the body out, replacing it with the default temporarily
         let body = std::mem::take(&mut self.request.body);
-        self.request.body = body.parse_buffer(&safety_settings);
+        self.request.body = body.parse_buffer(&settings);
     }
 
     /// Returns the body of the request as a reference to `HttpBody`.
@@ -505,6 +518,25 @@ impl<TS: TransportSpec> HttpContext<TS> {
         self.response.body = body;
         self
     }
+
+    /// Take the request out of this HTTP context for protocol transmission.
+    ///
+    /// If the request does not already carry a Host value, use the context's
+    /// configured host when it is non-empty.
+    pub(crate) fn take_request(&mut self) -> HttpRequest {
+        if self.request.meta.get_host().is_none() {
+            if let Some(host) = self.host.as_deref().filter(|h| !h.is_empty()) {
+                self.request.meta.set_host(Some(host.to_string()));
+            }
+        }
+
+        std::mem::take(&mut self.request)
+    }
+
+    /// Store a protocol response into this HTTP context.
+    pub(crate) fn set_response(&mut self, response: HttpResponse) {
+        self.response = response;
+    }
 }
 
 impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
@@ -547,6 +579,15 @@ impl<TS: TransportSpec> RequestContext for HttpContext<TS> {
     }
 }
 
+/// Endpoint bodies returning `HttpResponse` keep working: the value is stored
+/// into the context's response slot here instead of by the macro wrapper.
+impl<TS: TransportSpec> EndpointOutcome<HttpContext<TS>> for HttpResponse {
+    fn apply_to(self, ctx: &mut HttpContext<TS>) -> Result<(), HttpError> {
+        ctx.response = self;
+        Ok(())
+    }
+}
+
 impl<TS: TransportSpec> Default for HttpContext<TS> {
     fn default() -> Self {
         Self::new_client(String::new(), HttpSafety::default())
@@ -560,7 +601,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
 }
 
 // Type alias for backward compatibility with client code
-pub type HttpResCtx<TS = crate::connection::tcp::TcpTransport> = HttpContext<TS>;
+pub type HttpResCtx<TS = hotaru_io_tokio::TcpTransport> = HttpContext<TS>;
 
 impl<TS: TransportSpec> HttpContext<TS> {
     /// Creates a client context for sending requests (backward compatibility)
@@ -570,11 +611,67 @@ impl<TS: TransportSpec> HttpContext<TS> {
 
     pub fn request(&mut self, mut request: HttpRequest) {
         if request.meta.get_host().is_none() {
-            if let Some(ref host) = self.host {
-                request.meta.set_host(Some(host.clone()));
+            if let Some(host) = self.host.as_deref().filter(|h| !h.is_empty()) {
+                request.meta.set_host(Some(host.to_string()));
             }
         };
         self.request = request;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::message::http_value::StatusCode;
+    use crate::message::response::response_templates;
+
+    type TestHttpContext = HttpContext<hotaru_io_tokio::TcpTransport>;
+
+    fn client_context(host: &str) -> TestHttpContext {
+        TestHttpContext::new_client(host.to_string(), HttpSafety::default())
+    }
+
+    #[test]
+    fn take_request_sets_missing_host_from_context() {
+        let mut ctx = client_context("example.com");
+
+        let mut request = ctx.take_request();
+
+        assert_eq!(request.meta.get_host(), Some("example.com".to_string()));
+    }
+
+    #[test]
+    fn take_request_preserves_existing_request_host() {
+        let mut ctx = client_context("context.example");
+        let mut request = HttpRequest::default();
+        request.meta.set_host(Some("request.example".to_string()));
+        ctx.request = request;
+
+        let mut request = ctx.take_request();
+
+        assert_eq!(request.meta.get_host(), Some("request.example".to_string()));
+    }
+
+    #[test]
+    fn take_request_ignores_empty_context_host() {
+        let mut ctx = client_context("");
+
+        let mut request = ctx.take_request();
+
+        assert_eq!(request.meta.get_host(), None);
+    }
+
+    #[test]
+    fn set_response_stores_response() {
+        let mut ctx = client_context("");
+        let response = response_templates::normal_response(StatusCode::CREATED, "created");
+
+        ctx.set_response(response);
+
+        assert_eq!(
+            ctx.response.meta.start_line.status_code(),
+            StatusCode::CREATED
+        );
     }
 }
 
@@ -587,49 +684,49 @@ impl<TS: TransportSpec> HttpContext<TS> {
 //     use hotaru_tls::{TlsClientConfig, TlsConnector, TlsTransport};
 //     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-    // =========================================================================
-    // Socket Address Accessor Tests
-    // =========================================================================
+// =========================================================================
+// Socket Address Accessor Tests
+// =========================================================================
 
-    // #[test]
-    // fn test_client_ip_with_address() {
-    //     use crate::app::application::App;
-    //     use crate::http::request::HttpRequest;
-    //     use crate::url::Url;
-    //     use std::sync::Arc;
+// #[test]
+// fn test_client_ip_with_address() {
+//     use crate::app::application::App;
+//     use crate::http::request::HttpRequest;
+//     use crate::url::Url;
+//     use std::sync::Arc;
 
-    //     let app = App::new().build();
-    //     let endpoint = Arc::new(Url::<super::HttpContext>::default());
-    //     let request = HttpRequest::default();
-    //     let remote = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 54321);
-    //     let local = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8080);
+//     let app = App::new().build();
+//     let endpoint = Arc::new(Url::<super::HttpContext>::default());
+//     let request = HttpRequest::default();
+//     let remote = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 54321);
+//     let local = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8080);
 
-    //     let ctx = super::HttpContext::new_server(app, endpoint, request, Some(remote), Some(local));
+//     let ctx = super::HttpContext::new_server(app, endpoint, request, Some(remote), Some(local));
 
-    //     // Test client_ip()
-    //     assert_eq!(ctx.client_ip(), Some(remote));
-    //     assert_eq!(ctx.client_ip_or_default(), remote);
+//     // Test client_ip()
+//     assert_eq!(ctx.client_ip(), Some(remote));
+//     assert_eq!(ctx.client_ip_or_default(), remote);
 
-    //     // Test client_ip_only()
-    //     assert_eq!(
-    //         ctx.client_ip_only(),
-    //         Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)))
-    //     );
-    //     assert_eq!(
-    //         ctx.client_ip_only_or_default(),
-    //         IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100))
-    //     );
+//     // Test client_ip_only()
+//     assert_eq!(
+//         ctx.client_ip_only(),
+//         Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)))
+//     );
+//     assert_eq!(
+//         ctx.client_ip_only_or_default(),
+//         IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100))
+//     );
 
-    //     // Test server_addr()
-    //     assert_eq!(ctx.server_addr(), Some(local));
-    //     assert_eq!(ctx.server_addr_or_default(), local);
+//     // Test server_addr()
+//     assert_eq!(ctx.server_addr(), Some(local));
+//     assert_eq!(ctx.server_addr_or_default(), local);
 
-    //     // Test aliases
-    //     assert_eq!(ctx.remote_addr(), Some(remote));
-    //     assert_eq!(ctx.remote_addr_or_default(), remote);
-    //     assert_eq!(ctx.local_addr(), Some(local));
-    //     assert_eq!(ctx.local_addr_or_default(), local);
-    // }
+//     // Test aliases
+//     assert_eq!(ctx.remote_addr(), Some(remote));
+//     assert_eq!(ctx.remote_addr_or_default(), remote);
+//     assert_eq!(ctx.local_addr(), Some(local));
+//     assert_eq!(ctx.local_addr_or_default(), local);
+// }
 
 //     #[test]
 //     fn test_client_ip_without_address() {
@@ -673,7 +770,7 @@ impl<TS: TransportSpec> HttpContext<TS> {
 
 //     #[test]
 //     fn test_client_context_has_no_addresses() {
-//         let ctx = super::HttpContext::<crate::connection::tcp::TcpTransport>::new_client(
+//         let ctx = super::HttpContext::<hotaru_io_tokio::TcpTransport>::new_client(
 //             "example.com".to_string(),
 //             HttpSafety::default(),
 //         );

@@ -8,7 +8,7 @@ use crate::message::meta::HttpMeta;
 use crate::context::io;
 use crate::message::start_line::{HttpStartLine, ResponseStartLine};
 use std::collections::HashMap;
-use tokio::io::{AsyncBufRead, AsyncWrite};
+use hotaru_core::connection::{HotaruBufRead, HotaruWrite};
 
 #[derive(Debug, Clone)]
 pub struct HttpResponse {
@@ -21,7 +21,7 @@ impl HttpResponse {
         Self { meta, body }
     }
 
-    pub async fn parse_lazy<R: AsyncBufRead + Unpin>(
+    pub async fn parse_lazy<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         stream: &mut R,
         config: &HttpSafety,
         print_raw: bool,
@@ -77,7 +77,7 @@ impl HttpResponse {
 
     /// Send the response
     /// When this method is changed, please also check Request::send()
-    pub async fn send<W: AsyncWrite + Unpin>(self, writer: &mut W) -> std::io::Result<()> {
+    pub async fn send<W: HotaruWrite<Error = std::io::Error> + Unpin + Send>(self, writer: &mut W) -> std::io::Result<()> {
         io::send(self.meta, self.body, writer).await
     }
 

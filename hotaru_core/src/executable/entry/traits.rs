@@ -1,12 +1,14 @@
-use core::{any::Any, future::Future, pin::Pin, time::Duration};
-use std::sync::{Arc, RwLock};
-
-use akari::extensions::{Locals, Params};
-use tokio::io::BufReader;
+use alloc::sync::Arc;
+use core::{any::Any, time::Duration};
 
 use crate::{
-    app::common::RuntimeConfig, connection::{ConnStream, TransportSpec} 
+    alias::PRwLock,
+    app::common::RuntimeConfig,
+    connection::{
+        BufferedReadHalf, BufferedWriteHalf, ConnStream, MaybeSendBoxFuture, TransportSpec,
+    },
 };
+use akari::extensions::{Locals, Params};
 
 /// Neutral protocol-entry boundary shared by server and client execution.
 ///
@@ -23,47 +25,46 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
     fn serve(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
+    ) -> MaybeSendBoxFuture<'static, ()>;
 
     /// Handle an upgrade from another protocol.
     fn serve_upgrade(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-        params: RwLock<Params>,
-        locals: RwLock<Locals>,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
+        params: PRwLock<Params>,
+        locals: PRwLock<Locals>,
+    ) -> MaybeSendBoxFuture<'static, ()>;
 
     fn request(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>;
+    ) -> MaybeSendBoxFuture<'static, ()>;
 
     fn request_upgrade(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-        params: RwLock<Params>,
-        locals: RwLock<Locals>,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>>; 
+        params: PRwLock<Params>,
+        locals: PRwLock<Locals>,
+    ) -> MaybeSendBoxFuture<'static, ()>;
 
     /// Returns the protocol's default connection-timeout policy.
     ///
-    /// Used to resolve [`TimeoutSetting::Inherit`] at connection time.
+    /// Used to resolve [`TimeoutSetting::Inherit`](crate::app::common::TimeoutSetting::Inherit) at connection time.
     fn default_connection_timeout(&self) -> Option<Duration>;
 
     /// Allows downcasting.
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
-

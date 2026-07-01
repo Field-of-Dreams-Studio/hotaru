@@ -1,9 +1,8 @@
 use hotaru::http::*;
 use hotaru::prelude::*;
 
-#[tokio::main]
-async fn main() {
-    APP.clone().run().await;
+fn main() {
+    run_server!(APP);
 }
 
 LServer!(
@@ -71,6 +70,17 @@ endpoint! {
                 "Template rendering"
             ]
         )
+    }
+}
+
+// Bench: regex-routed endpoint with no I/O. Exercises the router's regex
+// match path so the RegexSegment caching change is observable end-to-end.
+endpoint! {
+    APP.url("/n/<int:id>"),
+
+    bench_int <HTTP> {
+        let id = req.pattern("id").unwrap_or_else(|| "0".to_string());
+        response_templates::normal_response(200u16, format!("ok {}", id))
     }
 }
 

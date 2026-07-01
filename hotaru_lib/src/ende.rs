@@ -28,12 +28,13 @@ pub mod aes {
     //     key
     // }
 
+    /// HKDF-SHA256, extract-then-expand. Not a password KDF — no brute-force
+    /// stretching, so `password` must be high-entropy (32+ random bytes).
     pub fn derive_key(password: &str, salt: &[u8]) -> [u8; 32] {
         let mut key = [0u8; 32];
-        let info = password.as_bytes();
-        Hkdf::<Sha256>::new(None, salt)
-            .expand(info, &mut key)
-            .unwrap();
+        Hkdf::<Sha256>::new(Some(salt), password.as_bytes())
+            .expand(b"hotaru.ende.aes-256-gcm.v1", &mut key)
+            .expect("32 bytes is within HKDF-SHA256 output limit");
         key
     }
 
@@ -153,5 +154,23 @@ mod test {
         println!("Decrypted text: {}", decrypted);
 
         assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn wrong_password_fails() {
+        let encrypted = super::aes::encrypt("data", "correct password").expect("Encryption failed");
+        assert!(super::aes::decrypt(&encrypted, "wrong password").is_err());
+    }
+
+    #[test]
+    fn tampered_ciphertext_fails() {
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+
+        let encrypted = super::aes::encrypt("data", "password").expect("Encryption failed");
+        let mut raw = BASE64.decode(&encrypted).expect("valid base64");
+        let last = raw.len() - 1; // flip a bit in the GCM tag
+        raw[last] ^= 0x01;
+        let tampered = BASE64.encode(raw);
+        assert!(super::aes::decrypt(&tampered, "password").is_err());
     }
 }

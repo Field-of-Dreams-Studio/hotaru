@@ -5,7 +5,7 @@ use crate::util::form::*;
 use crate::message::http_value::*;
 use crate::message::meta::HttpMeta;
 use akari::Value;
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt};
+use hotaru_core::connection::HotaruBufRead;
 
 static EMPTY: Vec<u8> = Vec::new();
 
@@ -27,7 +27,7 @@ pub enum HttpBody {
 }
 
 impl HttpBody {
-    pub async fn read_buffer<R: AsyncBufRead + Unpin>(
+    pub async fn read_buffer<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
         header: &mut HttpMeta,
         parse_config: &HttpSafety,
@@ -86,7 +86,7 @@ impl HttpBody {
     }
 
     /// Parse the HTTP body directly from a TCP Stream
-    pub async fn direct_parse<R: AsyncBufRead + Unpin>(
+    pub async fn direct_parse<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
         header: &mut HttpMeta,
         parse_config: &HttpSafety,
@@ -100,13 +100,13 @@ impl HttpBody {
         buffer.parse_buffer(parse_config)
     }
 
-    pub async fn read_binary_info<R: AsyncBufRead + Unpin>(
+    pub async fn read_binary_info<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
         buf_reader: &mut R,
         header: &mut HttpMeta,
         parse_config: &HttpSafety,
     ) -> std::io::Result<Vec<u8>> {
         /// Reads body with Content-Length
-        async fn read_content_length_body<R: AsyncBufRead + Unpin>(
+        async fn read_content_length_body<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
             buf_reader: &mut R,
             safety_setting: &HttpSafety,
             content_length: usize,
@@ -144,7 +144,7 @@ impl HttpBody {
         /// Malformed but size-compliant data will be caught at the application layer or cause
         /// predictable failures without security impact. This saves energy while maintaining
         /// equivalent security to exhaustive validation.
-        async fn read_chunked_body<R: AsyncBufRead + Unpin>(
+        async fn read_chunked_body<R: HotaruBufRead<Error = std::io::Error> + Unpin + Send>(
             buf_reader: &mut R,
             header: &mut HttpMeta,
             safety_setting: &HttpSafety,

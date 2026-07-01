@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 use super::super::pattern::PathPattern;
 use super::lexer::{RawToken, TypeKind};
 
@@ -75,8 +77,8 @@ impl core::fmt::Display for PatternError {
 }
 
 /// Convert a token stream into:
-/// - Vec<PathPattern>: one entry per path segment (split on Slash tokens)
-/// - Vec<Option<String>>: optional parameter name associated with each segment
+/// - `Vec<PathPattern>`: one entry per path segment (split on Slash tokens)
+/// - `Vec<Option<String>>`: optional parameter name associated with each segment
 ///
 /// Returns Result to capture structural errors in the token stream.
 ///
@@ -85,12 +87,12 @@ impl core::fmt::Display for PatternError {
 ///   consecutive slashes or leading/trailing slash) are skipped.
 /// - A segment can be:
 ///   - Literal: only literal content, no angle patterns.
-///   - Any: produced by <str> or <name> with no other content in the segment.
-///   - Regex: produced by typed patterns (<int>, <uuid>, custom regex blocks), or any
+///   - Any: produced by `<str>` or `<name>` with no other content in the segment.
+///   - Regex: produced by typed patterns (`<int>`, `<uuid>`, custom regex blocks), or any
 ///     mixture of literal + dynamic parts inside a single segment. Literal parts are
 ///     regex-escaped when embedded.
-///   - AnyPath: produced by <**path>. It must be the only content of the segment.
-/// - Names: If a segment defines a name via <..:name> or <name>, it's captured as Some(name).
+///   - AnyPath: produced by `<**path>`. It must be the only content of the segment.
+/// - Names: If a segment defines a name via `<..:name>` or `<name>`, it's captured as Some(name).
 ///   If multiple names are specified in a single segment, the first one wins.
 pub fn tokens_to_patterns(
     tokens: &Vec<RawToken>,
@@ -229,7 +231,7 @@ pub fn tokens_to_patterns(
             if seg_only_any && seg_regex.is_empty() {
                 patterns.push(PathPattern::Any);
             } else {
-                patterns.push(PathPattern::Regex(seg_regex));
+                patterns.push(PathPattern::regex_path(seg_regex));
             }
             names.push(seg_name);
         } else if !seg_literal.is_empty() {
@@ -441,7 +443,7 @@ mod tests {
 
     #[test]
     fn ok_literal_and_named_any_segments() {
-        let tokens = tokenize("/users/<id>/details");
+        let tokens = tokenize("/users/<id>/details").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -457,7 +459,7 @@ mod tests {
 
     #[test]
     fn root_url() {
-        let tokens = tokenize("/");
+        let tokens = tokenize("/").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         // "/" is a separator between two empty segments
         assert_eq!(
@@ -491,7 +493,7 @@ mod tests {
 
     #[test]
     fn ok_anypath_catch_all() {
-        let tokens = tokenize("/files/<**path:rest>");
+        let tokens = tokenize("/files/<**path:rest>").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -506,7 +508,7 @@ mod tests {
 
     #[test]
     fn ok_name_only_any() {
-        let tokens = tokenize("/<slug>");
+        let tokens = tokenize("/<slug>").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -517,13 +519,13 @@ mod tests {
 
     #[test]
     fn ok_str_any_without_name() {
-        let tokens = tokenize("/<str>");
+        let tokens = tokenize("/<str>").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
             vec![
                 PathPattern::Literal("".into()),
-                PathPattern::Regex("[^/]+".into())
+                PathPattern::regex_path("[^/]+"),
             ]
         );
         assert_eq!(names, vec![None, None]);
@@ -531,13 +533,13 @@ mod tests {
 
     #[test]
     fn any_str_with_trailing_slash() {
-        let tokens = tokenize("/<str>/");
+        let tokens = tokenize("/<str>/").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
             vec![
                 PathPattern::Literal("".into()),
-                PathPattern::Regex("[^/]+".into()),
+                PathPattern::regex_path("[^/]+"),
                 PathPattern::Literal("".into()),
             ]
         );
@@ -546,14 +548,14 @@ mod tests {
 
     #[test]
     fn error_unterminated_angle() {
-        let tokens = tokenize("/<int");
+        let tokens = tokenize("/<int").unwrap();
         let err = tokens_to_patterns(&tokens).unwrap_err();
         matches!(err, PatternError::ExpectedAngleClose { .. });
     }
 
     #[test]
     fn error_anypath_mixed_with_literal() {
-        let tokens = tokenize("/files\\<**path>");
+        let tokens = tokenize("/files\\<**path>").unwrap();
         let (pats, names) = tokens_to_patterns(&tokens).unwrap();
         assert_eq!(
             pats,
@@ -567,7 +569,7 @@ mod tests {
 
     #[test]
     fn error_colon_without_name() {
-        let tokens = tokenize("/<int:>");
+        let tokens = tokenize("/<int:>").unwrap();
         let err = tokens_to_patterns(&tokens).unwrap_err();
         matches!(err, PatternError::ExpectedIdentAfterColon { .. });
     }

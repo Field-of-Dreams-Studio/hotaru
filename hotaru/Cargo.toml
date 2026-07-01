@@ -1,32 +1,46 @@
 [package]
 name = "hotaru"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>", "JerrySu <jerrysu@fds.moe>"]
-description = "Small, sweet, easy framework for full-stack web application"
+description = "Small, sweet, easy framework with a protocol-neutral, no_std-ready core"
 license = "MIT"
 repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
 homepage = "https://hotaru.rs"
-categories = ["network-programming", "web-programming::http-server" ]
-keywords = ["full-stack", "web-framework", "hotaru"]
+categories = ["network-programming", "web-programming::http-server", "web-programming::http-client", "asynchronous"]
+keywords = ["web-framework", "full-stack", "http", "async", "hotaru"]
 readme = "readme.md"
 
 [dependencies]
-akari = { version = "0.2.6", features = ["full"] }
+akari = { version = "0.2.8", default-features = false }
 regex = "1.12"
-tokio = { version = "1.28", features = ["full"] }
+tokio = { version = "1.28", features = ["full"], optional = true }
 futures = "0.3"
 once_cell = "1.17.2"
-hotaru_trans = { path = "../hotaru_trans", version="0.8.2", default-features = false }
-hotaru_core = { path = "../hotaru_core", version="0.8.2" }
-hotaru_http = { path = "../hotaru_http", version = "0.8.2", optional = true }
-ahttpm = { path = "../ahttpm", version="0.7.0", optional = true }
-hotaru_lib = { path = "../hotaru_lib", version="0.8.2", features = ["url_encoding"]  }
+hotaru_trans = { path = "../hotaru_trans", version = "=0.8.3", default-features = false }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = false }
+hotaru_rt_tokio = { path = "../hotaru_rt_tokio", version = "=0.8.3", optional = true }
+hotaru_io_tokio = { path = "../hotaru_io_tokio", version = "=0.8.3", optional = true }
+hotaru_io_futures = { path = "../hotaru_io_futures", version = "=0.8.3", optional = true }
+# `hotaru_io_embedded` is intentionally NOT re-exported through the umbrella in
+# 0.8.x. `hotaru` is the std convenience layer (its prelude pulls
+# `std::thread::sleep`, `std::sync::Arc`, `once_cell::sync::Lazy`), so it cannot
+# build `no_std`. For bare-metal, depend on `hotaru_core` + `hotaru_io_embedded`
+# directly — see readme.md ("no_std / embedded").
+# hotaru_io_embedded = { path = "../hotaru_io_embedded", version = "=0.8.3", optional = true, default-features = false }
+hotaru_http = { path = "../hotaru_http", version = "=0.8.3", optional = true }
+ahttpm = { path = "../ahttpm", version = "=0.7.1", optional = true }
+hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3", optional = true, default-features = false, features = ["url_encoding"] }
 # ctor is only needed when external-ctor feature is enabled
 ctor = { version = "0.4.0", optional = true }
 
 [features]
-default = ["trans", "http"]
+default = ["trans", "http", "tokio", "full"]
+
+# Regex/akari flavour forwarded to hotaru_core (exactly one). `full` pulls
+# unicode-aware regex + full akari; `lite` is the smaller no_std flavour.
+full = ["hotaru_core/full", "akari/full"]
+lite = ["hotaru_core/lite", "akari/no_std"]
 
 # Enable debug logging for development and troubleshooting
 debug = ["hotaru_core/dev-log"]
@@ -41,7 +55,8 @@ attr = ["hotaru_trans/attr"]
 
 # HTTP/1.1 protocol stack (request/response types, codec, helpers).
 # On by default. Turn off for protocol-only builds (e.g. gRPC-only).
-http = ["dep:hotaru_http", "dep:ahttpm"]
+http = ["dep:hotaru_http", "dep:ahttpm", "lib"]
+lib = ["dep:hotaru_lib"]
 
 # HTTPS support — implies `http`; forwards to hotaru_http's tls feature.
 https = ["http", "hotaru_http/tls"]
@@ -49,3 +64,16 @@ https = ["http", "hotaru_http/tls"]
 # HTTP body compression (gzip/deflate/brotli/zstd) for Content-Encoding.
 # Implies `http`. Off by default to keep clean builds fast.
 http_compression = ["http", "hotaru_http/compression", "hotaru_lib/compression"]
+
+tokio = ["hotaru_core/std", "hotaru_core/spawn_send", "dep:tokio", "dep:hotaru_rt_tokio", "hotaru_rt_tokio/std", "io_tokio"]
+std = ["hotaru_core/std"]
+io_futures = ["dep:hotaru_io_futures", "hotaru_io_futures/std"]
+io_tokio = ["dep:hotaru_io_tokio", "hotaru_io_tokio/std"]
+spawn_send = ["hotaru_core/spawn_send"]
+spawn_local = ["hotaru_core/spawn_local"]
+
+# `embedded` / `io_embedded` are dropped from the umbrella in 0.8.x — `hotaru` is
+# a std-only convenience crate and cannot build no_std. For bare-metal targets,
+# depend on `hotaru_core` + `hotaru_io_embedded` directly.
+# embedded = ["hotaru_core/embedded", "hotaru_io_embedded?/embedded"]
+# io_embedded = ["dep:hotaru_io_embedded"]

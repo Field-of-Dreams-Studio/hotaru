@@ -17,6 +17,7 @@ pub struct TlsTransport;
 
 impl TransportSpec for TlsTransport {
     type Wire = TlsStream;
+    type IoError = std::io::Error;
     type Inbound = TlsInbound;
     type Outbound = TlsOutbound;
 }

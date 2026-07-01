@@ -24,6 +24,8 @@ const DEFAULT_MAX_AGE: u64 = 86400;
 ///
 /// # Example
 /// ```
+/// use htmstd::cors_settings::{AppCorsSettings, AllowedHeaders, AllowedMethods, AllowedOrigins};
+///
 /// let base = AppCorsSettings::default();
 /// let override_settings = AppCorsSettings {
 ///     allowed_origins: AllowedOrigins::Some(vec!["https://trusted.com".into()].into_iter().collect()),
@@ -339,6 +341,8 @@ impl AppCorsSettings {
     ///
     /// # Example
     /// ```
+    /// use htmstd::cors_settings::{AppCorsSettings, AllowedOrigins};
+    ///
     /// let base = AppCorsSettings::default();
     /// let override_settings = AppCorsSettings {
     ///     allowed_origins: AllowedOrigins::All,

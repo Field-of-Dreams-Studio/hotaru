@@ -1,9 +1,16 @@
-use core::{any::Any, future::Future, pin::Pin, time::Duration};
-use std::sync::{Arc, RwLock};
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
+use core::{any::Any, time::Duration};
+use alloc::sync::Arc;
+
+use crate::{
+    alias::PRwLock,
+    connection::{
+        BufferedReadHalf, BufferedWriteHalf, HotaruRead, HotaruWrite, MaybeSendBoxFuture,
+    },
+};
 
 use akari::extensions::{Locals, Params, ParamsClone};
-use tokio::io::BufReader;
-
 use crate::{
     app::common::RuntimeConfig, connection::{ConnStream, TransportSpec}, executable::{ExecutableBinding, access::{access_point::AccessPoint, table::AccessPointTable}, entry::ProtocolEntryTrait, middleware::AsyncMiddlewareChain}, protocol::Protocol, url::{PathPattern, UrlError, UrlRegistration, UrlRoot, node::StepName}
 };
@@ -74,8 +81,9 @@ where
     /// The caller (e.g. `Client::open_channel`) owns connection sourcing.
     pub fn create_channel(&self, wire: TS::Wire) -> P::Channel {
         let (read, write, meta) = wire.split();
-        let reader = BufReader::new(read);
-        self.protocol.clone().open_channel(reader, write, meta)
+        let reader = read.into_buf();
+        let writer = write.into_buf_write();
+        self.protocol.clone().open_channel(reader, writer, meta)
     }
 }
 
@@ -83,7 +91,7 @@ impl<P, TS> ProtocolEntryTrait<TS> for ProtocolEntry<P, TS>
 where
     P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static,
     TS: TransportSpec,
-{ 
+{
     fn test(&self, buf: &[u8]) -> bool {
         P::detect(buf)
     }
@@ -95,10 +103,10 @@ where
     fn serve(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+    ) -> MaybeSendBoxFuture<'static, ()> {
         let protocol = self.protocol.clone();
         let root = self.root_handler.clone();
 
@@ -122,22 +130,22 @@ where
     fn serve_upgrade(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-        _params: RwLock<Params>,
-        _locals: RwLock<Locals>,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+        _params: PRwLock<Params>,
+        _locals: PRwLock<Locals>,
+    ) -> MaybeSendBoxFuture<'static, ()> {
         self.serve(runtime, reader, writer, meta)
     }
 
     fn request(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+    ) -> MaybeSendBoxFuture<'static, ()> {
         let protocol = self.protocol.clone();
         let root = self.root_handler.clone();
 
@@ -161,12 +169,12 @@ where
     fn request_upgrade(
         &self,
         runtime: Arc<RuntimeConfig>,
-        reader: BufReader<<TS::Wire as ConnStream>::ReadHalf>,
-        writer: <TS::Wire as ConnStream>::WriteHalf,
+        reader: BufferedReadHalf<TS>,
+        writer: BufferedWriteHalf<TS>,
         meta: <TS::Wire as ConnStream>::Meta,
-        _params: RwLock<Params>,
-        _locals: RwLock<Locals>,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+        _params: PRwLock<Params>,
+        _locals: PRwLock<Locals>,
+    ) -> MaybeSendBoxFuture<'static, ()> {
         self.request(runtime, reader, writer, meta)
     } 
 

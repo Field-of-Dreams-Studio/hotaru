@@ -1,6 +1,5 @@
 //! TLS server-side accepter.
 
-use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsAcceptor as RustlsAcceptor;
@@ -62,17 +61,60 @@ impl TlsAccepter {
     }
 }
 
-#[async_trait]
 impl Accepter for TlsAccepter {
     type Raw = TcpStream;
     type Stream = TlsStream;
+    type Error = TlsUpgradeError;
 
-    async fn upgrade(&self, raw: Self::Raw) -> std::io::Result<Self::Stream> {
+    async fn upgrade(&self, raw: Self::Raw) -> Result<Self::Stream, Self::Error> {
+        // `tokio_rustls::TlsAcceptor::accept` returns `io::Result<TlsStream>`
+        // — the underlying rustls handshake error is already boxed inside
+        // `io::Error`. Wrap it in our own variant so downstream code can
+        // pattern-match on "handshake" without stringly-typed sniffing.
         self.acceptor
             .accept(raw)
             .await
             .map(TlsStream::Server)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            .map_err(TlsUpgradeError::Handshake)
+    }
+}
+
+/// Errors returned by [`TlsAccepter::upgrade`].
+///
+/// A single variant today; kept as an enum so future additions
+/// (peer-cert rejection, timeout, …) can slot in without breaking
+/// `type Error` at call sites.
+#[derive(Debug)]
+pub enum TlsUpgradeError {
+    /// Server-side TLS handshake failed. Inner `io::Error` carries the
+    /// rustls diagnostic verbatim.
+    Handshake(std::io::Error),
+}
+
+impl std::fmt::Display for TlsUpgradeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Handshake(e) => write!(f, "TLS handshake failed: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for TlsUpgradeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Handshake(e) => Some(e),
+        }
+    }
+}
+
+impl From<TlsUpgradeError> for std::io::Error {
+    /// Lossless unwrap: `Handshake` already holds an `io::Error`, so
+    /// downgrading loses only the outer enum tag. Lets
+    /// `TlsInbound::accept` propagate via `?` without a manual map.
+    fn from(err: TlsUpgradeError) -> Self {
+        match err {
+            TlsUpgradeError::Handshake(e) => e,
+        }
     }
 }
 

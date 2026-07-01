@@ -1,16 +1,16 @@
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
+use alloc::sync::Arc;
 use core::future::Future;
-use core::pin::Pin;
-use std::sync::Arc;
 
 // use crate::debug_log;
 
+use crate::marker::{MaybeSend, MaybeSendBoxFuture};
 use crate::protocol::RequestContext;
 use core::any::Any;
 
 /// A boxed future returning `C`.
-pub type BoxFuture<C> = Pin<Box<
-    dyn Future<Output = Result<C, <C as RequestContext>::Error>> + Send + 'static 
->>;
+pub type BoxFuture<C> = MaybeSendBoxFuture<'static, Result<C, <C as RequestContext>::Error>>;
 
 pub type AsyncMiddlewareChain<C> = Vec<Arc<dyn AsyncMiddleware<C>>>;
 
@@ -26,13 +26,12 @@ pub trait AsyncMiddleware<C: RequestContext>: Send + Sync + 'static {
         &self,
         rc: C,
         next: Box<
-            dyn Fn(C) -> Pin<Box<
-                dyn Future<Output = Result<C, <C as RequestContext>::Error>> + Send
-            >> + Send + Sync + 'static,
+            dyn Fn(C) -> MaybeSendBoxFuture<'static, Result<C, <C as RequestContext>::Error>>
+                + Send
+                + Sync
+                + 'static,
         >,
-    ) -> Pin<Box<
-        dyn Future<Output = Result<C, <C as RequestContext>::Error>> + Send + 'static
-    >>; 
+    ) -> MaybeSendBoxFuture<'static, Result<C, <C as RequestContext>::Error>>;
 }
 
 /// The “final handler” trait that sits at the end of a middleware chain.
@@ -41,17 +40,17 @@ pub trait AsyncFinalHandler<C: RequestContext>: Send + Sync + 'static {
     fn handle(&self, ctx: C) -> BoxFuture<C>;
 }
 
-/// Blanket impl: any async fn or closure `Fn(R) -> impl Future<Output=R>` becomes an AsyncFinalHandler<R>.
+/// Blanket impl: any async fn or closure `Fn(R) -> impl Future<Output=R>` becomes an `AsyncFinalHandler<R>`.
 impl<F, Fut, C> AsyncFinalHandler<C> for F
 where
     C: RequestContext,
     F: Fn(C) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Result<C, <C as RequestContext>::Error>> + Send + 'static,
+    Fut: Future<Output = Result<C, <C as RequestContext>::Error>> + MaybeSend + 'static,
 {
     fn handle(&self, ctx: C) -> BoxFuture<C> {
         Box::pin((self)(ctx))
     }
-} 
+}
 
 // HTTP Implementation example (to be moved to hotaru_http crate later)
 // pub struct LoggingMiddleware;

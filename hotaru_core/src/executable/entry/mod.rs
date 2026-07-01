@@ -1,11 +1,14 @@
+/// Builder for protocol entries.
 pub mod builder;
 
-pub use builder::ProtocolEntryBuilder; 
+pub use builder::ProtocolEntryBuilder;
 
-pub mod traits; 
+/// Traits used by protocol entry dispatch.
+pub mod traits;
 
-pub use traits::ProtocolEntryTrait; 
+pub use traits::ProtocolEntryTrait;
 
-pub mod entry; 
+/// Concrete protocol entry implementation.
+pub mod entry;
 
-pub use entry::ProtocolEntry; 
+pub use entry::ProtocolEntry;

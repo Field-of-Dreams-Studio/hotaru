@@ -1,15 +1,17 @@
-use std::sync::Arc;
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
+use alloc::sync::Arc;
 
 use crate::{
     connection::TransportSpec,
-    protocol::Protocol,
     executable::entry::{ProtocolEntry, ProtocolEntryTrait},
     executable::middleware::AsyncMiddleware,
+    protocol::Protocol,
     url::UrlRoot,
 };
 
 /// Neutral builder for one protocol entry shared by server and client runtimes.
-pub struct ProtocolEntryBuilder<P, TS = crate::connection::tcp::TcpTransport>
+pub struct ProtocolEntryBuilder<P, TS>
 where
     P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static,
     TS: TransportSpec,
@@ -23,7 +25,7 @@ impl<P, TS> ProtocolEntryBuilder<P, TS>
 where
     P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static,
     TS: TransportSpec,
-{ 
+{
     pub fn new(protocol: P) -> Self {
         Self {
             protocol: Some(protocol),

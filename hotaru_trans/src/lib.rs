@@ -80,6 +80,64 @@ pub fn run(input: TokenStream) -> TokenStream {
     }
 }
 
+/// `run_server!(APP)` — blocking entry, for sync `fn main()`.
+#[proc_macro]
+pub fn run_server(input: TokenStream) -> TokenStream {
+    let s = input.to_string();
+    format!("::hotaru::hotaru_core::app::server::run_server(({s}).clone())")
+        .parse()
+        .expect("run_server! expansion")
+}
+
+/// `run_server_until!(APP, stop)` — blocking with user-supplied stop future.
+#[proc_macro]
+pub fn run_server_until(input: TokenStream) -> TokenStream {
+    let (server, stop) = split_comma(&input);
+    format!("::hotaru::hotaru_core::app::server::run_server_until(({server}).clone(), {stop})")
+        .parse()
+        .expect("run_server_until! expansion")
+}
+
+/// `run_server_no_block!(APP)` — fire-and-forget inside an async context.
+#[proc_macro]
+pub fn run_server_no_block(input: TokenStream) -> TokenStream {
+    let s = input.to_string();
+    format!("::hotaru::hotaru_core::app::server::run_server_no_block(({s}).clone())")
+        .parse()
+        .expect("run_server_no_block! expansion")
+}
+
+/// `run_server_no_block_until!(APP, stop)` — fire-and-forget with stop.
+#[proc_macro]
+pub fn run_server_no_block_until(input: TokenStream) -> TokenStream {
+    let (server, stop) = split_comma(&input);
+    format!(
+        "::hotaru::hotaru_core::app::server::run_server_no_block_until(({server}).clone(), {stop})"
+    )
+    .parse()
+    .expect("run_server_no_block_until! expansion")
+}
+
+// Splits `input` at the first top-level comma. Used by the two `_until`
+// macros. Not balance-aware for `<` / `>` (turbofish etc.) — upgrade to
+// `syn` parsing if that stops holding.
+fn split_comma(input: &TokenStream) -> (String, String) {
+    let s = input.to_string();
+    let mut depth: i32 = 0;
+    let bytes = s.as_bytes();
+    for (i, &b) in bytes.iter().enumerate() {
+        match b {
+            b'(' | b'[' | b'{' => depth += 1,
+            b')' | b']' | b'}' => depth -= 1,
+            b',' if depth == 0 => {
+                return (s[..i].trim().to_string(), s[i + 1..].trim().to_string());
+            }
+            _ => {}
+        }
+    }
+    panic!("expected `server, stop` — got: {s}");
+}
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "trans")] {
         #[proc_macro]

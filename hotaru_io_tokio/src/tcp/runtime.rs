@@ -1,11 +1,9 @@
 //! TCP inbound and outbound runtime objects.
 
-use async_trait::async_trait;
-use tokio::net::{TcpListener, TcpStream};
+use hotaru_core::connection::{Accepter, Inbound, Outbound};
+use tokio::net::TcpListener;
 
-use crate::connection::{Accepter, Inbound, Outbound};
-
-use super::primitive::TcpAccepter;
+use super::{primitive::TcpAccepter, stream::TcpStream};
 
 /// Bound plain TCP inbound runtime.
 pub struct TcpInbound {
@@ -13,28 +11,30 @@ pub struct TcpInbound {
     accepter: TcpAccepter,
 }
 
-#[async_trait]
 impl Inbound for TcpInbound {
     type Wire = TcpStream;
     type BindTarget = String;
+    type Error = std::io::Error;
 
-    async fn bind(target: Self::BindTarget) -> std::io::Result<Self> {
+    async fn bind(target: Self::BindTarget) -> Result<Self, Self::Error> {
         Ok(Self {
             listener: TcpListener::bind(target).await?,
             accepter: TcpAccepter,
         })
     }
 
-    async fn accept(&self) -> std::io::Result<Self::Wire> {
+    async fn accept(&self) -> Result<Self::Wire, Self::Error> {
         let (tcp, _) = self.listener.accept().await?;
-        self.accepter.upgrade(tcp).await
+        // `TcpAccepter::upgrade` is infallible (its `Error = Infallible`);
+        // the `Err` arm exhausts the empty variant.
+        match self.accepter.upgrade(tcp).await {
+            Ok(wire) => Ok(wire),
+            Err(never) => match never {},
+        }
     }
 }
 
 /// TCP outbound runtime using normal `TcpStream::connect`.
-///
-/// The OS chooses the local address and port. The remote target is
-/// captured at `build` time and used by every `connect` call.
 pub struct TcpOutbound {
     target: String,
 }
@@ -46,19 +46,16 @@ impl TcpOutbound {
     }
 }
 
-#[async_trait]
 impl Outbound for TcpOutbound {
     type Wire = TcpStream;
     type ConnectTarget = String;
+    type Error = std::io::Error;
 
-    async fn build(target: Self::ConnectTarget) -> std::io::Result<Self> {
-        // No work at build time for plain TCP — DNS resolution and socket
-        // creation happen per-`connect`. Future TLS / pooled variants can
-        // do more here.
+    async fn build(target: Self::ConnectTarget) -> Result<Self, Self::Error> {
         Ok(Self { target })
     }
 
-    async fn connect(&self) -> std::io::Result<Self::Wire> {
+    async fn connect(&self) -> Result<Self::Wire, Self::Error> {
         TcpStream::connect(&self.target).await
     }
 }
