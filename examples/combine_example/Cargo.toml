@@ -1,0 +1,8 @@
+[package]
+name = "combine_example"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hotaru = { path = "../../hotaru", version = "=0.8.3" }

@@ -29,7 +29,7 @@ pub type Client<TS = hotaru_io_tokio::TcpTransport, Rt = hotaru_rt_tokio::TokioR
     hotaru_core::app::client::Client<TS, Rt>;
 #[cfg(not(feature = "tokio"))]
 pub type Client<TS, Rt> = hotaru_core::app::client::Client<TS, Rt>;
-pub use hotaru_core::app::common::{RunMode, TimeoutSetting};
+pub use hotaru_core::app::common::{AppInUse, RunMode, TimeoutSetting};
 pub use hotaru_core::url::PathPattern;
 /// Umbrella alias for Hotaru's URL routing tree.
 #[cfg(feature = "io_tokio")]

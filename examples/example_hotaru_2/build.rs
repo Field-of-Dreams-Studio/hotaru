@@ -13,33 +13,22 @@ fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
 
-    // Determine if we're in a workspace by checking for a Cargo.toml in the parent
-    // that contains [workspace]
-    let is_in_workspace = manifest_dir
-        .parent()
-        .map(|parent| {
-            let workspace_toml = parent.join("Cargo.toml");
-            if workspace_toml.exists() {
-                match fs::read_to_string(workspace_toml) {
-                    Ok(content) => content.contains("[workspace]"),
-                    Err(_) => false,
-                }
-            } else {
-                false
-            }
-        })
-        .unwrap_or(false);
+    // Walk ancestors for a Cargo.toml containing [workspace]; example
+    // crates live one level below the workspace root.
+    let workspace_root = manifest_dir.ancestors().skip(1).find(|dir| {
+        fs::read_to_string(dir.join("Cargo.toml"))
+            .map(|content| content.contains("[workspace]"))
+            .unwrap_or(false)
+    });
+    let is_in_workspace = workspace_root.is_some();
 
     // Determine target directory based on environment
     let (output_dir, workspace_root) = if let Ok(dir) = env::var("CARGO_TARGET_DIR") {
         // Explicit target dir specified
         (PathBuf::from(dir), None)
-    } else if is_in_workspace {
+    } else if let Some(root) = workspace_root {
         // We're in a workspace, so target is at workspace root
-        let workspace_root = manifest_dir
-            .parent()
-            .expect("Failed to find workspace root");
-        (workspace_root.join("target"), Some(workspace_root))
+        (root.join("target"), Some(root))
     } else {
         // Standard non-workspace crate
         (manifest_dir.join("target"), None)
@@ -129,9 +118,7 @@ fn main() {
     }
 
     if !copied {
-        println!(
-            "cargo:warning=No assets were copied. Verify that 'templates' or 'programfiles' directories exist."
-        );
+        println!("cargo:warning=No assets were copied. Verify that 'templates' or 'programfiles' directories exist.");
     }
 
     // Create a resource locator module to help find resources at runtime

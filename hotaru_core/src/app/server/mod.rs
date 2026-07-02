@@ -22,12 +22,12 @@ pub use crate::executable::ProtocolRegistryBuilder;
 // use super::middleware::AsyncMiddleware;
 pub use super::common::builder::AppBuilder;
 use super::common::builder::ServerRole;
-use super::common::{OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
+use super::common::{AppInUse, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting};
 
 // type Job = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 /// Server runtime for inbound protocol traffic.
-pub struct Server<TS: TransportSpec, Rt: RuntimeSpec> {
+pub struct Server<TS: TransportSpec, Rt: RuntimeSpec> { 
     pub registry: ProtocolRegistryKind<TS>,
     pub binding: <TS::Inbound as Inbound>::BindTarget,
     pub inbound: <Rt as RuntimeSpec>::OnceCell<Arc<TS::Inbound>>,
@@ -318,6 +318,76 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Server<TS, Rt> {
                 Ok(Arc::new(TS::Inbound::bind(self.binding.clone()).await?))
             })
             .await
+    }
+
+    /// Left-biased merge of two freshly built servers; keeps self's binding
+    /// and inbound. Errs with both apps returned if either `Arc` is shared,
+    /// e.g. already serving.
+    pub fn try_combine(
+        self: Arc<Self>,
+        other: Arc<Self>,
+    ) -> Result<Arc<Self>, AppInUse<Arc<Self>>> {
+        if Arc::ptr_eq(&self, &other) {
+            return Ok(self);
+        }
+        let this = match Arc::try_unwrap(self) {
+            Ok(inner) => inner,
+            Err(shared) => {
+                debug_warn!("Server::try_combine refused: self is shared");
+                return Err(AppInUse { app: shared, other });
+            }
+        };
+        let other = match Arc::try_unwrap(other) {
+            Ok(inner) => inner,
+            Err(shared) => {
+                debug_warn!("Server::try_combine refused: other is shared");
+                return Err(AppInUse {
+                    app: Arc::new(this),
+                    other: shared,
+                });
+            }
+        };
+        // Runtime merges only when both sides are exclusively owned;
+        // otherwise self's Arc is kept as-is (still left-biased).
+        let runtime = match Arc::try_unwrap(this.runtime) {
+            Ok(mut rt) => {
+                if let Ok(other_rt) = Arc::try_unwrap(other.runtime) {
+                    rt.combine(other_rt);
+                }
+                Arc::new(rt)
+            }
+            Err(shared) => shared,
+        };
+        Ok(Arc::new(Self {
+            registry: this.registry.combine(other.registry),
+            binding: this.binding,
+            inbound: this.inbound,
+            runtime,
+            config: this.config.combine(other.config),
+            _rt: PhantomData,
+        }))
+    }
+
+    /// `try_combine` with a safe fallback: on refusal, drops `other` and
+    /// returns `self` unchanged.
+    pub fn combine(self: Arc<Self>, other: Arc<Self>) -> Arc<Self> {
+        self.try_combine(other).unwrap_or_else(|e| e.app)
+    }
+
+    /// `try_combine` retried until both `Arc`s are exclusively owned. Waits
+    /// forever if a reference never drops; wrap in `Rt::timeout` to bound it.
+    pub async fn combine_wait(self: Arc<Self>, other: Arc<Self>) -> Arc<Self> {
+        let (mut a, mut b) = (self, other);
+        loop {
+            match a.try_combine(b) {
+                Ok(app) => return app,
+                Err(e) => {
+                    debug_log!("Server::combine_wait: app Arc still shared; retrying");
+                    (a, b) = (e.app, e.other);
+                    Rt::sleep(Duration::from_millis(10)).await;
+                }
+            }
+        }
     }
 }
 

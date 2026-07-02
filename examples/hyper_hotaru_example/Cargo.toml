@@ -2,11 +2,12 @@
 name = "hyper_hotaru_example"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 [dependencies]
 # Only import the main crates
-hotaru = { path = "../hotaru", version = "=0.8.3" }
-h2per = { path = "../h2per", version = "=0.7.0" }
+hotaru = { path = "../../hotaru", version = "=0.8.3" }
+h2per = { path = "../../h2per", version = "=0.7.0" }
 
 # Required for endpoint macros
 ctor = "0.4"

@@ -18,12 +18,13 @@ members = [
     # "h2per",
     # "hotaru_grpc",
 
-    # "multi_protocol_example",
-    "example_hotaru",
-    # "example_hotaru_2",
-    # "hyper_hotaru_example",
+    # "examples/multi_protocol_example",
+    "examples/example_hotaru",
+    "examples/combine_example",
+    # "examples/example_hotaru_2",
+    # "examples/hyper_hotaru_example",
     # "hotaru_style_guide",
-    # "tutorial_examples"
+    # "examples/tutorial_examples"
 ]
 
 # `hotaru_io_embedded` now defaults to the `embedded`/`no_std` flavour, which
@@ -48,6 +49,7 @@ default-members = [
     "hotaru_lib",
     "ahttpm",
     "htmstd",
-    "example_hotaru",
+    "examples/example_hotaru",
+    "examples/combine_example",
 ]
 resolver = "3"

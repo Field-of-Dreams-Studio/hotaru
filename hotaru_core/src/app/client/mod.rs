@@ -7,7 +7,8 @@ use akari::extensions::ParamsClone;
 
 use crate::{
     app::common::{
-        AppBuilder, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting, builder::ClientRole,
+        AppBuilder, AppInUse, OperationalConfig, RunMode, RuntimeConfig, TimeoutSetting,
+        builder::ClientRole,
     },
     app::runtime::{Either, OnceCellCap, RuntimeSpec},
     connection::{Outbound, TransportSpec},
@@ -354,5 +355,75 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> Client<TS, Rt> {
             }
             Ok(())
         })
+    }
+
+    /// Left-biased merge of two freshly built clients; keeps self's target
+    /// and outbound. Errs with both apps returned if either `Arc` is shared,
+    /// e.g. already in use.
+    pub fn try_combine(
+        self: Arc<Self>,
+        other: Arc<Self>,
+    ) -> Result<Arc<Self>, AppInUse<Arc<Self>>> {
+        if Arc::ptr_eq(&self, &other) {
+            return Ok(self);
+        }
+        let this = match Arc::try_unwrap(self) {
+            Ok(inner) => inner,
+            Err(shared) => {
+                crate::debug_warn!("Client::try_combine refused: self is shared");
+                return Err(AppInUse { app: shared, other });
+            }
+        };
+        let other = match Arc::try_unwrap(other) {
+            Ok(inner) => inner,
+            Err(shared) => {
+                crate::debug_warn!("Client::try_combine refused: other is shared");
+                return Err(AppInUse {
+                    app: Arc::new(this),
+                    other: shared,
+                });
+            }
+        };
+        // Runtime merges only when both sides are exclusively owned;
+        // otherwise self's Arc is kept as-is (still left-biased).
+        let runtime = match Arc::try_unwrap(this.runtime) {
+            Ok(mut rt) => {
+                if let Ok(other_rt) = Arc::try_unwrap(other.runtime) {
+                    rt.combine(other_rt);
+                }
+                Arc::new(rt)
+            }
+            Err(shared) => shared,
+        };
+        Ok(Arc::new(Self {
+            registry: this.registry.combine(other.registry),
+            target: this.target,
+            outbound: this.outbound,
+            runtime,
+            config: this.config.combine(other.config),
+            _rt: PhantomData,
+        }))
+    }
+
+    /// `try_combine` with a safe fallback: on refusal, drops `other` and
+    /// returns `self` unchanged.
+    pub fn combine(self: Arc<Self>, other: Arc<Self>) -> Arc<Self> {
+        self.try_combine(other).unwrap_or_else(|e| e.app)
+    }
+
+    /// `try_combine` retried until both `Arc`s are exclusively owned. Waits
+    /// forever if a reference never drops; wrap in `Rt::timeout` to bound it.
+    pub async fn combine_wait(self: Arc<Self>, other: Arc<Self>) -> Arc<Self> {
+        let (mut a, mut b) = (self, other);
+        loop {
+            match a.try_combine(b) {
+                Ok(app) => return app,
+                Err(e) => {
+                    crate::debug_log!("Client::combine_wait: app Arc still shared; retrying");
+                    (a, b) = (e.app, e.other);
+                    Rt::sleep(core::time::Duration::from_millis(10)).await;
+                }
+            }
+        }
     }
 }
