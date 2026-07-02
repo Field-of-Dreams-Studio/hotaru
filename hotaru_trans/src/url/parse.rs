@@ -1,5 +1,5 @@
 use hotaru_lib::random::random_alpha_string;
-use std::iter::Peekable;
+use core::iter::Peekable;
 
 use proc_macro::{Delimiter, Ident, Span, TokenStream, TokenTree};
 

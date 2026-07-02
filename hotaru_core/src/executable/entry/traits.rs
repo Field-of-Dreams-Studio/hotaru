@@ -64,6 +64,10 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
     /// Used to resolve [`TimeoutSetting::Inherit`](crate::app::common::TimeoutSetting::Inherit) at connection time.
     fn default_connection_timeout(&self) -> Option<Duration>;
 
+    /// Merges `other` into `self` if it is the same concrete protocol entry
+    /// type. Returns false (no-op) on type mismatch.
+    fn combine_from(&self, other: &dyn ProtocolEntryTrait<TS>) -> bool; 
+    
     /// Allows downcasting.
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;

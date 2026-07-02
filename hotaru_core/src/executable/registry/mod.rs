@@ -144,6 +144,20 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         }
     }
 
+    /// Merges `other`'s protocols: unknown protocols are appended; protocols
+    /// already present resolve via `combine_from` (left-biased).
+    pub fn combine(&mut self, other: Self) {
+        for other_handler in other.handlers {
+            let ty = other_handler.as_any().type_id();
+            match self.handlers.iter().find(|h| h.as_any().type_id() == ty) {
+                Some(existing) => {
+                    existing.combine_from(other_handler.as_ref());
+                }
+                None => self.handlers.push(other_handler),
+            }
+        }
+    }
+
     pub fn first_protocol_type_id(&self) -> Option<TypeId> {
         self.handlers.first().map(|h| h.as_any().type_id())
     }

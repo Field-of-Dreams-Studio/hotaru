@@ -251,7 +251,7 @@ impl CallArgs {
             TokenTree::Punct(Punct::new('>', Spacing::Alone)),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, {
                 let mut g = TokenStream::new();
-                g.extend(std::iter::once(arg));
+                g.extend(core::iter::once(arg));
                 g
             })),
         ]);

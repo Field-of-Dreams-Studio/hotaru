@@ -241,6 +241,20 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
         self.walk(segments.iter(), PartialState::NotStart).await
     }
 
+    #[av::ver(
+        unstable, since = "0.8.4", note = "Safety proof: src/url/node/COMBINE_SAFETY.md"
+    )]
+    /// Left-biased merge: keeps self's payload whole; recursively merges children.
+    pub fn combine(self: &Arc<Self>, other: &Arc<UrlNode<C, TS>>) {
+        // Shared subtree (adopted by an earlier merge): already identical.
+        if Arc::ptr_eq(self, other) {
+            return;
+        }
+        for (a, b) in self.children.combine(&other.children) {
+            a.combine(&b);
+        }
+    }
+
     /// Retrieves a cloned value of type `T` from the URL's parameter storage.
     /// Returns `Some(T)` if the parameter exists and matches the type, `None` otherwise.
     pub fn get_params<T: ParamValue + Clone + 'static>(&self) -> Option<T> {
@@ -427,5 +441,75 @@ mod tests {
             .expect("AnyPath should match /files/a/b/c");
 
         assert!(Arc::ptr_eq(&matched, &rest));
+    }
+
+    #[test]
+    fn children_combine_adopts_missing_and_reports_collisions() {
+        let left = empty_node(PathPattern::literal_path("root"));
+        let right = empty_node(PathPattern::literal_path("root"));
+
+        let shared_left = empty_node(PathPattern::literal_path("shared"));
+        let only_left = empty_node(PathPattern::literal_path("left"));
+        left.insert_child(shared_left.clone());
+        left.insert_child(only_left.clone());
+
+        let shared_right = empty_node(PathPattern::literal_path("shared"));
+        let only_right = empty_node(PathPattern::literal_path("right"));
+        right.insert_child(shared_right.clone());
+        right.insert_child(only_right.clone());
+
+        let collisions = left.children().combine(right.children());
+
+        // Exactly the (self, other) pair for the shared pattern is reported.
+        assert_eq!(collisions.len(), 1);
+        assert!(Arc::ptr_eq(&collisions[0].0, &shared_left));
+        assert!(Arc::ptr_eq(&collisions[0].1, &shared_right));
+
+        // Self's children survive untouched; other's unique child is adopted by Arc.
+        let kept = left
+            .find_child(&PathPattern::literal_path("shared"))
+            .unwrap();
+        assert!(Arc::ptr_eq(&kept, &shared_left));
+        let adopted = left
+            .find_child(&PathPattern::literal_path("right"))
+            .unwrap();
+        assert!(Arc::ptr_eq(&adopted, &only_right));
+        assert!(Arc::ptr_eq(
+            &left.find_child(&PathPattern::literal_path("left")).unwrap(),
+            &only_left
+        ));
+
+        // Other's table is only read, never mutated.
+        assert!(right.find_child(&PathPattern::literal_path("left")).is_none());
+    }
+
+    #[test]
+    fn node_combine_merges_recursively_left_biased() {
+        let left = empty_node(PathPattern::literal_path("root"));
+        let right = empty_node(PathPattern::literal_path("root"));
+
+        let left_api = empty_node(PathPattern::literal_path("api"));
+        let left_users = empty_node(PathPattern::literal_path("users"));
+        left.insert_child(left_api.clone());
+        left_api.insert_child(left_users.clone());
+
+        let right_api = empty_node(PathPattern::literal_path("api"));
+        let right_users = empty_node(PathPattern::literal_path("users"));
+        let right_orders = empty_node(PathPattern::literal_path("orders"));
+        right.insert_child(right_api.clone());
+        right_api.insert_child(right_users.clone());
+        right_api.insert_child(right_orders.clone());
+
+        left.combine(&right);
+
+        // Colliding nodes keep self's Arc at every level of the recursion.
+        let api = left.find_child(&PathPattern::literal_path("api")).unwrap();
+        assert!(Arc::ptr_eq(&api, &left_api));
+        let users = api.find_child(&PathPattern::literal_path("users")).unwrap();
+        assert!(Arc::ptr_eq(&users, &left_users));
+
+        // Other's unique subtree is adopted by sharing its Arc.
+        let orders = api.find_child(&PathPattern::literal_path("orders")).unwrap();
+        assert!(Arc::ptr_eq(&orders, &right_orders));
     }
 }

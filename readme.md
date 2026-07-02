@@ -6,11 +6,11 @@ The Hotaru 0.8 era starts from 23/May/2026.
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-> Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
-
 ## Overview
 
-The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly.
+<!--The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly.--> 
+
+> Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
 
 **[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
 

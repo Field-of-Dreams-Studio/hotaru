@@ -178,6 +178,20 @@ where
         self.request(runtime, reader, writer, meta)
     } 
 
+    fn combine_from(&self, other: &dyn ProtocolEntryTrait<TS>) -> bool {
+        let Some(other) = other.as_any().downcast_ref::<Self>() else { return false; };
+        self.root_handler.combine(&other.root_handler);
+        for name in other.access_points.names() {
+            if !self.access_points.contains(&name) {
+                if let Some(ap) = other.access_points.get(&name) {
+                    self.access_points.insert(name, ap);
+                }
+            }
+        }
+        // middlewares: left-biased, self's chain kept untouched
+        true
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }

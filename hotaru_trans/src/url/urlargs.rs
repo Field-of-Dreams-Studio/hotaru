@@ -89,13 +89,15 @@ impl UrlArgs {
             }
         } 
 
-        // std::sync::Arc::new(__wrapper_xxx)
+        // ::hotaru::prelude::Arc::new(__wrapper_xxx)
         let mut arc_func = TokenStream::new();
         arc_func.extend(vec![
-            TokenTree::Ident(Ident::new("std", Span::call_site())),
             TokenTree::Punct(Punct::new(':', Spacing::Joint)),
             TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-            TokenTree::Ident(Ident::new("sync", Span::call_site())),
+            TokenTree::Ident(Ident::new("hotaru", Span::call_site())),
+            TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+            TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("prelude", Span::call_site())),
             TokenTree::Punct(Punct::new(':', Spacing::Joint)),
             TokenTree::Punct(Punct::new(':', Spacing::Alone)),
             TokenTree::Ident(Ident::new("Arc", Span::call_site())),
@@ -105,7 +107,7 @@ impl UrlArgs {
             TokenTree::Group(Group::new(Delimiter::Parenthesis, reg_func)),
         ]);
 
-        // let mut binding = hotaru::hotaru_core::executable::ExecutableBinding::new().with_handler(std::sync::Arc::new(__wrapper_xxx)); 
+        // let mut binding = hotaru::hotaru_core::executable::ExecutableBinding::new().with_handler(::hotaru::prelude::Arc::new(__wrapper_xxx));
         cont.extend(vec![
             TokenTree::Ident(Ident::new("let", Span::call_site())),
             TokenTree::Ident(Ident::new("mut", Span::call_site())),
@@ -137,7 +139,7 @@ impl UrlArgs {
         let needs_mw_vec = matches!(kind, UrlKind::Outpoint) || self.middlewares.is_some();
 
         if needs_mw_vec {
-            // let mut middlewares: Vec<std::sync::Arc<dyn hotaru::hotaru_core::app::middleware::AsyncMiddleware<Protocol> + 'static>> = vec![];
+            // let mut middlewares: Vec<::hotaru::prelude::Arc<dyn hotaru::hotaru_core::app::middleware::AsyncMiddleware<Protocol> + 'static>> = vec![];
             let mut mw_decl = TokenStream::new();
             mw_decl.extend(vec![
                 TokenTree::Ident(Ident::new("let", Span::call_site())),
@@ -146,10 +148,12 @@ impl UrlArgs {
                 TokenTree::Punct(Punct::new(':', Spacing::Alone)),
                 TokenTree::Ident(Ident::new("Vec", Span::call_site())),
                 TokenTree::Punct(Punct::new('<', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("std", Span::call_site())),
                 TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                 TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("sync", Span::call_site())),
+                TokenTree::Ident(Ident::new("hotaru", Span::call_site())),
+                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                TokenTree::Ident(Ident::new("prelude", Span::call_site())),
                 TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                 TokenTree::Punct(Punct::new(':', Spacing::Alone)),
                 TokenTree::Ident(Ident::new("Arc", Span::call_site())),
@@ -188,7 +192,7 @@ impl UrlArgs {
         // `return_self()` factory, so `Arc::new(...::return_self())` gives
         // us the concrete-typed handle that coerces to dyn AsyncMiddleware.
         if matches!(kind, UrlKind::Outpoint) {
-            // middlewares.push(std::sync::Arc::new(__Outpoint_MW_<fn>::return_self()));
+            // middlewares.push(::hotaru::prelude::Arc::new(__Outpoint_MW_<fn>::return_self()));
             let mut return_self_call = TokenStream::new();
             return_self_call.extend(vec![
                 TokenTree::Ident(Ident::new(
@@ -202,10 +206,12 @@ impl UrlArgs {
             ]);
             let mut arc_new = TokenStream::new();
             arc_new.extend(vec![
-                TokenTree::Ident(Ident::new("std", Span::call_site())),
                 TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                 TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("sync", Span::call_site())),
+                TokenTree::Ident(Ident::new("hotaru", Span::call_site())),
+                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                TokenTree::Ident(Ident::new("prelude", Span::call_site())),
                 TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                 TokenTree::Punct(Punct::new(':', Spacing::Alone)),
                 TokenTree::Ident(Ident::new("Arc", Span::call_site())),
@@ -304,13 +310,15 @@ impl UrlArgs {
                 } else {
                     // Regular middleware - use existing logic
                     let mut push_call = TokenStream::new();
-                    // middlewares.push(std::sync::Arc::new(expr));
+                    // middlewares.push(::hotaru::prelude::Arc::new(expr));
                     let mut arc_new = TokenStream::new();
                     arc_new.extend(vec![
-                        TokenTree::Ident(Ident::new("std", Span::call_site())),
                         TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                         TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                        TokenTree::Ident(Ident::new("sync", Span::call_site())),
+                        TokenTree::Ident(Ident::new("hotaru", Span::call_site())),
+                        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+                        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+                        TokenTree::Ident(Ident::new("prelude", Span::call_site())),
                         TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                         TokenTree::Punct(Punct::new(':', Spacing::Alone)),
                         TokenTree::Ident(Ident::new("Arc", Span::call_site())),
@@ -341,7 +349,7 @@ impl UrlArgs {
                 TokenTree::Ident(Ident::new("set_middlewares", Span::call_site())),
                 TokenTree::Group(Group::new(Delimiter::Parenthesis, {
                     let mut g = TokenStream::new();
-                    g.extend(std::iter::once(TokenTree::Ident(Ident::new(
+                    g.extend(core::iter::once(TokenTree::Ident(Ident::new(
                         "middlewares",
                         Span::call_site(),
                     ))));
@@ -360,7 +368,7 @@ impl UrlArgs {
         ); 
 
         cont.extend(modified_url_expr);
-        cont.extend(std::iter::once(TokenTree::Punct(Punct::new(';', Spacing::Alone)))); 
+        cont.extend(core::iter::once(TokenTree::Punct(Punct::new(';', Spacing::Alone))));
         
         let mut tokens = TokenStream::new();
         tokens.extend(ctor_attrs);

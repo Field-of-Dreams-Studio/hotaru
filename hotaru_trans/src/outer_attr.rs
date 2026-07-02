@@ -1,4 +1,4 @@
-use std::iter::Peekable;
+use core::iter::Peekable;
 
 use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
@@ -156,7 +156,7 @@ pub fn parse_outer_attrs(
 
 #[cfg(test)]
 mod tests {
-    use std::iter::Peekable;
+    use core::iter::Peekable;
 
     use proc_macro2::{
         Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree,
@@ -338,7 +338,7 @@ fn split_top_level_until_comma(input: TokenStream) -> Vec<TokenStream> {
                 next_stream = TokenStream::new();
             }
             Some(tt) => {
-                next_stream.extend(std::iter::once(tt));
+                next_stream.extend(core::iter::once(tt));
             }
             None => break,
         }

@@ -1,4 +1,4 @@
-use std::iter::Peekable;
+use core::iter::Peekable;
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
@@ -143,7 +143,7 @@ pub fn expect_array_consume<T: AsRef<str>>(
                         array.push(current);
                         current = TokenStream::new();
                     }
-                    Some(token) => current.extend(std::iter::once(token)),
+                    Some(token) => current.extend(core::iter::once(token)),
                     None => {
                         array.push(current);
                         break;
@@ -170,7 +170,7 @@ pub fn expect_stream_before_comma_consume<T: AsRef<str>>(
             Some(TokenTree::Punct(punct)) if punct.as_char() == ',' => {
                 return Ok(out);
             }
-            Some(token) => out.extend(std::iter::once(token)),
+            Some(token) => out.extend(core::iter::once(token)),
             None => {
                 if must_have_comma {
                     return Err(generate_compile_error(Span::call_site(), error.as_ref()));

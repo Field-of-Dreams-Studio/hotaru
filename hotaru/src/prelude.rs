@@ -14,6 +14,10 @@ pub use crate::TokioRuntime;
 pub use crate::Url;
 pub use crate::Value;
 pub use crate::object;
+
+#[cfg(feature = "lite")]
+pub use crate::akari::prelude::*;
+
 pub use crate::{AnyPath, AnyUrl, LitUrl, RegUrl, TrailingSlash};
 pub use crate::{Client, RunMode, Server, TimeoutSetting};
 pub use crate::{Inbound, Outbound};

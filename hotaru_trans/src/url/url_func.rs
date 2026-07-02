@@ -232,7 +232,7 @@ impl UrlFunc {
             TokenTree::Ident(Ident::new("send", Span::call_site())),
             TokenTree::Group(Group::new(Delimiter::Parenthesis, {
                 let mut g = TokenStream::new();
-                g.extend(std::iter::once(TokenTree::Ident(self.req_var_name.clone())));
+                g.extend(core::iter::once(TokenTree::Ident(self.req_var_name.clone())));
                 g
             })),
             TokenTree::Punct(Punct::new('.', Spacing::Alone)),

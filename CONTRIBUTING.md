@@ -116,6 +116,9 @@ We welcome contributions in the following areas:
 - Add doc comments (`///`) for public APIs
 - Write descriptive variable and function names
 
+For framework code style and formatting requirements, see
+[CONTRIBUTOR_STYLE.md](./CONTRIBUTOR_STYLE.md).
+
 ## Project Roadmap
 
 ### 0.8.3 (Current)
