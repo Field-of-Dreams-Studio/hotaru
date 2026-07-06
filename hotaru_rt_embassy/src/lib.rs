@@ -26,4 +26,19 @@ mod runtime;
 
 pub use mutex::EmbassyMutex;
 pub use once_cell::EmbassyOnceCell;
-pub use runtime::{EmbassyJoinError, EmbassyJoinHandle, EmbassyRuntime, EmbassyTimeoutError};
+pub use runtime::{EmbassyJoinError, EmbassyJoinHandle, EmbassyTimeoutError};
+
+#[doc(hidden)]
+pub mod __private {
+    pub use embassy_executor;
+    pub use embassy_time;
+    pub use hotaru_core;
+
+    pub use crate::{
+        EmbassyMutex, EmbassyOnceCell,
+        runtime::{
+            EmbassyJobQueue, EmbassyRuntimeState, run_queued_jobs, select2, spawn_join, spawn_task,
+            to_embassy_duration,
+        },
+    };
+}

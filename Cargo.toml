@@ -3,6 +3,7 @@ members = [
     "hotaru",
     "hotaru_core",
     "hotaru_rt_tokio",
+    "hotaru_rt_embassy",
     "hotaru_io_tokio",
     "hotaru_io_futures",
     "hotaru_io_embedded",

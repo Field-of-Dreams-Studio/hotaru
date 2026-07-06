@@ -8,91 +8,85 @@ use core::{
     time::Duration,
 };
 
-use embassy_executor::Spawner;
 use embassy_futures::select;
-use embassy_sync::channel::Channel;
-use embassy_sync::signal::Signal;
+use embassy_sync::{channel::Channel, signal::Signal};
 use hotaru_core::{
-    app::runtime::{BoxFuture, Either, RuntimeSpec},
+    app::runtime::{BoxFuture, Either},
     marker::MaybeSend,
 };
 
-use crate::{EmbassyMutex, mutex::EmbassyRawMutex, once_cell::EmbassyOnceCell};
-//引入工具
-const WORKER_COUNT: usize = 4; //4个worker
-const JOB_QUEUE_CAPACITY: usize = 16; //队列最多放16个任务
+use crate::mutex::EmbassyRawMutex;
 
-type Job = BoxFuture<'static, ()>;
+/// A boxed Hotaru job ready to be driven by an Embassy worker.
+pub type EmbassyJob = BoxFuture<'static, ()>;
 
-struct JobQueue(Channel<EmbassyRawMutex, Job, JOB_QUEUE_CAPACITY>);
+/// Global job queue storage for one configured Embassy runtime.
+///
+/// The capacity is a const generic so the macro-generated runtime can keep the
+/// queue static without baking a fixed size into this backend.
+pub struct EmbassyJobQueue<const N: usize>(Channel<EmbassyRawMutex, EmbassyJob, N>);
 
-unsafe impl Sync for JobQueue {} //编译器不能自动确认它在多处共享是否安全
+// SAFETY: the queue is used as a global scheduler handoff. Under `spawn_send`
+// the raw mutex is critical-section based; under `spawn_local` callers must use
+// the single Embassy executor contract already required by this backend.
+unsafe impl<const N: usize> Sync for EmbassyJobQueue<N> {}
 
-static JOB_QUEUE: JobQueue = JobQueue(Channel::new());
+impl<const N: usize> EmbassyJobQueue<N> {
+    /// Create an empty job queue.
+    pub const fn new() -> Self {
+        Self(Channel::new())
+    }
 
-#[embassy_executor::task(pool_size = 4)]
-async fn hotaru_job_worker() {
-    loop {
-        let job = JOB_QUEUE.0.receive().await;
-        job.await;
+    fn try_send(&'static self, job: EmbassyJob) -> Result<(), EmbassyJoinError> {
+        self.0
+            .try_send(job)
+            .map_err(|_| EmbassyJoinError::QueueFull)
+    }
+
+    async fn receive(&'static self) -> EmbassyJob {
+        self.0.receive().await
     }
 }
-//一直循环，从一个队列中（4个任务）取出一个任务并执行，执行完继续下一个任务
-/// Embassy-backed runtime.
-///
-/// Call [`EmbassyRuntime::init`] once from your Embassy entry task before using
-/// Hotaru APIs that spawn tasks.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct EmbassyRuntime;
-//这是一个代表 Embassy 运行时的空结构体。
-//它自己不保存数据，只是一个“标识”：告诉 Hotaru 当前使用 Embassy 作为运行时后端。
-struct RuntimeState(UnsafeCell<bool>);
 
-unsafe impl Sync for RuntimeState {}
+/// Initialization flag for one configured Embassy runtime.
+pub struct EmbassyRuntimeState(UnsafeCell<bool>);
 
-static INITIALIZED: RuntimeState = RuntimeState(UnsafeCell::new(false));
-//这里记录 Embassy 运行时有没有初始化。
-impl EmbassyRuntime {
-    /// Installs the Embassy spawner used by [`RuntimeSpec::spawn`] and
-    /// [`RuntimeSpec::spawn_detached`].
-    ///
-    /// Embassy exposes spawning through a `Spawner` value supplied by
-    /// `#[embassy_executor::main]` or `Executor::run`. Hotaru's runtime trait is
-    /// static, so this backend starts a small worker pool that accepts boxed
-    /// Hotaru jobs through a bounded queue.
-    pub fn init(spawner: Spawner) {
-        let start_workers = critical_section::with(|_| unsafe {
-            let initialized = &mut *INITIALIZED.0.get();
+// SAFETY: all mutation is protected by `critical_section::with`.
+unsafe impl Sync for EmbassyRuntimeState {}
+
+impl EmbassyRuntimeState {
+    /// Create an uninitialized runtime state.
+    pub const fn new() -> Self {
+        Self(UnsafeCell::new(false))
+    }
+
+    /// Mark the runtime as initialized, returning true only for the first call.
+    pub fn initialize_once(&'static self) -> bool {
+        critical_section::with(|_| unsafe {
+            let initialized = &mut *self.0.get();
             let start_workers = !*initialized;
             *initialized = true;
             start_workers
-        });
-
-        if start_workers {
-            for _ in 0..WORKER_COUNT {
-                spawner
-                    .spawn(hotaru_job_worker().expect("failed to spawn hotaru embassy job worker"));
-            }
-        }
+        })
     }
 
-    fn is_initialized() -> bool {
-        critical_section::with(|_| unsafe { *INITIALIZED.0.get() })
+    /// Returns whether the runtime has already been initialized.
+    pub fn is_initialized(&'static self) -> bool {
+        critical_section::with(|_| unsafe { *self.0.get() })
     }
 }
-//检查是否已经初始化过。
-//如果没初始化过，就启动 4 个后台 worker。
+
 /// Error returned by Embassy join handles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmbassyJoinError {
-    /// [`EmbassyRuntime::init`] has not installed an Embassy spawner yet.
+    /// The configured Embassy runtime has not installed an Embassy spawner yet.
     SpawnerNotInitialized,
     /// The bounded runtime job queue is full.
     QueueFull,
     /// The join handle was polled again after completion.
     PolledAfterCompletion,
 }
-//这里定义等待任务结果时可能遇到的错误
+
 impl fmt::Display for EmbassyJoinError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -104,7 +98,7 @@ impl fmt::Display for EmbassyJoinError {
         }
     }
 }
-//错误显示文本
+
 impl core::error::Error for EmbassyJoinError {}
 
 /// Error returned when an Embassy timeout expires.
@@ -118,14 +112,14 @@ impl fmt::Display for EmbassyTimeoutError {
 }
 
 impl core::error::Error for EmbassyTimeoutError {}
-//打印超时错误
+
 enum JoinState<T: MaybeSend + 'static> {
     Waiting(Arc<Signal<EmbassyRawMutex, T>>),
     Ready(Option<Result<T, EmbassyJoinError>>),
     Done,
 }
-//这是任务结果句柄的内部状态
-/// Awaitable handle returned by [`EmbassyRuntime::spawn`].
+
+/// Awaitable handle returned by a configured Embassy runtime.
 pub struct EmbassyJoinHandle<T: MaybeSend + 'static> {
     state: JoinState<T>,
 }
@@ -143,10 +137,9 @@ impl<T: MaybeSend + 'static> EmbassyJoinHandle<T> {
         }
     }
 }
-//waiting：任务已经成功排队，等待它完成。
-//failed：任务没能成功排队，直接保存错误。
+
 impl<T: MaybeSend + 'static> Unpin for EmbassyJoinHandle<T> {}
-//这表示这个 handle 可以安全移动位置
+
 impl<T: MaybeSend + 'static> Future for EmbassyJoinHandle<T> {
     type Output = Result<T, EmbassyJoinError>;
 
@@ -177,126 +170,279 @@ impl<T: MaybeSend + 'static> Future for EmbassyJoinHandle<T> {
         }
     }
 }
-//这是让 EmbassyJoinHandle 变成一个可以等待的东西。
-//内部逻辑是：
-//如果状态是 Waiting，就检查信号有没有来。
-//如果任务完成了，返回 Ok(output)。
-//如果还没完成，继续等待。
-//如果状态是 Ready，直接返回之前保存的结果。
-//如果已经 Done，就保持等待状态。
-fn to_embassy_duration(duration: Duration) -> embassy_time::Duration {
+
+pub fn to_embassy_duration(duration: Duration) -> embassy_time::Duration {
     u64::try_from(duration.as_nanos())
         .ok()
         .and_then(embassy_time::Duration::try_from_nanos)
         .unwrap_or(embassy_time::Duration::MAX)
 }
-//这个函数负责把普通时间长度转换成 Embassy 能理解的时间长度。
-//如果时间太大，超过 Embassy 能表示的范围，就用最大值，避免溢出。
-fn spawn_task<F>(future: F) -> Result<(), EmbassyJoinError>
+
+/// Run one configured runtime worker forever.
+pub async fn run_queued_jobs<const N: usize>(queue: &'static EmbassyJobQueue<N>) {
+    loop {
+        let job = queue.receive().await;
+        job.await;
+    }
+}
+
+/// Queue a detached task onto one configured runtime.
+pub fn spawn_task<F, const N: usize>(
+    state: &'static EmbassyRuntimeState,
+    queue: &'static EmbassyJobQueue<N>,
+    future: F,
+) -> Result<(), EmbassyJoinError>
 where
     F: Future<Output = ()> + MaybeSend + 'static,
 {
-    if !EmbassyRuntime::is_initialized() {
+    if !state.is_initialized() {
         return Err(EmbassyJoinError::SpawnerNotInitialized);
     }
 
-    let job: Job = Box::pin(future);
-
-    JOB_QUEUE
-        .0
-        .try_send(job)
-        .map_err(|_| EmbassyJoinError::QueueFull)
+    queue.try_send(Box::pin(future))
 }
-//先检查运行时有没有初始化。
-//把任务装箱，变成统一的 Job。
-//尝试放入全局任务队列。
-//如果队列满了，返回 QueueFull。
-impl RuntimeSpec for EmbassyRuntime {
-    type JoinHandle<T: MaybeSend + 'static> = EmbassyJoinHandle<T>; //告诉hotaru后端使用自定义的JoinHandle类型
-    type JoinError = EmbassyJoinError; //告诉hotaru后端使用自定义的JoinError类型
 
-    fn spawn_detached<F>(future: F)
-    where
-        F: Future<Output = ()> + MaybeSend + 'static,
-    {
-        spawn_task(future).expect("failed to spawn detached embassy task");
-    }
-    //启动一个后台任务，但不关心返回值。
-    //如果提交失败，会直接 panic，因为这种任务没有地方返回错误。
-    fn spawn<F>(future: F) -> Self::JoinHandle<F::Output>
-    where
-        F: Future + MaybeSend + 'static,
-        F::Output: MaybeSend + 'static,
-    {
-        let signal = Arc::new(Signal::<EmbassyRawMutex, F::Output>::new());
-        let task_signal = Arc::clone(&signal);
-        let task = async move {
-            let output = future.await;
-            task_signal.signal(output);
-        };
+/// Queue a task and return a join handle for its output.
+pub fn spawn_join<F, const N: usize>(
+    state: &'static EmbassyRuntimeState,
+    queue: &'static EmbassyJobQueue<N>,
+    future: F,
+) -> EmbassyJoinHandle<F::Output>
+where
+    F: Future + MaybeSend + 'static,
+    F::Output: MaybeSend + 'static,
+{
+    let signal = Arc::new(Signal::<EmbassyRawMutex, F::Output>::new());
+    let task_signal = Arc::clone(&signal);
+    let task = async move {
+        let output = future.await;
+        task_signal.signal(output);
+    };
 
-        match spawn_task(task) {
-            Ok(()) => EmbassyJoinHandle::waiting(signal),
-            Err(error) => EmbassyJoinHandle::failed(error),
-        }
+    match spawn_task(state, queue, task) {
+        Ok(()) => EmbassyJoinHandle::waiting(signal),
+        Err(error) => EmbassyJoinHandle::failed(error),
     }
-    //启动一个有返回值的任务
-    //创建一个 Signal。
-    //任务执行完成后，把结果发进 Signal。
-    //返回一个 EmbassyJoinHandle。
-    //调用者等待这个 handle，就能拿到结果。
-    type Instant = embassy_time::Instant;
-    type TimeoutError = EmbassyTimeoutError;
-
-    fn now() -> Self::Instant {
-        embassy_time::Instant::now()
-    }
-
-    fn instant_plus(instant: Self::Instant, dur: Duration) -> Self::Instant {
-        instant.saturating_add(to_embassy_duration(dur))
-    }
-
-    fn sleep(dur: Duration) -> impl Future<Output = ()> + MaybeSend + 'static {
-        embassy_time::Timer::after(to_embassy_duration(dur))
-    }
-
-    fn sleep_until(deadline: Self::Instant) -> impl Future<Output = ()> + MaybeSend + 'static {
-        embassy_time::Timer::at(deadline)
-    }
-    //这些把 Hotaru 的时间操作接到 Embassy 的时间系统：
-    //now：当前时间点。
-    //instant_plus：某个时间点加上一段时间。
-    //sleep：睡一段时间。
-    //sleep_until：睡到某个时间点。
-    async fn timeout<F>(dur: Duration, future: F) -> Result<F::Output, Self::TimeoutError>
-    where
-        F: Future + MaybeSend,
-        F::Output: MaybeSend,
-    {
-        embassy_time::with_timeout(to_embassy_duration(dur), future)
-            .await
-            .map_err(|_| EmbassyTimeoutError)
-    }
-    //意思是：给一个任务限定时间。
-    //如果任务在规定时间内完成，返回任务结果。
-    //如果时间到了还没完成，返回 EmbassyTimeoutError。
-    async fn select2<A, B>(a: A, b: B) -> Either<A::Output, B::Output>
-    where
-        A: Future + MaybeSend,
-        B: Future + MaybeSend,
-        A::Output: MaybeSend,
-        B::Output: MaybeSend,
-    {
-        match select::select(a, b).await {
-            select::Either::First(output) => Either::Left(output),
-            select::Either::Second(output) => Either::Right(output),
-        }
-    }
-    //同时等待两个任务，谁先完成就返回谁的结果。
-    //第一个先完成：返回 Either::Left
-    //第二个先完成：返回 Either::Right
-    type OnceCell<T: MaybeSend + Sync + 'static> = EmbassyOnceCell<T>;
-    type AsyncMutex<T: MaybeSend + 'static> = EmbassyMutex<T>;
 }
-//一次性初始化容器用 EmbassyOnceCell。
-//异步锁用 EmbassyMutex。
+
+/// Race two futures using Embassy's select primitive.
+pub async fn select2<A, B>(a: A, b: B) -> Either<A::Output, B::Output>
+where
+    A: Future + MaybeSend,
+    B: Future + MaybeSend,
+    A::Output: MaybeSend,
+    B::Output: MaybeSend,
+{
+    match select::select(a, b).await {
+        select::Either::First(output) => Either::Left(output),
+        select::Either::Second(output) => Either::Right(output),
+    }
+}
+
+/// Define a configured Embassy-backed Hotaru runtime.
+///
+/// Hotaru's runtime trait schedules through static methods, so the Embassy job
+/// queue is intentionally global for each generated runtime type. All fixed
+/// capacities are supplied by the macro caller:
+///
+/// ```ignore
+/// hotaru_rt_embassy::define_runtime_worker_pool!(
+///     pub AppRuntime,
+///     worker_count = 4,
+///     job_queue_capacity = 32,
+/// );
+/// ```
+///
+/// The shorthand `define_runtime_worker_pool!(N)` creates `pub EmbassyRuntime`
+/// with both worker count and queue capacity set to `N`.
+#[macro_export]
+macro_rules! define_runtime_worker_pool {
+    ($worker_count:expr $(,)?) => {
+        $crate::define_runtime_worker_pool!(
+            pub EmbassyRuntime,
+            worker_count = $worker_count,
+            job_queue_capacity = $worker_count,
+        );
+    };
+    ($worker_count:expr, $job_queue_capacity:expr $(,)?) => {
+        $crate::define_runtime_worker_pool!(
+            pub EmbassyRuntime,
+            worker_count = $worker_count,
+            job_queue_capacity = $job_queue_capacity,
+        );
+    };
+    (
+        $vis:vis $runtime:ident,
+        workers = $worker_count:expr,
+        queue = $job_queue_capacity:expr $(,)?
+    ) => {
+        $crate::define_runtime_worker_pool!(
+            $vis $runtime,
+            worker_count = $worker_count,
+            job_queue_capacity = $job_queue_capacity,
+        );
+    };
+    (
+        $vis:vis $runtime:ident,
+        worker_count = $worker_count:expr,
+        job_queue_capacity = $job_queue_capacity:expr $(,)?
+    ) => {
+        #[derive(Debug, Clone, Copy, Default)]
+        $vis struct $runtime;
+
+        mod __hotaru_rt_embassy_runtime {
+            use super::$runtime;
+
+            const WORKER_COUNT: usize = $worker_count;
+            const JOB_QUEUE_CAPACITY: usize = $job_queue_capacity;
+
+            const _: () = {
+                assert!(
+                    WORKER_COUNT > 0,
+                    "hotaru_rt_embassy: worker_count must be greater than 0",
+                );
+                assert!(
+                    JOB_QUEUE_CAPACITY > 0,
+                    "hotaru_rt_embassy: job_queue_capacity must be greater than 0",
+                );
+            };
+
+            static RUNTIME_STATE: $crate::__private::EmbassyRuntimeState =
+                $crate::__private::EmbassyRuntimeState::new();
+            static JOB_QUEUE: $crate::__private::EmbassyJobQueue<JOB_QUEUE_CAPACITY> =
+                $crate::__private::EmbassyJobQueue::new();
+
+            #[$crate::__private::embassy_executor::task(pool_size = WORKER_COUNT)]
+            async fn hotaru_job_worker() {
+                $crate::__private::run_queued_jobs(&JOB_QUEUE).await;
+            }
+
+            impl $runtime {
+                /// Number of Embassy workers in this generated runtime.
+                pub const WORKER_COUNT: usize = WORKER_COUNT;
+                /// Capacity of this generated runtime's global job queue.
+                pub const JOB_QUEUE_CAPACITY: usize = JOB_QUEUE_CAPACITY;
+
+                /// Installs the Embassy spawner and starts this runtime's workers.
+                ///
+                /// Call this once from the Embassy entry task before using Hotaru APIs
+                /// that spawn tasks.
+                pub fn init(spawner: $crate::__private::embassy_executor::Spawner) {
+                    if RUNTIME_STATE.initialize_once() {
+                        for _ in 0..WORKER_COUNT {
+                            spawner.spawn(
+                                hotaru_job_worker()
+                                    .expect("failed to spawn hotaru embassy job worker"),
+                            );
+                        }
+                    }
+                }
+
+                /// Returns whether this generated runtime has been initialized.
+                pub fn is_initialized() -> bool {
+                    RUNTIME_STATE.is_initialized()
+                }
+            }
+
+            impl $crate::__private::hotaru_core::app::runtime::RuntimeSpec for $runtime {
+                type JoinHandle<
+                    T: $crate::__private::hotaru_core::marker::MaybeSend + 'static,
+                > = $crate::EmbassyJoinHandle<T>;
+                type JoinError = $crate::EmbassyJoinError;
+
+                fn spawn_detached<F>(future: F)
+                where
+                    F: ::core::future::Future<Output = ()>
+                        + $crate::__private::hotaru_core::marker::MaybeSend
+                        + 'static,
+                {
+                    $crate::__private::spawn_task(&RUNTIME_STATE, &JOB_QUEUE, future)
+                        .expect("failed to spawn detached embassy task");
+                }
+
+                fn spawn<F>(future: F) -> Self::JoinHandle<F::Output>
+                where
+                    F: ::core::future::Future
+                        + $crate::__private::hotaru_core::marker::MaybeSend
+                        + 'static,
+                    F::Output: $crate::__private::hotaru_core::marker::MaybeSend + 'static,
+                {
+                    $crate::__private::spawn_join(&RUNTIME_STATE, &JOB_QUEUE, future)
+                }
+
+                type Instant = $crate::__private::embassy_time::Instant;
+                type TimeoutError = $crate::EmbassyTimeoutError;
+
+                fn now() -> Self::Instant {
+                    $crate::__private::embassy_time::Instant::now()
+                }
+
+                fn instant_plus(
+                    instant: Self::Instant,
+                    dur: ::core::time::Duration,
+                ) -> Self::Instant {
+                    instant.saturating_add($crate::__private::to_embassy_duration(dur))
+                }
+
+                fn sleep(
+                    dur: ::core::time::Duration,
+                ) -> impl ::core::future::Future<Output = ()>
+                       + $crate::__private::hotaru_core::marker::MaybeSend
+                       + 'static {
+                    $crate::__private::embassy_time::Timer::after(
+                        $crate::__private::to_embassy_duration(dur),
+                    )
+                }
+
+                fn sleep_until(
+                    deadline: Self::Instant,
+                ) -> impl ::core::future::Future<Output = ()>
+                       + $crate::__private::hotaru_core::marker::MaybeSend
+                       + 'static {
+                    $crate::__private::embassy_time::Timer::at(deadline)
+                }
+
+                async fn timeout<F>(
+                    dur: ::core::time::Duration,
+                    future: F,
+                ) -> Result<F::Output, Self::TimeoutError>
+                where
+                    F: ::core::future::Future
+                        + $crate::__private::hotaru_core::marker::MaybeSend,
+                    F::Output: $crate::__private::hotaru_core::marker::MaybeSend,
+                {
+                    $crate::__private::embassy_time::with_timeout(
+                        $crate::__private::to_embassy_duration(dur),
+                        future,
+                    )
+                    .await
+                    .map_err(|_| $crate::EmbassyTimeoutError)
+                }
+
+                async fn select2<A, B>(
+                    a: A,
+                    b: B,
+                ) -> $crate::__private::hotaru_core::app::runtime::Either<A::Output, B::Output>
+                where
+                    A: ::core::future::Future
+                        + $crate::__private::hotaru_core::marker::MaybeSend,
+                    B: ::core::future::Future
+                        + $crate::__private::hotaru_core::marker::MaybeSend,
+                    A::Output: $crate::__private::hotaru_core::marker::MaybeSend,
+                    B::Output: $crate::__private::hotaru_core::marker::MaybeSend,
+                {
+                    $crate::__private::select2(a, b).await
+                }
+
+                type OnceCell<
+                    T: $crate::__private::hotaru_core::marker::MaybeSend
+                        + Sync
+                        + 'static,
+                > = $crate::__private::EmbassyOnceCell<T>;
+                type AsyncMutex<
+                    T: $crate::__private::hotaru_core::marker::MaybeSend + 'static,
+                > = $crate::__private::EmbassyMutex<T>;
+            }
+        }
+    };
+}
