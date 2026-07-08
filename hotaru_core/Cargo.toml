@@ -22,7 +22,7 @@ av = "0.1"
 # tables on top (`regex/unicode` — larger binary, needed for `\p{...}`
 # style classes). `regex-lite` was tried but its 0.1.x line still
 # hard-requires `std` via a compile_error, so it can't run bare-metal.
-regex = { version = "1.12", default-features = false, features = [
+regex = { version = "1.12", optional = true, default-features = false, features = [
     "perf-dfa",
     "perf-onepass",
     "perf-backtrack",
@@ -43,8 +43,9 @@ default = ["full", "std", "spawn_send"]
 # `full` is purely a regex/unicode size choice. It deliberately does NOT
 # pull `akari/full`, because that enables akari's std-only template engine
 # (`hotaru_core` never uses `TemplateManager`), which breaks no_std builds.
-full = ["regex/unicode"]
-lite = ["akari/no_std"]
+full = ["dep:regex", "regex/unicode"]
+lite = ["dep:regex", "akari/no_std"]
+esp8266-probe = ["akari/no_std", "spawn_local"]
 dev-log = []
 
 # Platform/sync axis: choose exactly one (`std` uses parking_lot, `embedded` uses spin).
