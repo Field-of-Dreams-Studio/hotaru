@@ -41,31 +41,34 @@ compile_error!(
     "hotaru_core: enable exactly one task-mobility feature (`spawn_send` or `spawn_local`)"
 );
 
+// `spawn_local_atomic` / `spawn_local_no_atomic` are refinements of
+// `spawn_local` (each enables it), so the check above already governs the
+// spawn_send-vs-local axis. They differ only in atomic-CAS availability and
+// must not both be active at once.
+#[cfg(all(feature = "spawn_local_atomic", feature = "spawn_local_no_atomic"))]
+compile_error!(
+    "hotaru_core: features `spawn_local_atomic` and `spawn_local_no_atomic` are mutually exclusive"
+);
+
 /// Crate-internal prelude.
 ///
-/// Under `no_std` (`not(feature = "std")`) this re-exports
-/// [`akari::prelude`], which supplies `Box`, `String`, `ToString`,
-/// `Vec`, `format!`, `vec!`, and `HashMap` — everything that
-/// `std::prelude` would otherwise auto-import under std.
-///
-/// Files bring the prelude in with:
-///
-/// ```ignore
-/// #[cfg(not(feature = "std"))]
-/// use crate::prelude::*;
-/// ```
-///
-/// Under `std` the import is elided entirely (std's own prelude covers
-/// the same names), so nothing here fires and no "unused import"
-/// warnings appear.
-///
-/// The `akari::prelude` module itself is `#[cfg(feature = "no_std")]`
-/// on the akari side, activated for us through the `akari/no_std`
-/// entry in the `lite` feature — so this re-export resolves iff both
-/// crates are in their no_std flavour.
+/// This is Hotaru's facade for common allocation-backed types and marker
+/// aliases. Both `std` and `embedded` builds link `alloc`, so the basic
+/// allocation types come directly from `alloc` in all modes. Only aliases with
+/// real capability differences (for example [`Arc`](crate::marker::Arc) under
+/// `spawn_local_no_atomic`) are cfg-selected behind [`marker`](crate::marker).
 pub mod prelude {
-    #[cfg(not(feature = "std"))]
-    pub use akari::prelude::*;
+    pub use akari::hash::HashMap;
+    pub use alloc::boxed::Box;
+    pub use alloc::format;
+    pub use alloc::string::{String, ToString};
+    pub use alloc::vec;
+    pub use alloc::vec::Vec;
+
+    pub use crate::marker::{
+        Arc, BoxFuture, MaybeSend, MaybeSendBoxFuture, MaybeSendFuture, MaybeSendSync, MaybeSync,
+        PMutex, PMutexGuard, PRwLock, PRwLockReadGuard, PRwLockWriteGuard,
+    };
 }
 
 /// Shared marker traits and task-mobility aliases.
@@ -95,8 +98,8 @@ pub use akari::*;
 
 // Re-export commonly used marker aliases.
 pub use marker::{
-    BoxFuture, MaybeSend, MaybeSendBoxFuture, MaybeSendFuture, PRwLock, PRwLockReadGuard,
-    PRwLockWriteGuard,
+    Arc, BoxFuture, MaybeSend, MaybeSendBoxFuture, MaybeSendFuture, MaybeSendSync, MaybeSync,
+    PRwLock, PRwLockReadGuard, PRwLockWriteGuard,
 };
 
 // Helpers `hotaru_core::app::server::run_server*` are the runtime plumbing

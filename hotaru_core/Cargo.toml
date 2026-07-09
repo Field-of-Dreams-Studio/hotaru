@@ -56,3 +56,7 @@ embedded = ["dep:spin", "akari/no_std"]
 # Task-mobility axis: multi-thread/executor-moving tasks use `spawn_send`; single-thread/local tasks use `spawn_local`.
 spawn_send = []
 spawn_local = []
+
+# Refinements of `spawn_local` for embedded targets; `spawn_local_no_atomic` targets chips without CAS (e.g. ESP8266 / Xtensa LX106).
+spawn_local_atomic = ["spawn_local"]
+spawn_local_no_atomic = ["spawn_local"]

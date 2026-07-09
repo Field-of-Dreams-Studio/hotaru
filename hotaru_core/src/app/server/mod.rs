@@ -1,7 +1,7 @@
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
 use akari::extensions::ParamsClone;
-use alloc::sync::Arc;
+use crate::prelude::Arc;
 use core::any::TypeId;
 use core::marker::PhantomData;
 use core::panic;

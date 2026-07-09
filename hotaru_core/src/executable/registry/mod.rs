@@ -1,7 +1,7 @@
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
 use core::any::TypeId;
-use alloc::sync::Arc;
+use crate::prelude::Arc;
 
 use crate::{
     app::common::RuntimeConfig,

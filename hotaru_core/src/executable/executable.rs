@@ -1,10 +1,10 @@
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
+use crate::prelude::Arc;
 
 use crate::protocol::RequestContext;
 
-use super::middleware::{AsyncFinalHandler, AsyncMiddleware, AsyncMiddlewareChain, BoxFuture};
+use super::middleware::{AsyncFinalHandler, AsyncMiddleware, AsyncMiddlewareChain, NextFn};
 
 /// A route- or node-level executable binding.
 ///
@@ -130,13 +130,13 @@ impl<C: RequestContext> ExecutableBinding<C> {
 /// The execution-chain builder and executor.
 pub struct ExecutionChain<C> 
 where 
-    C: RequestContext + Send + 'static {
-    inner: Arc<dyn Fn(C) -> BoxFuture<C> + Send + Sync + 'static>,
+    C: RequestContext + 'static {
+    inner: Arc<NextFn<C>>,
 }
 
 impl<C> Clone for ExecutionChain<C> 
 where 
-    C: RequestContext + Send + 'static { 
+    C: RequestContext + 'static { 
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -146,14 +146,14 @@ where
 
 impl<C> ExecutionChain<C>
 where
-    C: RequestContext + Send + 'static,
+    C: RequestContext + 'static,
 {
     /// Build a chain from middleware definitions and a final handler.
     pub fn new(
         middlewares: Vec<Arc<dyn AsyncMiddleware<C>>>,
         final_handler: Arc<dyn AsyncFinalHandler<C>>,
     ) -> Self {
-        let final_fn: Arc<dyn Fn(C) -> BoxFuture<C> + Send + Sync + 'static> =
+        let final_fn: Arc<NextFn<C>> =
             Arc::new(move |ctx| final_handler.handle(ctx));
 
         let chain = middlewares.into_iter().rev().fold(final_fn, |next, mw| {
@@ -161,7 +161,7 @@ where
             Arc::new(move |ctx: C| {
                 let next_fn = next_clone.clone();
                 mw.handle(ctx, Box::new(move |r| next_fn(r)))
-            }) as Arc<dyn Fn(C) -> BoxFuture<C> + Send + Sync + 'static>
+            }) as Arc<NextFn<C>>
         });
 
         Self { inner: chain }
@@ -175,7 +175,7 @@ where
 
 impl<C> TryFrom<ExecutableBinding<C>> for ExecutionChain<C>
 where
-    C: RequestContext + Send + 'static,
+    C: RequestContext + 'static,
 {
     type Error = &'static str;
 

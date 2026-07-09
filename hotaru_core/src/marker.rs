@@ -9,6 +9,18 @@ use core::pin::Pin;
 
 use alloc::boxed::Box;
 
+// ============ Shared Pointer ============
+
+/// Shared pointer alias used throughout Hotaru core.
+///
+/// Normal std/embedded builds use `Arc`. No-atomic local embedded builds use
+/// `Rc`, because targets without pointer atomics cannot provide
+/// `alloc::sync::Arc`.
+#[cfg(not(feature = "spawn_local_no_atomic"))]
+pub use alloc::sync::Arc;
+#[cfg(feature = "spawn_local_no_atomic")]
+pub use alloc::rc::Rc as Arc;
+
 // ============ Concurrency Primitives ============
 
 /// Read-write lock alias. `parking_lot::RwLock` (default) or `spin::RwLock`
@@ -59,6 +71,23 @@ pub trait MaybeSend {}
 
 #[cfg(feature = "spawn_local")]
 impl<T: ?Sized> MaybeSend for T {}
+
+/// Alias for `Sync` when shared values may cross execution contexts.
+#[cfg(feature = "spawn_send")]
+pub use core::marker::Sync as MaybeSync;
+
+/// Conditional sync marker used by shared framework types.
+/// Local/no-atomic builds implement this for all types.
+#[cfg(feature = "spawn_local")]
+pub trait MaybeSync {}
+
+#[cfg(feature = "spawn_local")]
+impl<T: ?Sized> MaybeSync for T {}
+
+/// Convenience marker for values that need both Hotaru mobility markers.
+pub trait MaybeSendSync: MaybeSend + MaybeSync {}
+
+impl<T: ?Sized> MaybeSendSync for T where T: MaybeSend + MaybeSync {}
 
 /// Object-safe helper for boxed runtime futures.
 /// It combines `Future + MaybeSend` into one trait-object base, which works

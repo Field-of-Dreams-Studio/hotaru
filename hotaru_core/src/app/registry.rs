@@ -21,7 +21,7 @@
 
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
+use crate::prelude::Arc;
 use core::any::TypeId;
 use core::time::Duration;
 
@@ -330,7 +330,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::sync::Arc;
+    use crate::prelude::Arc;
     use core::convert::Infallible;
     use core::future::Future;
 

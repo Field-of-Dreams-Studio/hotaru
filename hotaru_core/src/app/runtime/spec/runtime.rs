@@ -1,7 +1,7 @@
 use core::future::Future;
 use core::time::Duration;
 
-use crate::marker::MaybeSend;
+use crate::marker::{MaybeSend, MaybeSendSync};
 
 use super::{AsyncMutexCap, Either, OnceCellCap};
 
@@ -115,7 +115,7 @@ pub trait RuntimeSpec: 'static {
     /// Backend's async one-time-init cell. Framework fields like
     /// `Server::inbound` are typed `Rt::OnceCell<Arc<...>>` and
     /// materialised on first use.
-    type OnceCell<T: MaybeSend + Sync + 'static>: OnceCellCap<T>;
+    type OnceCell<T: MaybeSendSync + 'static>: OnceCellCap<T>;
 
     /// Backend's async mutex — the "held across `.await`" flavour, not
     /// the sync [`PMutex`](crate::marker::PMutex) used for short critical

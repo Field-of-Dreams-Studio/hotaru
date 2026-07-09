@@ -1,6 +1,11 @@
 //! App-level `combine()`: two independently assembled server blueprints are
 //! merged into one app before serving. Left side wins every conflict.
 //!
+//! Combining is not possible for `LServer!`/`endpoint!` statics: the static
+//! holds its own `Arc` handle forever, so `try_combine` (which needs sole
+//! ownership) always refuses. Blueprints that are meant to be combined must
+//! be built and routed with the plain function API, as done here.
+//!
 //! Run `cargo run -p combine_example`, then:
 //!   curl http://127.0.0.1:3005/hello   -> served by blueprint A (collision: A wins)
 //!   curl http://127.0.0.1:3005/world   -> served by blueprint B (adopted subtree)

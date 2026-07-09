@@ -1,20 +1,25 @@
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
+use crate::prelude::Arc;
 use core::future::Future;
 
 // use crate::debug_log;
 
-use crate::marker::{MaybeSend, MaybeSendBoxFuture};
+use crate::marker::{MaybeSend, MaybeSendBoxFuture, MaybeSendSync};
 use crate::protocol::RequestContext;
 use core::any::Any;
 
 /// A boxed future returning `C`.
 pub type BoxFuture<C> = MaybeSendBoxFuture<'static, Result<C, <C as RequestContext>::Error>>;
 
+#[cfg(feature = "spawn_send")]
+pub type NextFn<C> = dyn Fn(C) -> BoxFuture<C> + Send + Sync + 'static;
+#[cfg(feature = "spawn_local")]
+pub type NextFn<C> = dyn Fn(C) -> BoxFuture<C> + 'static;
+
 pub type AsyncMiddlewareChain<C> = Vec<Arc<dyn AsyncMiddleware<C>>>;
 
-pub trait AsyncMiddleware<C: RequestContext>: Send + Sync + 'static {
+pub trait AsyncMiddleware<C: RequestContext>: MaybeSendSync + 'static {
     fn as_any(&self) -> &dyn Any;
 
     /// Used when creating the mddleware
@@ -25,17 +30,12 @@ pub trait AsyncMiddleware<C: RequestContext>: Send + Sync + 'static {
     fn handle<'a>(
         &self,
         rc: C,
-        next: Box<
-            dyn Fn(C) -> MaybeSendBoxFuture<'static, Result<C, <C as RequestContext>::Error>>
-                + Send
-                + Sync
-                + 'static,
-        >,
+        next: Box<NextFn<C>>,
     ) -> MaybeSendBoxFuture<'static, Result<C, <C as RequestContext>::Error>>;
 }
 
 /// The “final handler” trait that sits at the end of a middleware chain.
-pub trait AsyncFinalHandler<C: RequestContext>: Send + Sync + 'static {
+pub trait AsyncFinalHandler<C: RequestContext>: MaybeSendSync + 'static {
     /// Consume the request‐context and return a future yielding the (possibly modified) context.
     fn handle(&self, ctx: C) -> BoxFuture<C>;
 }
@@ -44,7 +44,7 @@ pub trait AsyncFinalHandler<C: RequestContext>: Send + Sync + 'static {
 impl<F, Fut, C> AsyncFinalHandler<C> for F
 where
     C: RequestContext,
-    F: Fn(C) -> Fut + Send + Sync + 'static,
+    F: Fn(C) -> Fut + MaybeSendSync + 'static,
     Fut: Future<Output = Result<C, <C as RequestContext>::Error>> + MaybeSend + 'static,
 {
     fn handle(&self, ctx: C) -> BoxFuture<C> {

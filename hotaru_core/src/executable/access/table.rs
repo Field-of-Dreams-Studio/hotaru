@@ -1,6 +1,6 @@
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
+use crate::prelude::Arc;
 use akari::hash::HashMap;
 
 use crate::{

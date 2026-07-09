@@ -1,6 +1,6 @@
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
+use crate::prelude::Arc;
 use core::slice::Iter;
 
 use crate::{
@@ -332,7 +332,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::sync::Arc;
+    use crate::prelude::Arc;
 
     use crate::{
         connection::test_support::TestTransport,

@@ -1,6 +1,6 @@
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
+use crate::prelude::Arc;
 use core::slice::Iter;
 
 use akari::extensions::ParamsClone;
@@ -381,7 +381,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> Default for UrlRoot<
 
 #[cfg(test)]
 mod tests {
-    use alloc::sync::Arc;
+    use crate::prelude::Arc;
 
     use akari::extensions::ParamsClone;
 
