@@ -24,7 +24,7 @@ mod mutex;
 mod once_cell;
 mod runtime;
 
-pub use mutex::EmbassyMutex;
+pub use mutex::{EmbassyMutex, EmbassyRawMutex};
 pub use once_cell::EmbassyOnceCell;
 pub use runtime::{EmbassyJoinError, EmbassyJoinHandle, EmbassyTimeoutError};
 
@@ -35,10 +35,10 @@ pub mod __private {
     pub use hotaru_core;
 
     pub use crate::{
-        EmbassyMutex, EmbassyOnceCell,
+        EmbassyMutex, EmbassyOnceCell, EmbassyRawMutex,
         runtime::{
-            EmbassyJobQueue, EmbassyRuntimeState, run_queued_jobs, select2, spawn_join, spawn_task,
-            to_embassy_duration,
+            EmbassyJobQueue, EmbassyRuntimeState, run_queued_jobs, select2, spawn_join,
+            spawn_join_with_mutex, spawn_task, spawn_task_with_mutex, to_embassy_duration,
         },
     };
 }
