@@ -1,0 +1,35 @@
+[package]
+name = "hotaru_rt_embassy"
+version = "0.8.3"
+edition = "2024"
+authors = ["Redstone <redstone@fds.moe>"]
+description = "Embassy runtime backend for Hotaru"
+license = "MIT"
+repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
+homepage = "https://hotaru.rs"
+categories = ["asynchronous", "embedded", "network-programming", "no-std"]
+keywords = ["hotaru", "embassy", "runtime", "async", "backend"]
+
+[dependencies]
+hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = false }
+critical-section = "1.2"
+embassy-executor = { version = "0.10", default-features = false }
+embassy-futures = { version = "0.1", default-features = false }
+embassy-sync = { version = "0.8", default-features = false }
+embassy-time = { version = "0.5", default-features = false }
+
+[features]
+default = ["embedded", "spawn_local"]
+
+std = [
+    "hotaru_core/std",
+    "spawn_send",
+    "embassy-executor/platform-std",
+    "embassy-executor/executor-thread",
+    "embassy-sync/std",
+    "embassy-time/std",
+    "critical-section/std",
+]
+embedded = ["hotaru_core/embedded"]
+spawn_send = ["hotaru_core/spawn_send"]
+spawn_local = ["hotaru_core/spawn_local"]
