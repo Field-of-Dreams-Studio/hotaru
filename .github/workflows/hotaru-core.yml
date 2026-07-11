@@ -38,6 +38,8 @@ jobs:
           - lite,std,spawn_local
           - lite,embedded,spawn_send
           - lite,embedded,spawn_local
+          - lite,embedded,spawn_local_atomic
+          - lite,embedded,spawn_local_no_atomic
           # `dev-log` is an additive marker feature; verify it compiles on
           # representative content/platform/mobility combinations.
           - full,std,spawn_send,dev-log
@@ -51,30 +53,45 @@ jobs:
       - name: Check hotaru_core feature set
         run: cargo check -p hotaru_core --no-default-features --features "${{ matrix.features }}"
 
-  # Bare-metal no_std builds — proves the crate actually links on a real
-  # embedded target, not just that it typechecks on the host where std is
-  # silently available. Each target requires:
-  #  - native atomic CAS (rules out Cortex-M0/M0+, RISC-V IMC-without-A)
-  #  - a working `alloc` allocator (user's board must supply one)
+  # Bare-metal no_std builds — proves the crate actually links on real embedded
+  # targets, not just that it typechecks on the host where std is silently
+  # available. The riscv32imc no-atomic leg is allowed to fail until spin /
+  # regex-automata are routed away from native CAS.
   no-std-targets:
-    name: bare-metal ${{ matrix.target }}
+    name: bare-metal ${{ matrix.target }} / ${{ matrix.features }}
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow_failure }}
     strategy:
       fail-fast: false
       matrix:
-        target:
+        include:
           # ARM Cortex-M4/M7 with FPU. Covers the STM32F4/F7/H7/L4/L5/H5
           # families, Nordic nRF52840, and most other Cortex-M4-class boards.
-          - thumbv7em-none-eabihf
-          # RISC-V with atomics (imac). Covers ESP32-C6/P4, most SiFive
-          # chips, BL616. The imc-only variant (no atomics) is deliberately
-          # out of scope — `spin` needs native CAS.
-          - riscv32imac-unknown-none-elf
-        features:
-          # The one canonical no_std flavour today.
-          - lite,embedded,spawn_local
-          # Same, with dev-log on — exercises the hollow-arm debug macros.
-          - lite,embedded,spawn_local,dev-log
+          - target: thumbv7em-none-eabihf
+            features: lite,embedded,spawn_local
+            allow_failure: false
+          - target: thumbv7em-none-eabihf
+            features: lite,embedded,spawn_local,dev-log
+            allow_failure: false
+          - target: thumbv7em-none-eabihf
+            features: lite,embedded,spawn_local_atomic
+            allow_failure: false
+          # RISC-V with atomics (imac). Covers ESP32-C6/P4, most SiFive chips,
+          # and BL616.
+          - target: riscv32imac-unknown-none-elf
+            features: lite,embedded,spawn_local
+            allow_failure: false
+          - target: riscv32imac-unknown-none-elf
+            features: lite,embedded,spawn_local,dev-log
+            allow_failure: false
+          - target: riscv32imac-unknown-none-elf
+            features: lite,embedded,spawn_local_atomic
+            allow_failure: false
+          # RISC-V without atomics (imc). Tracks ESP32-C2/C3-style no-CAS
+          # fallout; currently expected to fail in spin / regex-automata.
+          - target: riscv32imc-unknown-none-elf
+            features: lite,embedded,spawn_local_no_atomic
+            allow_failure: true
     steps:
       - uses: actions/checkout@v4
       - name: Set up Rust stable + bare-metal target

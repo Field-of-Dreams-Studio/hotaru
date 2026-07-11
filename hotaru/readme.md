@@ -14,7 +14,7 @@ The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represe
 
 **[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
 
-MSRV: 1.86
+MSRV: 1.88
 
 ### Stability in 0.8.x
 

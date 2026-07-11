@@ -14,7 +14,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 **[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
 
-MSRV: 1.86
+MSRV: 1.88
 
 ### Stability in 0.8.x
 

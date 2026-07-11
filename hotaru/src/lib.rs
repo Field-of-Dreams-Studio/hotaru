@@ -3,6 +3,10 @@
 //! single import root. Most users want [`prelude`]; HTTP users also
 //! want [`http`].
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
 /// HTTP-specific re-exports — request/response types, the `HTTP`
 /// protocol alias, and (with the `https` feature) the TLS variants.
 #[cfg(feature = "http")]
