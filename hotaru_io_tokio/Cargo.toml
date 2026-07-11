@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_io_tokio"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "Tokio IO and TCP backend for Hotaru"
@@ -11,7 +11,7 @@ categories = ["asynchronous", "network-programming"]
 keywords = ["hotaru", "tokio", "io", "tcp", "async"]
 
 [dependencies]
-hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = false }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.4", default-features = false }
 tokio = { version = "1.28", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 

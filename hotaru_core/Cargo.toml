@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_core"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "Protocol-neutral routing, runtime, and transport traits for the Hotaru web framework (no_std + alloc)"

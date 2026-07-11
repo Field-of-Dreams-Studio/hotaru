@@ -6,7 +6,7 @@ publish = false
 build = "build.rs"
 
 [dependencies]
-hotaru = { version = "=0.8.3", path = "../../hotaru" }
+hotaru = { version = "=0.8.4", path = "../../hotaru" }
 htmstd = { path = "../../htmstd", version = "=0.8.3" }
 ctor = "0.4.0"
 once_cell = "1.17"

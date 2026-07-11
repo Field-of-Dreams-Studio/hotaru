@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_io_embedded"
-version = "0.8.3"
+version = "0.8.4"
 # Held back from crates.io for the 0.8.3 cycle — embedded support ships once it
 # stabilizes (targeted 0.8.5+). Still a workspace member so it keeps building and
 # can be CI-checked; it is simply excluded from `cargo publish`.
@@ -15,7 +15,7 @@ categories = ["no-std", "embedded", "asynchronous"]
 keywords = ["hotaru", "embedded-io", "no-std", "embedded", "async"]
 
 [dependencies]
-hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = false }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.4", default-features = false }
 embedded-io-async = { version = "0.6", default-features = false }
 
 [features]

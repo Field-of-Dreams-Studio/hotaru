@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-hotaru = { path = "../../hotaru", version = "=0.8.3", features = ["trans"] }
+hotaru = { path = "../../hotaru", version = "=0.8.4", features = ["trans"] }
 htmstd = { path = "../../htmstd", version = "=0.8.3" }
 tokio = { version = "1", features = ["full"] }
 akari = "0.2"

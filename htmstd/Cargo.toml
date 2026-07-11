@@ -11,9 +11,9 @@ categories = ["network-programming", "web-programming::http-server"]
 keywords = ["hotaru", "middleware", "session", "cors", "cookies"]
 
 [dependencies]
-hotaru_core = { path = "../hotaru_core", version = "=0.8.3" }
-hotaru_trans = { path = "../hotaru_trans", version = "=0.8.3", features = ["trans"], default-features = false }
-hotaru_http = { path = "../hotaru_http", version = "=0.8.3" }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.4" }
+hotaru_trans = { path = "../hotaru_trans", version = "=0.8.4", features = ["trans"], default-features = false }
+hotaru_http = { path = "../hotaru_http", version = "=0.8.4" }
 hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3", features = ["ende", "url_encoding"] }
 akari = "0.2.8"
 dashmap = "6.1.0" 

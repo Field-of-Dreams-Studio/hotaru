@@ -1,6 +1,6 @@
 [package]
 name = "hotaru"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Redstone <redstone@fds.moe>", "JerrySu <jerrysu@fds.moe>"]
@@ -15,84 +15,71 @@ readme = "readme.md"
 [dependencies]
 akari = { version = "0.2.8", default-features = false }
 tokio = { version = "1.28", features = ["full"], optional = true }
-hotaru_trans = { path = "../hotaru_trans", version = "=0.8.3", default-features = false }
-hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = false }
-hotaru_rt_tokio = { path = "../hotaru_rt_tokio", version = "=0.8.3", optional = true }
-hotaru_io_tokio = { path = "../hotaru_io_tokio", version = "=0.8.3", optional = true }
-hotaru_io_futures = { path = "../hotaru_io_futures", version = "=0.8.3", optional = true }
-hotaru_rt_embassy = { path = "../hotaru_rt_embassy", version = "=0.8.3", optional = true, default-features = false }
-hotaru_io_embedded = { path = "../hotaru_io_embedded", version = "=0.8.3", optional = true, default-features = false }
-hotaru_http = { path = "../hotaru_http", version = "=0.8.3", optional = true }
+hotaru_trans = { path = "../hotaru_trans", version = "=0.8.4", default-features = false }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.4", default-features = false }
+hotaru_rt_tokio = { path = "../hotaru_rt_tokio", version = "=0.8.4", optional = true }
+hotaru_io_tokio = { path = "../hotaru_io_tokio", version = "=0.8.4", optional = true }
+hotaru_io_futures = { path = "../hotaru_io_futures", version = "=0.8.4", optional = true }
+hotaru_rt_embassy = { path = "../hotaru_rt_embassy", version = "=0.8.4", optional = true, default-features = false }
+hotaru_io_embedded = { path = "../hotaru_io_embedded", version = "=0.8.4", optional = true, default-features = false }
+hotaru_http = { path = "../hotaru_http", version = "=0.8.4", optional = true }
 ahttpm = { path = "../ahttpm", version = "=0.7.1", optional = true }
 hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3", optional = true, default-features = false, features = ["url_encoding"] }
-# ctor is only needed when external-ctor feature is enabled
 ctor = { version = "0.4.0", optional = true }
 
 [features]
 default = ["trans", "http", "tokio", "full", "cli"]
 
-# Regex/akari flavour forwarded to hotaru_core (exactly one). `full` pulls
-# unicode-aware regex + full akari; `lite` is the smaller no_std flavour.
+# Regex/akari flavour forwarded to hotaru_core; pick exactly one.
 full = ["hotaru_core/full", "akari/full"]
+# Smaller no_std flavour of `full`.
 lite = ["hotaru_core/lite", "akari/no_std"]
 
-# Enable debug logging for development and troubleshooting
+# Enable dev-time logging (`debug_warn!` etc.) through hotaru_core.
 debug = ["hotaru_core/dev-log"]
 
-# Build the `hotaru` command-line tool (`hotaru new`, `hotaru init`, ...).
+# Build the `hotaru` CLI tool (`hotaru new`, `hotaru init`, ...).
 cli = ["std"]
 
-# Use external ctor crate instead of built-in constructor implementation
-# When enabled, you must add ctor = "0.4.0" to your own dependencies
+# Use the external `ctor` crate instead of the built-in ctor implementation.
 external-ctor = ["hotaru_trans/external-ctor", "ctor"]
 
+# Endpoint DSL syntax flavour — pick one.
 trans = ["hotaru_trans/trans"]
 semi-trans = ["hotaru_trans/semi-trans"]
 attr = ["hotaru_trans/attr"]
 
 # HTTP/1.1 protocol stack (request/response types, codec, helpers).
-# On by default. Turn off for protocol-only builds (e.g. gRPC-only).
 http = ["dep:hotaru_http", "dep:ahttpm", "lib"]
+# Standard-library helpers (`hotaru_lib`).
 lib = ["dep:hotaru_lib"]
-
 # HTTPS support — implies `http`; forwards to hotaru_http's tls feature.
 https = ["http", "hotaru_http/tls"]
-
-# HTTP body compression (gzip/deflate/brotli/zstd) for Content-Encoding.
-# Implies `http`. Off by default to keep clean builds fast.
+# HTTP body compression (gzip/deflate/brotli/zstd). Implies `http`.
 http_compression = ["http", "hotaru_http/compression", "hotaru_lib/compression"]
 
+# Tokio runtime + I/O adapter bundle — the std-side default.
 tokio = ["hotaru_core/std", "hotaru_core/spawn_send", "dep:tokio", "dep:hotaru_rt_tokio", "hotaru_rt_tokio/std", "io_tokio"]
+# Standard library across the workspace.
 std = ["hotaru_core/std"]
+# `futures-io` I/O adapter (std-side alternative to tokio).
 io_futures = ["dep:hotaru_io_futures", "hotaru_io_futures/std"]
+# Tokio I/O adapter (TcpTransport / TokioIo).
 io_tokio = ["dep:hotaru_io_tokio", "hotaru_io_tokio/std"]
-spawn_send = [
-    "hotaru_core/spawn_send",
-    "hotaru_rt_embassy?/spawn_send",
-    "hotaru_io_embedded?/spawn_send",
-]
-spawn_local = [
-    "hotaru_core/spawn_local",
-    "hotaru_rt_embassy?/spawn_local",
-    "hotaru_io_embedded?/spawn_local",
-]
 
-# Bare-metal core flavour. Forwards to hotaru_core and — if the embassy
-# runtime or embedded I/O adapter is also pulled — to those.
-embedded = [
-    "hotaru_core/embedded",
-    "hotaru_rt_embassy?/embedded",
-    "hotaru_io_embedded?/embedded",
-]
+# Multi-thread task mobility (`Send` futures). Mutually exclusive with `spawn_local`.
+spawn_send = ["hotaru_core/spawn_send", "hotaru_rt_embassy?/spawn_send", "hotaru_io_embedded?/spawn_send"]
+# Single-thread task mobility (`!Send` futures). Mutually exclusive with `spawn_send`.
+spawn_local = ["hotaru_core/spawn_local", "hotaru_rt_embassy?/spawn_local", "hotaru_io_embedded?/spawn_local"]
+# `spawn_local` refinement for embedded chips with native CAS; implies `spawn_local`.
+spawn_local_atomic = ["spawn_local", "hotaru_core/spawn_local_atomic"]
+# `spawn_local` refinement for chips without CAS (ESP8266 / Xtensa LX106); flips `Arc` to `Rc`.
+spawn_local_no_atomic = ["spawn_local", "hotaru_core/spawn_local_no_atomic"]
 
-# Embassy async runtime. Additive with `tokio` — a std host can enable
-# both (embassy on a std-target executor for testing while tokio runs the
-# main harness). The core flavour (`std` vs `embedded`) and the task
-# mobility (`spawn_send` vs `spawn_local`) are picked via the umbrella's
-# `embedded` / `std` / `spawn_local` / `spawn_send` features above, which
-# forward to `hotaru_rt_embassy` through `?/` optional-forwarding.
+# Bare-metal core flavour; forwards to embassy / io_embedded if pulled.
+embedded = ["hotaru_core/embedded", "hotaru_rt_embassy?/embedded", "hotaru_io_embedded?/embedded"]
+# Embassy async runtime. Additive with `tokio`.
 embassy = ["dep:hotaru_rt_embassy"]
-
 # Bare-metal I/O adapter (`embedded-io-async`-backed transport).
 io_embedded = ["dep:hotaru_io_embedded"]
 

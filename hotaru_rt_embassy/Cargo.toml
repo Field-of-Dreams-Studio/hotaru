@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_rt_embassy"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "Embassy runtime backend for Hotaru"
@@ -11,7 +11,7 @@ categories = ["asynchronous", "embedded", "network-programming", "no-std"]
 keywords = ["hotaru", "embassy", "runtime", "async", "backend"]
 
 [dependencies]
-hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = false }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.4", default-features = false }
 critical-section = "1.2"
 embassy-executor = { version = "0.10", default-features = false }
 embassy-futures = { version = "0.1", default-features = false }

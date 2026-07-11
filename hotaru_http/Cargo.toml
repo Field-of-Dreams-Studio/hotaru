@@ -1,6 +1,6 @@
 [package]
 name = "hotaru_http"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "HTTP/1.1 implementation for the Hotaru web framework"
@@ -12,8 +12,8 @@ categories = ["network-programming", "web-programming::http-server", "web-progra
 
 [dependencies]
 # Hotaru dependencies
-hotaru_core = { path = "../hotaru_core", version = "=0.8.3" }
-hotaru_io_tokio = { path = "../hotaru_io_tokio", version = "=0.8.3" }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.4" }
+hotaru_io_tokio = { path = "../hotaru_io_tokio", version = "=0.8.4" }
 hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3", features = ["url_encoding"] }
 hotaru_tls = { path = "../hotaru_tls", version = "=0.8.2", optional = true }
 

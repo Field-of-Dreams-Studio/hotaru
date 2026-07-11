@@ -5,4 +5,4 @@ edition = "2024"
 publish = false
 
 [dependencies]
-hotaru = { path = "../../hotaru", version = "=0.8.3" }
+hotaru = { path = "../../hotaru", version = "=0.8.4" }

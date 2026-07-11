@@ -11,8 +11,8 @@ categories = ["network-programming", "cryptography", "asynchronous"]
 keywords = ["hotaru", "tls", "https", "rustls", "async"]
 
 [dependencies]
-hotaru_core = { version = "=0.8.3", path = "../hotaru_core" }
-hotaru_io_tokio = { version = "=0.8.3", path = "../hotaru_io_tokio" }
+hotaru_core = { version = "=0.8.4", path = "../hotaru_core" }
+hotaru_io_tokio = { version = "=0.8.4", path = "../hotaru_io_tokio" }
 tokio = { version = "1.28", features = ["full"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
