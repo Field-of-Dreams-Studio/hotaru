@@ -28,12 +28,14 @@ hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3", optional = true, defa
 ctor = { version = "0.4.0", optional = true }
 
 [features]
-default = ["trans", "http", "tokio", "full", "cli"]
+default = ["trans", "http", "tokio", "full_regex", "template", "cli"]
 
-# Regex/akari flavour forwarded to hotaru_core; pick exactly one.
-full = ["hotaru_core/full", "akari/full"]
-# Smaller no_std flavour of `full`.
-lite = ["hotaru_core/lite", "akari/no_std"]
+# Regex style forwarded to hotaru_core; if both are enabled, full_regex wins.
+full_regex = ["hotaru_core/full_regex"]
+lite_regex = ["hotaru_core/lite_regex"]
+
+# Akari template engine (std-side convenience).
+template = ["akari/full"]
 
 # Enable dev-time logging (`debug_warn!` etc.) through hotaru_core.
 debug = ["hotaru_core/dev-log"]
@@ -59,7 +61,7 @@ https = ["http", "hotaru_http/tls"]
 http_compression = ["http", "hotaru_http/compression", "hotaru_lib/compression"]
 
 # Tokio runtime + I/O adapter bundle — the std-side default.
-tokio = ["hotaru_core/std", "hotaru_core/spawn_send", "dep:tokio", "dep:hotaru_rt_tokio", "hotaru_rt_tokio/std", "io_tokio"]
+tokio = ["std", "hotaru_core/spawn_send", "dep:tokio", "dep:hotaru_rt_tokio", "hotaru_rt_tokio/std", "io_tokio"]
 # Standard library across the workspace.
 std = ["hotaru_core/std"]
 # `futures-io` I/O adapter (std-side alternative to tokio).
@@ -71,13 +73,13 @@ io_tokio = ["dep:hotaru_io_tokio", "hotaru_io_tokio/std"]
 spawn_send = ["hotaru_core/spawn_send", "hotaru_rt_embassy?/spawn_send", "hotaru_io_embedded?/spawn_send"]
 # Single-thread task mobility (`!Send` futures). Mutually exclusive with `spawn_send`.
 spawn_local = ["hotaru_core/spawn_local", "hotaru_rt_embassy?/spawn_local", "hotaru_io_embedded?/spawn_local"]
-# `spawn_local` refinement for embedded chips with native CAS; implies `spawn_local`.
-spawn_local_atomic = ["spawn_local", "hotaru_core/spawn_local_atomic"]
-# `spawn_local` refinement for chips without CAS (ESP8266 / Xtensa LX106); flips `Arc` to `Rc`.
-spawn_local_no_atomic = ["spawn_local", "hotaru_core/spawn_local_no_atomic"]
+# `spawn_local` refinement using the atomic/spin lock backend.
+spawn_local_atomic = ["spawn_local", "hotaru_core/spawn_local_atomic", "hotaru_rt_embassy?/spawn_local_atomic", "hotaru_io_embedded?/spawn_local_atomic"]
+# `spawn_local` refinement using local Rc/RefCell internals.
+spawn_local_no_atomic = ["spawn_local", "hotaru_core/spawn_local_no_atomic", "hotaru_rt_embassy?/spawn_local_no_atomic", "hotaru_io_embedded?/spawn_local_no_atomic"]
 
 # Bare-metal core flavour; forwards to embassy / io_embedded if pulled.
-embedded = ["hotaru_core/embedded", "hotaru_rt_embassy?/embedded", "hotaru_io_embedded?/embedded"]
+embedded = ["hotaru_core/embedded", "akari/no_std", "hotaru_rt_embassy?/embedded", "hotaru_io_embedded?/embedded"]
 # Embassy async runtime. Additive with `tokio`.
 embassy = ["dep:hotaru_rt_embassy"]
 # Bare-metal I/O adapter (`embedded-io-async`-backed transport).

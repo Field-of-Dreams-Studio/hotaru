@@ -19,6 +19,8 @@ pub mod prelude;
 
 #[cfg(feature = "tokio")]
 pub use hotaru_rt_tokio::TokioRuntime;
+#[cfg(feature = "embassy")]
+pub use hotaru_rt_embassy;
 
 /// Tokio-backed server alias used by the umbrella crate.
 #[cfg(feature = "tokio")]
@@ -58,7 +60,7 @@ pub use hotaru_core::app::server::ProtocolRegistryKind;
 pub use hotaru_core::executable::ProtocolRegistryBuilder;
 pub use hotaru_core::executable::middleware::AsyncMiddleware;
 
-#[cfg(feature = "full")]
+#[cfg(feature = "template")]
 pub use hotaru_core::TemplateManager;
 pub use hotaru_core::Value;
 pub use hotaru_core::object;
@@ -70,11 +72,8 @@ pub use hotaru_core::protocol::{
     BoxProtocolError, DefaultProtocolError, EmptyError, EndpointOutcome, Message, Protocol,
     ProtocolError, ProtocolRole, RequestContext, Stream,
 };
-// `hotaru_io_embedded` is not surfaced through the umbrella in 0.8.x (`hotaru`
-// is std-only — see Cargo.toml). For no_std, use `hotaru_core` +
-// `hotaru_io_embedded` directly.
-// #[cfg(feature = "io_embedded")]
-// pub use hotaru_io_embedded::{EmbeddedBackend, EmbeddedIo};
+#[cfg(feature = "io_embedded")]
+pub use hotaru_io_embedded::{EmbeddedBackend, EmbeddedIo};
 #[cfg(feature = "io_futures")]
 pub use hotaru_io_futures::{FuturesBackend, FuturesIo};
 #[cfg(feature = "io_tokio")]

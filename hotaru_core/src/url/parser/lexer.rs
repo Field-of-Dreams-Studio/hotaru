@@ -62,11 +62,11 @@ impl TypeKind {
     // Convert to a regex snippet if applicable. Path is special and returns None.
     // These are intended for composing a full route regex later.
     //
-    // # ASCII-only by design (no_std / `lite` / `embedded`)
+    // # ASCII-only by design (no_std / `lite_regex` / `embedded`)
     //
     // These snippets deliberately use ASCII classes (`[0-9]`, explicit
     // `[0-9a-fA-F]`) instead of `\d` or the `(?i)` flag. Under the
-    // `lite`/`embedded` flavour the `regex` crate is built without its
+    // `lite_regex` / embedded flavour the `regex` crate is built without its
     // `unicode-perl` / `unicode-case` tables, so `\d` and `(?i)` fail to
     // compile — and because `RegexSegment::new` swallows a compile error into
     // `re = None`, a `\d`-based typed route would *silently never match*.

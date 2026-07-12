@@ -4,6 +4,8 @@
 
 #[cfg(feature = "io_futures")]
 pub use crate::FuturesIo;
+#[cfg(feature = "io_embedded")]
+pub use crate::EmbeddedIo;
 pub use crate::PathPattern;
 #[cfg(feature = "tokio")]
 pub use crate::TokioRuntime;
@@ -11,7 +13,7 @@ pub use crate::Url;
 pub use crate::Value;
 pub use crate::object;
 
-#[cfg(feature = "lite")]
+#[cfg(feature = "embedded")]
 pub use crate::akari::prelude::*;
 
 pub use crate::{AnyPath, AnyUrl, LitUrl, RegUrl, TrailingSlash};

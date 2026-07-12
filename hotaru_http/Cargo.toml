@@ -29,14 +29,11 @@ default = []
 tls = ["dep:hotaru_tls"]
 compression = ["hotaru_lib/compression"]
 
+# Hotaru HTTP is currently Tokio/std-only; embedded, futures-io, embedded-io, and spawn-local modes are not supported.
 tokio = ["hotaru_core/std", "hotaru_core/spawn_send", "hotaru_io_tokio/std"]
 std = ["hotaru_core/std"]
-embedded = ["hotaru_core/embedded"]
-io_futures = []
 io_tokio = ["hotaru_io_tokio/std"]
-io_embedded = []
 spawn_send = ["hotaru_core/spawn_send"]
-spawn_local = ["hotaru_core/spawn_local"]
 
 [dev-dependencies]
 tokio-test = "0.4"

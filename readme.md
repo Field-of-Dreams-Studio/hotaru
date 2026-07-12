@@ -2,7 +2,7 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.3-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.4-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
@@ -22,10 +22,10 @@ The **tokio + HTTP** stack (default features `trans`, `http`, `tokio`) is the te
 
 Everything else is **experimental** and will stabilize by 0.8.7:
 
-- `RuntimeSpec` trait surface (currently only `hotaru_rt_tokio` implements it; other runtime backends are planned, not shipped)
-- `no_std` builds of `hotaru_core` (Cortex-M / RISC-V bare-metal, CI-verified but not yet exercised by a real embedded backend)
-- IO adapter crates: `hotaru_io_futures` ships as a standalone crate (limited real-world use). `hotaru_io_embedded` is **not published in 0.8.3** — it stays in-repo until embedded stabilizes (targeted 0.8.5+). The `hotaru` umbrella is **std-only**; once the embedded backend ships, bare-metal projects will depend on `hotaru_core` + `hotaru_io_embedded` directly.
-- Embassy runtime backend (planned)
+- `RuntimeSpec` trait surface (`hotaru_rt_tokio` is the supported default; `hotaru_rt_embassy` is experimental)
+- `no_std` builds of `hotaru_core` (Cortex-M / RISC-V bare-metal, CI-verified and connected to experimental embedded backend crates, but not yet production-validated on hardware)
+- IO adapter crates: `hotaru_io_futures` ships as a standalone crate (limited real-world use). `hotaru_io_embedded` lives in the workspace and is still experimental and unpublished (crates.io). The `hotaru` facade exposes `EmbeddedIo` through its optional `io_embedded` feature.
+- Embassy runtime backend (`hotaru_rt_embassy`, experimental)
 
 If you are shipping something now, stick with the `tokio` default and revisit the experimental paths as they land.
 
@@ -35,7 +35,7 @@ If you are shipping something now, stick with the `tokio` default and revisit th
 
 - **Multi-Protocol**: HTTP/1.1 and HTTPS (TLS) ship out of the box. The `Protocol` trait is an open extension point for custom TCP-based protocols (WebSocket, MQTT, and other frames), though no non-HTTP protocol ships in this workspace today
 - **Server + Client**: Endpoints for inbound traffic, outpoints for outbound. Same protocol trait, same routing, same middleware
-- **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships today via `hotaru_rt_tokio` (the only runtime backend so far); other runtimes can plug in via the same sibling-crate pattern. IO adapters are further along, with `hotaru_io_tokio`, `hotaru_io_futures`, and `hotaru_io_embedded` already shipping
+- **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships today via `hotaru_rt_tokio`; other runtimes can plug in via the same sibling-crate pattern. IO adapters are further along, with `hotaru_io_tokio`, `hotaru_io_futures`, and the experimental in-workspace `hotaru_io_embedded`
 - **`no_std`-Ready Core**: `hotaru_core` builds bare-metal on Cortex-M4/M7 and RISC-V (with atomics) under `alloc`. CI verified on `thumbv7em-none-eabihf` and `riscv32imac-unknown-none-elf`
 - **Sync main**: `fn main() { run_server!(APP); }`. No `async fn main`, no `#[tokio::main]`
 - **Ergonomic Macros**: `endpoint!` / `outpoint!` / `middleware!` DSL in three flavors (`trans`, `semi-trans`, `attr`)
@@ -312,17 +312,27 @@ Hotaru is built on a modular architecture:
 - **[hotaru_rt_tokio](https://crates.io/crates/hotaru_rt_tokio)** - Tokio runtime backend (`TokioRuntime`)
 - **[hotaru_io_tokio](https://crates.io/crates/hotaru_io_tokio)** - Tokio TCP/IO backend (`TcpTransport`, `TokioIo`)
 - **[hotaru_io_futures](https://crates.io/crates/hotaru_io_futures)** - `futures-io` adapter backend (`FuturesIo`, experimental)
-- **hotaru_io_embedded** - `embedded-io-async` adapter backend (`EmbeddedIo`) — *experimental; not published in 0.8.3, planned for 0.8.5+*
+- **hotaru_io_embedded** - `embedded-io-async` adapter backend (`EmbeddedIo`) — *experimental; in-workspace, unpublished (crates.io), and re-exported by `hotaru` when `io_embedded` is enabled*
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
 ## Changelog
 
-### 0.8.3 (Current)
+### 0.8.4 (Current)
+- Continued backend split work by moving Tokio-specific IO/runtime support out of `hotaru_core`.
+- Clarified platform and task-mobility feature modes.
+- Added explicit local-executor refinements: `spawn_local_atomic` and `spawn_local_no_atomic`.
+- Made sync primitive selection feature-based: `parking_lot`, `spin`, or Hotaru `RefCell` fallback.
+- Removed hidden `target_has_atomic` behavior from core feature selection.
+- Replaced the old `full`/`lite` regex names with additive `full_regex` / `lite_regex`; omitting both uses Hotaru's no-regex stub path.
+- Improved `hotaru` facade dependency gating and reduced default-feature leakage.
+- Continued preparation for a smaller backend-neutral core.
+
+### 0.8.3
 - **Core/backend split**: `hotaru_core` is now backend-neutral at the public type layer. Concrete Tokio runtime and TCP/IO implementations moved into sibling crates (`hotaru_rt_tokio`, `hotaru_io_tokio`), while the umbrella `hotaru` crate keeps the familiar Tokio defaults.
 - **IO adapter crates**: futures-io and embedded-io-async adapters moved out of core into `hotaru_io_futures` and `hotaru_io_embedded`. Each backend uses local wrapper types (`TokioIo<T>`, `FuturesIo<T>`, `EmbeddedIo<T>`) so adapter impls stay additive and avoid trait-coherence conflicts.
-- **Simpler `hotaru_core` features**: core no longer owns `io_*`, `rt_*`, `tokio`, or `embassy` feature flags. It now keeps only the platform axis (`std` / `embedded`) and task-mobility axis (`spawn_send` / `spawn_local`); runtime and IO backends are selected through backend crates, or through the std-only `hotaru` umbrella (Tokio and futures backends only — the embedded backend is consumed directly).
-- **`hotaru` umbrella is std-only**: the umbrella no longer re-exports `hotaru_io_embedded` or exposes `embedded` / `io_embedded` features (its prelude pulls std-only items such as `std::thread::sleep` and `once_cell::sync::Lazy`). `hotaru_io_embedded` is **not published in 0.8.3** (targeted 0.8.5+); once it ships, `no_std` / bare-metal projects will depend on `hotaru_core` + `hotaru_io_embedded` directly.
+- **Simpler `hotaru_core` features**: core no longer owns `io_*`, `rt_*`, `tokio`, or `embassy` feature flags. It now keeps only the platform axis (`std` / `embedded`) and task-mobility axis (`spawn_send` / `spawn_local`); runtime and IO backends are selected through backend crates, or through optional facade features on `hotaru`.
+- **`hotaru` facade defaults to Tokio/std**: the umbrella keeps Tokio as the supported default path, while exposing experimental optional `embedded`, `embassy`, and `io_embedded` features for in-workspace backend work. `io_embedded` re-exports `EmbeddedIo`; the backend crate remains unpublished on crates.io.
 - **Runtime abstraction cleanup**: `RuntimeSpec` is the backend-neutral runtime trait, with Tokio implemented externally by `hotaru_rt_tokio::TokioRuntime`. Framework types (`Server`, `Client`, builders, and URL/protocol-entry types) now carry explicit transport/runtime parameters in core, while `hotaru` restores ergonomic defaults.
 - **`MaybeSend` task-mobility model**: async framework surfaces use `MaybeSend` so `spawn_send` builds keep real `Send` bounds and `spawn_local` builds can support local `!Send` futures. `hotaru_io_embedded` gates its actual embedded-io-async trait impls on `spawn_local`, not on the `embedded` platform flag.
 - **Framework-owned async IO traits**: `HotaruRead`, `HotaruWrite`, `HotaruBufRead`, `HotaruBufWrite`, `HotaruIOError`, `HotaruBufReader`, and `HotaruBufWriter` provide the common IO trait surface used by transports and protocols without hardcoding Tokio types in core.
@@ -330,7 +340,7 @@ Hotaru is built on a modular architecture:
 - **Protocol-agnostic endpoint outcomes**: `EndpointOutcome<C>` lets generated endpoints apply return values to any request context. HTTP keeps the existing `HttpResponse` endpoint style, while non-HTTP/inbound-only protocols can use `()` outcomes without placeholder responses.
 - **Per-protocol URL parsing hooks**: `Protocol` can customize URL tokenization/literal parsing, and URL parser internals such as `RawToken`, `TypeKind`, `tokenize`, and `tokens_to_patterns` are re-exported for protocol-specific routing work.
 - **Preferred-language middleware**: `htmstd` adds `PreferredLanguageMiddleware`, `PreferredLanguage`, settings, and request-extension helpers for parsing and negotiating the `Accept-Language` header.
-- **no_std preparation**: core continues moving toward `no_std` readiness with `alloc` usage, `core` imports, Akari `lite`/`no_std` alignment, generic IO errors, and backend-neutral abstractions. Real Embassy wiring remains deferred; embedded support is still experimental.
+- **no_std preparation**: core continues moving toward `no_std` readiness with `alloc` usage, `core` imports, Akari `embedded`/`no_std` alignment, generic IO errors, and backend-neutral abstractions. Embassy and embedded backend work exists in-tree but remains experimental.
 - **Sync-main entry macros**: `run_server!` / `run_server_until!` (blocking) and `run_server_no_block!` / `run_server_no_block_until!` (fire-and-forget) let users run a server from an ordinary `fn main()` — no `#[tokio::main]`, no `async fn main`. Backed by a new `BlockingRuntimeCap` capability trait implemented by `TokioRuntime`.
 
 ### 0.8.2

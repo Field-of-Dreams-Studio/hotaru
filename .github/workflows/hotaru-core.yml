@@ -23,6 +23,10 @@ jobs:
       - name: Check hotaru_core default features
         run: cargo check -p hotaru_core
 
+  # Host `cargo check` for non-default feature combinations that cannot run
+  # bare-metal (every non-default `std` combo) plus the `embedded` combos not
+  # exercised by the bare-metal jobs below. The crate's default feature set is
+  # covered by the dedicated default job above, so it is not repeated here.
   feature-matrix:
     name: ${{ matrix.features }}
     runs-on: ubuntu-latest
@@ -30,20 +34,15 @@ jobs:
       fail-fast: false
       matrix:
         features:
-          - full,std,spawn_send
-          - full,std,spawn_local
-          - full,embedded,spawn_send
-          - full,embedded,spawn_local
-          - lite,std,spawn_send
-          - lite,std,spawn_local
-          - lite,embedded,spawn_send
-          - lite,embedded,spawn_local
-          - lite,embedded,spawn_local_atomic
-          - lite,embedded,spawn_local_no_atomic
-          # `dev-log` is an additive marker feature; verify it compiles on
-          # representative content/platform/mobility combinations.
-          - full,std,spawn_send,dev-log
-          - lite,embedded,spawn_local,dev-log
+          - full_regex,std,spawn_local
+          - full_regex,embedded,spawn_send
+          - full_regex,embedded,spawn_local
+          - lite_regex,std,spawn_send
+          - lite_regex,std,spawn_local
+          - lite_regex,embedded,spawn_send
+          # `dev-log` is an additive marker feature; the embedded `dev-log`
+          # combo is covered once by the bare-metal jobs below.
+          - full_regex,std,spawn_send,dev-log
     steps:
       - uses: actions/checkout@v4
       - name: Set up Rust stable
@@ -55,8 +54,10 @@ jobs:
 
   # Bare-metal no_std builds — proves the crate actually links on real embedded
   # targets, not just that it typechecks on the host where std is silently
-  # available. The riscv32imc no-atomic leg is allowed to fail until spin /
-  # regex-automata are routed away from native CAS.
+  # available. Each feature combination is assigned to a single target so no
+  # combination is compiled more than once; the three arches together still
+  # exercise ARM, RISC-V-with-atomics, and RISC-V-without-atomics, plus both
+  # the spin and RefCell lock backends.
   no-std-targets:
     name: bare-metal ${{ matrix.target }} / ${{ matrix.features }}
     runs-on: ubuntu-latest
@@ -67,31 +68,23 @@ jobs:
         include:
           # ARM Cortex-M4/M7 with FPU. Covers the STM32F4/F7/H7/L4/L5/H5
           # families, Nordic nRF52840, and most other Cortex-M4-class boards.
+          # `spawn_local` exercises the RefCell lock backend; `spawn_local_atomic`
+          # exercises the spin backend.
           - target: thumbv7em-none-eabihf
-            features: lite,embedded,spawn_local
+            features: lite_regex,embedded,spawn_local
             allow_failure: false
           - target: thumbv7em-none-eabihf
-            features: lite,embedded,spawn_local,dev-log
-            allow_failure: false
-          - target: thumbv7em-none-eabihf
-            features: lite,embedded,spawn_local_atomic
+            features: lite_regex,embedded,spawn_local_atomic
             allow_failure: false
           # RISC-V with atomics (imac). Covers ESP32-C6/P4, most SiFive chips,
-          # and BL616.
+          # and BL616. Carries the embedded `dev-log` combo.
           - target: riscv32imac-unknown-none-elf
-            features: lite,embedded,spawn_local
+            features: lite_regex,embedded,spawn_local,dev-log
             allow_failure: false
-          - target: riscv32imac-unknown-none-elf
-            features: lite,embedded,spawn_local,dev-log
-            allow_failure: false
-          - target: riscv32imac-unknown-none-elf
-            features: lite,embedded,spawn_local_atomic
-            allow_failure: false
-          # RISC-V without atomics (imc). Tracks ESP32-C2/C3-style no-CAS
-          # fallout; currently expected to fail in spin / regex-automata.
+          # RISC-V without atomics (imc). No regex feature means no regex dep.
           - target: riscv32imc-unknown-none-elf
-            features: lite,embedded,spawn_local_no_atomic
-            allow_failure: true
+            features: embedded,spawn_local_no_atomic
+            allow_failure: false
     steps:
       - uses: actions/checkout@v4
       - name: Set up Rust stable + bare-metal target
@@ -103,6 +96,34 @@ jobs:
         # what caught `regex-lite`'s std dependency during development.
         run: |
           cargo build -p hotaru_core \
+            --target ${{ matrix.target }} \
+            --no-default-features \
+            --features "${{ matrix.features }}"
+
+  # Facade no_std / no-atomic coverage — proves the umbrella crate does not
+  # leak Tokio/std defaults when embedding through `hotaru`.
+  hotaru-facade-no-std-targets:
+    name: hotaru facade bare-metal ${{ matrix.target }} / ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.allow_failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # RISC-V without atomics (imc). Uses no regex feature so the regex
+          # dependency is absent, and spawn_local_no_atomic selects Rc/RefCell.
+          - target: riscv32imc-unknown-none-elf
+            features: embedded,io_embedded,spawn_local_no_atomic
+            allow_failure: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust stable + bare-metal target
+        run: |
+          rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+          rustup default stable
+      - name: Build hotaru facade for ${{ matrix.target }}
+        run: |
+          cargo build -p hotaru \
             --target ${{ matrix.target }} \
             --no-default-features \
             --features "${{ matrix.features }}"

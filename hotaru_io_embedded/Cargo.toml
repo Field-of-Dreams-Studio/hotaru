@@ -20,7 +20,7 @@ embedded-io-async = { version = "0.6", default-features = false }
 
 [features]
 # This crate's reason to exist is the bare-metal path, so its default is the
-# no_std flavour: `embedded` (→ hotaru_core/embedded, spin) + `spawn_local`
+# no_std flavour: `embedded` (→ hotaru_core/embedded) + `spawn_local`
 # (the mobility mode the trait impls below require — embedded-io-async futures
 # are typically `!Send`). Consumers depend on this crate directly — it is not
 # routed through the `hotaru` umbrella — so this default is what they get.
@@ -29,3 +29,6 @@ std = ["hotaru_core/std"]
 embedded = ["hotaru_core/embedded"]
 spawn_send = ["hotaru_core/spawn_send"]
 spawn_local = ["hotaru_core/spawn_local"]
+# `spawn_local` refinements: atomic/spin lock backend or local Rc/RefCell internals.
+spawn_local_atomic = ["spawn_local", "hotaru_core/spawn_local_atomic"]
+spawn_local_no_atomic = ["spawn_local", "hotaru_core/spawn_local_no_atomic"]

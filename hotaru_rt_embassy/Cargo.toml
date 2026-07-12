@@ -33,3 +33,6 @@ std = [
 embedded = ["hotaru_core/embedded"]
 spawn_send = ["hotaru_core/spawn_send"]
 spawn_local = ["hotaru_core/spawn_local"]
+# `spawn_local` refinements: atomic/spin lock backend or local Rc/RefCell internals.
+spawn_local_atomic = ["spawn_local", "hotaru_core/spawn_local_atomic"]
+spawn_local_no_atomic = ["spawn_local", "hotaru_core/spawn_local_no_atomic"]
