@@ -88,7 +88,7 @@ listed below. **Not yet declared** is a tracking status, not a tier.
 | Component | Files and directories | Primary | Backup | AI declaration |
 | --- | --- | --- | --- | --- |
 | HTTP, TLS, and standard web middleware | `hotaru_http/**`, `hotaru_tls/**`, `htmstd/**`, `ahttpm/**` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | **Human-Led** for `hotaru_http/**`, `htmstd/cors/**`, and `htmstd/session/**`; **Co-Authored** for the Akari integration in `ahttpm/**`; `hotaru_tls/**` and other middleware not yet declared |
-| MQTT client and broker | [`Field-of-Dreams-Studio/hotaru_mqtt`](https://github.com/Field-of-Dreams-Studio/hotaru_mqtt) | [@JerrySu5379](https://github.com/JerrySu5379) | [@Redstone-D](https://github.com/Redstone-D) | **Human-Led**, with broker and traits **Co-Authored** |
+| MQTT client and broker | [`Field-of-Dream-Studio/hotaru_mqtt`](https://github.com/Field-of-Dream-Studio/hotaru_mqtt) | [@JerrySu5379](https://github.com/JerrySu5379) | [@Redstone-D](https://github.com/Redstone-D) | **Human-Led**, with broker and traits **Co-Authored** |
 | Experimental protocol integrations | `h2per/**`, `hotaru_grpc/**` | [@Redstone-D](https://github.com/Redstone-D) and [@JerrySu5379](https://github.com/JerrySu5379) | — | Unstable Hyper integration in `h2per/**` **Co-Authored**; `hotaru_grpc/**` not yet declared |
 
 The MQTT repository should keep its own matching ownership file. This row

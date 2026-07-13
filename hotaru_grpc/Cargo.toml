@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Hotaru Contributors"]
 description = "gRPC support for the Hotaru web framework"
 license = "MIT"
-repository = "https://github.com/hotaru/hotaru"
+repository = "https://github.com/Field-of-Dream-Studio/hotaru"
 keywords = ["grpc", "rpc", "protobuf", "hotaru", "http2"]
 categories = ["network-programming", "web-programming"]
 

@@ -16,7 +16,10 @@ The name 'Hotaru' comes from the Japanese Character '蛍' represents the firefly
 
 **[Official Website](https://hotaru.rs)**
 
-**[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
+**[Example Project](https://github.com/Field-of-Dream-Studio/hotaru-example)**
+
+> Repository transfer notice: the Hotaru repository has moved to
+> `https://github.com/Field-of-Dream-Studio/hotaru`.
 
 MSRV: 1.86
 
@@ -279,7 +282,7 @@ endpoint! {
 
 ## Examples
 
-Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hotaru-example) for:
+Check out the [example repository](https://github.com/Field-of-Dream-Studio/hotaru-example) for:
 - Basic routing and handlers
 - Form processing and file uploads
 - Session management with cookies
@@ -300,7 +303,15 @@ Hotaru is built on a modular architecture:
 
 ## Changelog
 
-### 0.8.3 (Current)
+### 0.8.4 (Current)
+- Replaced old `full` / `lite` regex feature names with additive `full_regex` / `lite_regex`; when neither is enabled, core drops the `regex` dependency and uses its regex-stub path.
+- Made sync primitive selection feature-based: `parking_lot` on `std`, `spin` when enabled, or a `RefCell` fallback otherwise.
+- Added explicit local-executor refinements: `spawn_local_atomic` (spin locks) and `spawn_local_no_atomic` (Rc/RefCell).
+- Removed hidden `target_has_atomic` behavior from core feature selection.
+- Improved embedded / no-atomic CI coverage for `hotaru_core` and the `hotaru` facade, and deduplicated the core feature matrix so each feature combination is compiled once.
+- Updated repository metadata and documentation links for the transfer to `https://github.com/Field-of-Dream-Studio/hotaru`.
+
+### 0.8.3
 - **Protocol-agnostic `endpoint!` via `EndpointOutcome`**: new `EndpointOutcome<C>` trait in `hotaru_core::protocol` (re-exported from `hotaru::prelude`) decouples endpoint return values from the HTTP `response` field. Generated handlers now return `impl EndpointOutcome<Ctx> + 'static`; the wrapper applies the outcome via `EndpointOutcome::apply_to(__outcome, &mut req)?` instead of writing `req.response` directly. Generic impls for `()` (no-op) and `Result<O, C::Error>` (fallible bodies) live in `hotaru_core`; `impl EndpointOutcome<HttpContext<TS>> for HttpResponse` lives in `hotaru_http`. **Existing HTTP endpoint bodies compile unchanged** — bodies that end in `HttpResponse` still land in `ctx.response`. Inbound-only protocols can now use `()`-returning endpoints with no placeholder response.
 - **Per-protocol URL parsing on `Protocol` trait**: new `tokenize_url` (pattern side, default = the framework lexer) and `lit_parser` (literal side, minimal default — HTTP overrides with `/`-split that mirrors `UrlRoot::walk_str` empty-input semantics). `lexer::tokenize` is now fallible (`Result<Vec<RawToken>, PatternError>`); `RawToken`, `TypeKind`, `tokenize`, `tokens_to_patterns` are re-exported from `hotaru_core::url`. `url::parser::parse` signature unchanged.
 - **Preferred-language middleware in `htmstd`**: new `language` module exposing `PreferredLanguageMiddleware` plus the `PreferredLanguage` struct that parses the request `Accept-Language` header into ordered, q-weighted `LanguageRange` entries and stores it in `req.params`. `PreferredLanguage` provides downstream helpers — `preferred()`, `primary()`, `accepts()`, `quality_for()` / `quality_millis_for()` (q-values as `u16` milli-units), and `best_match()` / `best_match_owned()` for negotiating against a supported-language set. Configurable via `PreferredLanguageSettings` (fallback language, etc.) and ergonomic access via the `PreferredLanguageRequestExt` extension trait. All re-exported from `htmstd`.
@@ -358,7 +369,7 @@ Hotaru is built on a modular architecture:
 - **Akari Template Engine**: https://crates.io/crates/akari
 - **Homepage**: https://hotaru.rs 
 - **Documentation Home Page**: https://fds.rs
-- **GitHub**: https://github.com/Field-of-Dreams-Studio/hotaru
+- **GitHub**: https://github.com/Field-of-Dream-Studio/hotaru
 - **Documentation**: https://docs.rs/hotaru 
 
 | Video Resources | URL | 
@@ -383,7 +394,7 @@ relevant human decisions are settled. Reviewers may request an explanation or
 walkthrough.
 
 Per-component declarations are listed in
-[GOVERNANCE.md](https://github.com/Field-of-Dreams-Studio/hotaru/blob/main/GOVERNANCE.md#component-ownership).
+[GOVERNANCE.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/GOVERNANCE.md#component-ownership).
 
 ## 📄 License
 

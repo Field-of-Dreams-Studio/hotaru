@@ -12,7 +12,10 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 > Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
 
-**[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
+**[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dream-Studio/hotaru-example)**
+
+> Repository transfer notice: the Hotaru repository has moved to
+> `https://github.com/Field-of-Dream-Studio/hotaru`.
 
 MSRV: 1.88
 
@@ -293,7 +296,7 @@ endpoint! {
 
 ## Examples
 
-Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hotaru-example) for:
+Check out the [example repository](https://github.com/Field-of-Dream-Studio/hotaru-example) for:
 - Basic routing and handlers
 - Form processing and file uploads
 - Session management with cookies
@@ -324,8 +327,11 @@ Hotaru is built on a modular architecture:
 - Added explicit local-executor refinements: `spawn_local_atomic` and `spawn_local_no_atomic`.
 - Made sync primitive selection feature-based: `parking_lot`, `spin`, or Hotaru `RefCell` fallback.
 - Removed hidden `target_has_atomic` behavior from core feature selection.
-- Replaced the old `full`/`lite` regex names with additive `full_regex` / `lite_regex`; omitting both uses Hotaru's no-regex stub path.
-- Improved `hotaru` facade dependency gating and reduced default-feature leakage.
+- Replaced the old `full`/`lite` regex names with additive `full_regex` / `lite_regex`; when neither is enabled, Hotaru drops the `regex` dependency and uses its regex-stub path.
+- Split facade regex style from template support: `full_regex` / `lite_regex` control routing regex, while `template` controls Akari template support.
+- Added `hotaru` facade re-exports for `EmbeddedIo` behind `io_embedded`, and exposed the experimental Embassy backend crate behind `embassy`.
+- Added CI coverage for the `hotaru` facade on a no-atomic bare-metal target, and deduplicated the core feature matrix so each feature combination is compiled once.
+- Updated repository metadata and documentation links for the transfer to `https://github.com/Field-of-Dream-Studio/hotaru`.
 - Continued preparation for a smaller backend-neutral core.
 
 ### 0.8.3
@@ -390,7 +396,7 @@ Hotaru is built on a modular architecture:
 - **Akari Template Engine**: https://crates.io/crates/akari
 - **Homepage**: https://hotaru.rs
 - **Documentation Home Page**: https://fds.rs
-- **GitHub**: https://github.com/Field-of-Dreams-Studio/hotaru
+- **GitHub**: https://github.com/Field-of-Dream-Studio/hotaru
 - **Documentation**: https://docs.rs/hotaru
 
 | Video Resources | URL |
@@ -415,7 +421,7 @@ relevant human decisions are settled. Reviewers may request an explanation or
 walkthrough.
 
 Per-component declarations are listed in
-[GOVERNANCE.md](https://github.com/Field-of-Dreams-Studio/hotaru/blob/main/GOVERNANCE.md#component-ownership).
+[GOVERNANCE.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/GOVERNANCE.md#component-ownership).
 
 ## 📄 License
 
