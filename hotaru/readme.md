@@ -397,66 +397,25 @@ Hotaru is built on a modular architecture:
 | --- | --- |
 | Quick Tutorial | Youtube: https://www.youtube.com/watch?v=8pV-o04GuKk&t=6s <br> Bilibili: https://www.bilibili.com/video/BV1BamFB7E8n/ |
 
-## AI Declaration of each Mod
+## AI-assisted development
 
-We believe in transparency about AI-assisted development. The framework is governed jointly by two maintainer groups using a shared four-tier system that prioritizes understanding over line counts.
+AI-assistance tiers describe the kind of collaboration, not a percentage of
+generated code.
 
-<details>
-<summary><b>Click for more details</b></summary>
-
-### Maintained by: PMINE/Research
-
-| Name | Tier | Comments |
-| --- | --- | --- |
-| hotaru_core/app | Author-Owned | |
-| hotaru_core/connection | Author-Owned | |
-| hotaru_core/executable | Author-Owned | |
-| hotaru_core/url | Author-Owned | |
-| hotaru_core/protocol | Author-Owned | |
-| hotaru_http/trails | Co-Authored | |
-| hotaru_http/* | Human-Led | |
-| hotaru_mqtt/broker | Co-Authored | |
-| hotaru_mqtt/traits | Co-Authored | |
-| hotaru_mqtt/* | Human-Led | |
-| hotaru_lib | Human-Led | Basic API Access |
-| h2per | Co-Authored | Integration of Hyper - Not stable yet |
-| htmstd/cors | Human-Led | |
-| htmstd/session | Human-Led | |
-
-### Maintained by: Project-StarFall
-
-| Name | Tier | Comments |
-| --- | --- | --- |
-| hotaru_trans/endpoint | Author-Owned | Proof and language design must be fully understood by humans |
-| hotaru_trans/outpoint | Author-Owned | Proof and language design must be fully understood by humans |
-| hotaru_trans/middleware | Author-Owned | Proof and language design must be fully understood by humans |
-| hotaru_trans/cors | Co-Authored | Trivial user-level abstraction |
-| ahttpm | Co-Authored | Imports akari_macro plus improvements |
-| SFX | Co-Authored | Trivial user-level abstraction |
-| akari | External | https://crates.io/crates/akari |
-| akari_lang | External (TBD) | |
-| akari_macro | External | https://crates.io/crates/akari |
-
-### Shared term meanings
-
-| Term | Meaning |
+| Tier | Rule |
 | --- | --- |
-| **Forbidden** | The intelligence work in this module — design decisions, proof obligations, language semantics, novel logic — is authored by humans. AI is not used for this content (the mechanical/test/doc carve-out in operating rule 2 still applies). Reserved for modules where the work *is* the thinking, not the typing. |
-| **Author-Owned** | AI may assist with drafts and completion, but the committed code reads as the author's own throughout. A reviewer should not be able to tell where AI helped. The module signals "a human owns the design and the prose." |
-| **Human-Led** | The human authored the structure and the load-bearing pieces; AI filled in helpers, repetitive sections, or boilerplate. Some sections may visibly bear AI's hand, but the design choices and non-trivial logic are clearly human. The author can defend every part without re-consulting AI. |
-| **Co-Authored** | AI participated substantively in both design exploration and implementation. The human author has internalized the result and can defend, modify, and debug without re-prompting. Appropriate for well-understood patterns and third-party integrations. |
+| **Forbidden** | Design, proofs, semantics, and novel logic are human-authored. |
+| **Author-Owned** | AI may assist with drafts or completion; the human owns the design and committed work. |
+| **Human-Led** | The human writes the structure and load-bearing logic; AI may assist with helpers and boilerplate. |
+| **Co-Authored** | AI may assist with design and implementation; the human must fully internalize the result. |
 
-The understanding requirement is uniform across Author-Owned, Human-Led, and Co-Authored: the author can explain any line, modify surrounding code without AI help, and walk a reviewer through the code on request. The tiers differ only in where AI's voice is allowed to show through, not in what the author owes the team.
+In every tier, contributors must understand, explain, modify, and debug their
+work. AI may assist with tests, documentation, and mechanical typing after the
+relevant human decisions are settled. Reviewers may request an explanation or
+walkthrough.
 
-### Operating rules
-
-1. **No quantification.** Tiers describe the kind of collaboration, not the amount of AI-authored code. Counting lines is brittle and incentivizes the wrong behavior.
-2. **Tests, documentation, and mechanical typing are permitted in every tier — including Forbidden.** AI assistance is allowed across all modules for: unit tests; doc comments and inline prose; and mechanical typing where the design decision has already been made by a human and AI is only writing it out (e.g., applying a settled pattern across similar cases, expanding hand-authored pseudocode, regenerating a table from a spec). The defining criterion is that no *intelligence work* is delegated to AI — design, proof, and semantics decisions remain with the human. The author remains responsible for understanding what was generated.
-3. **Reviewer-driven understanding check.** Any reviewer may flag a PR with "this doesn't feel author-owned" — regardless of the module's tier. The author clears the flag by demonstrating understanding in PR comments or a short walkthrough. Flags are requests for evidence, not accusations.
-4. **Smell-test threshold scales with tier.** Author-Owned code is flagged if any section visibly reads as AI-generated. Human-Led is flagged if the structural code reads as AI-generated or AI's hand pervades rather than appearing locally. Co-Authored is flagged only if the author cannot defend the code in review.
-5. **Tier reflects the work, not preferences.** Maintainers set tiers based on the nature of the module. If the character of a module changes, the tier is re-set rather than stretched.
-6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked.
-</details>
+Per-component declarations are listed in
+[GOVERNANCE.md](https://github.com/Field-of-Dreams-Studio/hotaru/blob/main/GOVERNANCE.md#component-ownership).
 
 ## 📄 License
 
