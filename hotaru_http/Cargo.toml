@@ -15,7 +15,7 @@ categories = ["network-programming", "web-programming::http-server", "web-progra
 hotaru_core = { path = "../hotaru_core", version = "=0.8.4" }
 hotaru_io_tokio = { path = "../hotaru_io_tokio", version = "=0.8.4" }
 hotaru_lib = { path = "../hotaru_lib", version = "=0.8.3", features = ["url_encoding"] }
-hotaru_tls = { path = "../hotaru_tls", version = "=0.8.2", optional = true }
+hotaru_tls = { path = "../hotaru_tls", version = "=0.8.3", optional = true }
 
 akari = { version = "0.2.8", features = ["full"] }
 once_cell = "1.19"
