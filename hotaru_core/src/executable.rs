@@ -13,7 +13,10 @@ pub mod middleware;
 /// Protocol registry builder and registry storage.
 pub mod registry;
 
-// pub use def::{AccessPointDef, BindError, Endpoint, MiddlewareSlot, Outpoint, UrlMode};
+pub use def::{
+    AccessPointDef, BindError, Endpoint, EndpointHandler, FinalHandlerDef, MiddlewareSlot, Outpoint,
+    OutpointHandler, RouteAddress, UrlMode,
+};
 pub use entry::ProtocolEntryBuilder;
 pub use executable::{ExecutableBinding, ExecutionChain, run_chain};
 pub use registry::ProtocolRegistryBuilder;
