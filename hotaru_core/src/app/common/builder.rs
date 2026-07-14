@@ -1,10 +1,19 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use crate::prelude::Arc;
 use core::marker::PhantomData;
 
 use crate::{
-    app::{client::Client, registry::ProtocolRegistryKind, runtime::RuntimeSpec, server::Server},
+    app::{
+        instance::{
+            App,
+            client::Client,
+            server::Server,
+            target::{InboundOnly, InboundState, OutboundOnly, OutboundState},
+        },
+        registry::ProtocolRegistryKind,
+        runtime::RuntimeSpec,
+    },
     connection::{Inbound, Outbound, TransportSpec},
     executable::{ProtocolEntryBuilder, ProtocolRegistryBuilder, registry::ProtocolEntryRegistry},
     extensions::{Locals, Params},
@@ -163,13 +172,17 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ServerRole, TS, Rt> {
         );
         let runtime = Arc::new(runtime);
 
-        let app = Arc::new(Server {
+        let app = Arc::new(App::<TS, Rt, InboundOnly> {
             registry,
-            binding,
-            inbound: Default::default(),
+            inbound_state: InboundState {
+                binding,
+                inbound: Default::default(),
+            },
+            outbound_state: (),
             runtime,
             config,
             _rt: PhantomData,
+            _target: PhantomData,
         });
 
         app
@@ -202,13 +215,17 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ClientRole, TS, Rt> {
         let runtime = Arc::new(RuntimeConfig::from_parts(mode, self.config, self.statics));
         let config = OperationalConfig::from_client_parts(connect_timeout, request_timeout);
 
-        Arc::new(Client {
+        Arc::new(App::<TS, Rt, OutboundOnly> {
             registry,
-            target,
-            outbound: Default::default(),
+            inbound_state: (),
+            outbound_state: OutboundState {
+                target,
+                outbound: Default::default(),
+            },
             runtime,
             config,
             _rt: PhantomData,
+            _target: PhantomData,
         })
     }
 }

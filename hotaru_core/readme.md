@@ -378,23 +378,8 @@ Hotaru is built on a modular architecture:
 
 ## AI-assisted development
 
-AI-assistance tiers describe the kind of collaboration, not a percentage of
-generated code.
-
-| Tier | Rule |
-| --- | --- |
-| **Forbidden** | Design, proofs, semantics, and novel logic are human-authored. |
-| **Author-Owned** | AI may assist with drafts or completion; the human owns the design and committed work. |
-| **Human-Led** | The human writes the structure and load-bearing logic; AI may assist with helpers and boilerplate. |
-| **Co-Authored** | AI may assist with design and implementation; the human must fully internalize the result. |
-
-In every tier, contributors must understand, explain, modify, and debug their
-work. AI may assist with tests, documentation, and mechanical typing after the
-relevant human decisions are settled. Reviewers may request an explanation or
-walkthrough.
-
-Per-component declarations are listed in
-[GOVERNANCE.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/GOVERNANCE.md#component-ownership).
+Definitions and component declarations are maintained in
+[GOVERNANCE.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/GOVERNANCE.md#3-ai-declarations).
 
 ## 📄 License
 

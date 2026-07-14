@@ -1,154 +1,189 @@
 # Hotaru Governance and Component Ownership
 
-This document explains where technical questions, issues, and pull requests
-should be routed. Hotaru uses two levels of ownership:
+## 1. Project nature and purpose
 
-1. A **family** groups components with the same architectural role.
-2. A **component** maps that role to concrete files and has a primary
-   maintainer.
+Hotaru is an FDS-led open-source project. Anyone may use the project, raise an
+issue, propose a design, submit a pull request, or review code. Project-wide
+governance remains with FDS; family and component authority may be delegated
+to eligible FDS or PMINE members.
 
-The ownership hierarchy is:
+This document identifies the technical head for each part of Hotaru, defines
+the escalation path for decisions, and makes appointments and succession
+predictable. Technical maintainership is separate from community moderation
+under the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
-```text
-Family maintainer(s)
-└── Component maintainer(s)
-    └── Contributors
-```
+## 2. Roles and ownership
 
-## Family ownership
+- **Project Maintainer** — governs repository-wide policy, permissions,
+  releases, security, licensing, and cross-family decisions. Current:
+  [@Redstone-D](https://github.com/Redstone-D).
+- **Family Maintainer** — the senior technical head of every component in a
+  family.
+- **Component Maintainer** — the delegated technical head and first contact for
+  one component, one rank below the Family Maintainer.
+- **Reviewer or Steward** — assists with review and technical guidance without
+  final governance or merge authority.
 
-| Family | Scope | Current family maintainer |
-| --- | --- | --- |
-| Core framework | Core contracts, DSL, and routing | [@Redstone-D](https://github.com/Redstone-D) |
-| Facade and tooling | Public facade, feature wiring, CLI, project templates, and shared utilities | [@JerrySu5379](https://github.com/JerrySu5379) |
-| Protocol implementations | HTTP/TLS, web middleware, MQTT, and experimental protocols | [@Redstone-D](https://github.com/Redstone-D) |
-| Runtime implementations | Tokio and Embassy runtime adapters | [@JerrySu5379](https://github.com/JerrySu5379) |
-| I/O implementations | Tokio, Futures, and embedded I/O adapters | [@JerrySu5379](https://github.com/JerrySu5379) |
-| Project-wide coordination | Workspace configuration, CI, releases, governance, and cross-component examples | [@Redstone-D](https://github.com/Redstone-D) |
+Family and Component Maintainers are both technical heads for a component. The
+Family Maintainer may operate directly, approve or block merges, appoint
+Component Maintainers, and publish additional family rules. Component
+Maintainers must follow those rules. Family rules must be public and may not
+conflict with FDS policy, the license, the Code of Conduct, security rules,
+required CI, or project-wide governance.
 
-Family maintainers oversee every component in their family. The component
-tables below identify the delegated technical contact for each path.
+Ordinary component merges may be delegated to Component Maintainers. No
+maintainer may be the sole approver of their own change. A cross-family change
+requires approval from every affected family. Questions start with the
+Component Maintainer, escalate to the Family Maintainer, and finally to the
+Project Maintainer.
 
-## How ownership works
+Root workspace files, root documentation, and `.github/**` are governed at the
+project level. [@Redstone-D](https://github.com/Redstone-D) and
+[@JerrySu5379](https://github.com/JerrySu5379) are the primary reviewers.
+Examples inherit the ownership and AI declaration of the components they
+demonstrate.
 
-Technical maintainership is separate from community moderation under the
-[Code of Conduct](./CODE_OF_CONDUCT.md). A component maintainer is the first
-technical contact, not the sole person allowed to contribute or make design
-suggestions.
+**Release governance.** Release scope, readiness, and timing are decided at
+the regular Wednesday and Sunday coordination meetings conducted under the
+[FDS Administrator Rules](https://doc.fds.moe/policies/admin/). The Project
+Maintainer records and carries out the release decision.
 
-The family maintainer:
+**RFC governance.** Each Family Maintainer defines the RFC process for their
+family, subject to these project-wide requirements:
 
-- is accountable for the family-level architecture and every component within
-  the family;
-- delegates day-to-day technical ownership to component maintainers and
-  coordinates their work;
-- assigns new or unclear work to the appropriate component;
-- coordinates reviews for changes spanning multiple components; and
-- has final responsibility for family-level decisions after consulting the
-  affected component maintainers.
-
-The primary component maintainer:
-
-- maintains the component under authority delegated by the family maintainer;
-- answers or forwards questions about the component;
-- provides design context and reviews changes;
-- keeps the component's tests and documentation aligned with its behavior; and
-- requests cross-component review when a change affects shared contracts.
-
-The backup maintainer handles component questions when the primary maintainer
-is unavailable. Questions that cannot be resolved at the component level are
-escalated to the current family maintainer or maintainers.
-
-## AI declarations
-
-The AI-assistance tiers are defined in the
-[README](./readme.md#ai-assisted-development). Each component's declaration is
-listed below. **Not yet declared** is a tracking status, not a tier.
-
-## Component ownership
+1. A patch-level update that changes only the final version component, such as
+   `0.a.b` to `0.a.c`, must not break a stable API.
+2. A major or breaking public API change must be proposed to the community and
+   discussed at an internal meeting before approval.
+3. Family RFC rules may be stricter than these requirements, but not weaker.
 
 ### Core framework
 
-| Component | Files and directories | Primary | Backup | AI declaration |
-| --- | --- | --- | --- | --- |
-| Core contracts and semantics | `hotaru_core/**`, except the routing paths listed below | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | **Author-Owned** for `app`, `connection`, `executable`, and `protocol`; remaining paths not yet declared |
-| DSL and procedural macros | `hotaru_trans/**` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | **Author-Owned** for `endpoint`, `outpoint`, and `middleware`, whose proof and language design must be human-understood; remaining paths not yet declared |
+Core contracts and the procedural-macro DSL.
+
+**Family Maintainer:** [@Redstone-D](https://github.com/Redstone-D)
+
+| Component | Files and directories | Component Maintainer |
+| --- | --- | --- |
+| Core contracts and semantics | `hotaru_core/**` except the URL paths below | [@Redstone-D](https://github.com/Redstone-D) |
+| DSL and procedural macros | `hotaru_trans/**` | [@Redstone-D](https://github.com/Redstone-D) |
 
 ### Facade and tooling
 
-| Component | Files and directories | Primary | Backup | AI declaration |
-| --- | --- | --- | --- | --- |
-| Routing and URL semantics | `hotaru_core/src/url.rs`, `hotaru_core/src/url/**` | [@JerrySu5379](https://github.com/JerrySu5379) | [@Redstone-D](https://github.com/Redstone-D) | **Author-Owned** |
-| Facade and public feature surface | `hotaru/src/lib.rs`, `hotaru/src/prelude.rs`, `hotaru/src/http.rs`, `hotaru/src/test.rs`, `hotaru/Cargo.toml`, `hotaru/readme.md` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | Not yet declared |
-| CLI and project templates | `hotaru/src/main.rs`, `templates/**`, `programfiles/**`, `hotaru_style_guide/**` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | Not yet declared |
-| Shared utilities | `hotaru_lib/**` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | **Human-Led**; basic API access |
+Routing, the public facade and feature surface, CLI tooling, templates, and
+shared user-facing utilities.
+
+**Family Maintainer:** [@JerrySu5379](https://github.com/JerrySu5379)
+
+| Component | Files and directories | Component Maintainer |
+| --- | --- | --- |
+| Routing and URL semantics | `hotaru_core/src/url.rs`, `hotaru_core/src/url/**` | [@JerrySu5379](https://github.com/JerrySu5379) |
+| Facade and public feature surface | `hotaru/src/lib.rs`, `hotaru/src/prelude.rs`, `hotaru/src/http.rs`, `hotaru/src/test.rs`, `hotaru/Cargo.toml`, `hotaru/readme.md` | [@Redstone-D](https://github.com/Redstone-D) |
+| CLI and project templates | `hotaru/src/main.rs`, `templates/**`, `programfiles/**`, `hotaru_style_guide/**` | [@Redstone-D](https://github.com/Redstone-D) |
+| Shared utilities | `hotaru_lib/**` | [@Redstone-D](https://github.com/Redstone-D) |
 
 ### Protocol implementations
 
-| Component | Files and directories | Primary | Backup | AI declaration |
-| --- | --- | --- | --- | --- |
-| HTTP, TLS, and standard web middleware | `hotaru_http/**`, `hotaru_tls/**`, `htmstd/**`, `ahttpm/**` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | **Human-Led** for `hotaru_http/**`, `htmstd/cors/**`, and `htmstd/session/**`; **Co-Authored** for the Akari integration in `ahttpm/**`; `hotaru_tls/**` and other middleware not yet declared |
-| MQTT client and broker | [`Field-of-Dream-Studio/hotaru_mqtt`](https://github.com/Field-of-Dream-Studio/hotaru_mqtt) | [@JerrySu5379](https://github.com/JerrySu5379) | [@Redstone-D](https://github.com/Redstone-D) | **Human-Led**, with broker and traits **Co-Authored** |
-| Experimental protocol integrations | `h2per/**`, `hotaru_grpc/**` | [@Redstone-D](https://github.com/Redstone-D) and [@JerrySu5379](https://github.com/JerrySu5379) | — | Unstable Hyper integration in `h2per/**` **Co-Authored**; `hotaru_grpc/**` not yet declared |
+Wire protocols, protocol-specific security, and standard middleware.
 
-The MQTT repository should keep its own matching ownership file. This row
-records where Hotaru contributors should initially route MQTT questions.
+**Family Maintainer:** [@Redstone-D](https://github.com/Redstone-D)
+
+| Component | Files and directories | Component Maintainer |
+| --- | --- | --- |
+| HTTP, TLS, and web middleware | `hotaru_http/**`, `hotaru_tls/**`, `htmstd/**`, `ahttpm/**` | [@Redstone-D](https://github.com/Redstone-D) |
+| MQTT client and broker | [`Field-of-Dream-Studio/hotaru_mqtt`](https://github.com/Field-of-Dream-Studio/hotaru_mqtt) | [@JerrySu5379](https://github.com/JerrySu5379) |
+| Experimental protocol integrations | `h2per/**`, `hotaru_grpc/**` | [@Redstone-D](https://github.com/Redstone-D), [@JerrySu5379](https://github.com/JerrySu5379) |
+
+The MQTT repository should maintain its own matching ownership rules.
 
 ### Runtime implementations
 
-| Component | Files and directories | Primary | Backup | AI declaration |
-| --- | --- | --- | --- | --- |
-| Tokio runtime | `hotaru_rt_tokio/**` | [@JerrySu5379](https://github.com/JerrySu5379) | [@Redstone-D](https://github.com/Redstone-D) | Not yet declared |
-| Embassy runtime | `hotaru_rt_embassy/**` | [@zkmaojack](https://github.com/zkmaojack) | [@JerrySu5379](https://github.com/JerrySu5379) | Not yet declared |
+Runtime scheduling, spawning, and runtime-specific integration.
+
+**Family Maintainer:** [@JerrySu5379](https://github.com/JerrySu5379)
+
+| Component | Files and directories | Component Maintainer |
+| --- | --- | --- |
+| Tokio runtime | `hotaru_rt_tokio/**` | [@JerrySu5379](https://github.com/JerrySu5379) |
+| Embassy runtime | `hotaru_rt_embassy/**` | [@zkmaojack](https://github.com/zkmaojack) |
 
 ### I/O implementations
 
-| Component | Files and directories | Primary | Backup | AI declaration |
-| --- | --- | --- | --- | --- |
-| Tokio I/O | `hotaru_io_tokio/**` | [@JerrySu5379](https://github.com/JerrySu5379) | [@Redstone-D](https://github.com/Redstone-D) | Not yet declared |
-| Futures I/O | `hotaru_io_futures/**` | [@JerrySu5379](https://github.com/JerrySu5379) | [@Redstone-D](https://github.com/Redstone-D) | Not yet declared |
-| Embedded I/O | `hotaru_io_embedded/**` | [@zkmaojack](https://github.com/zkmaojack) | [@JerrySu5379](https://github.com/JerrySu5379) | Not yet declared |
+Adapters between Hotaru's transport contracts and concrete I/O ecosystems.
 
-### Project-wide coordination
+**Family Maintainer:** [@JerrySu5379](https://github.com/JerrySu5379)
 
-| Component | Files and directories | Primary reviewers | AI declaration |
-| --- | --- | --- | --- |
-| Workspace, CI, releases, and governance | root-level workspace files and documentation, `.github/**` | [@Redstone-D](https://github.com/Redstone-D) and [@JerrySu5379](https://github.com/JerrySu5379) | Not yet declared |
-| Examples | `examples/**` | Maintainer of the component demonstrated by the example | Inherits the declaration of the demonstrated component |
+| Component | Files and directories | Component Maintainer |
+| --- | --- | --- |
+| Tokio I/O | `hotaru_io_tokio/**` | [@JerrySu5379](https://github.com/JerrySu5379) |
+| Futures I/O | `hotaru_io_futures/**` | [@JerrySu5379](https://github.com/JerrySu5379) |
+| Embedded I/O | `hotaru_io_embedded/**` | [@zkmaojack](https://github.com/zkmaojack) |
 
-An example that combines multiple components should be reviewed by the
-maintainers of each affected component.
+## 3. AI declarations
 
-## Cross-cutting review
+AI tiers describe the kind of collaboration, not a percentage of generated
+code.
 
-Some changes belong to one component by path but affect several components by
-behavior. In those cases, use the path owner as the first contact and also
-request the following review:
-
-| Change | Additional review |
+| Tier | Definition |
 | --- | --- |
-| Shared `RuntimeSpec` or runtime behavior | Maintainers of every affected runtime implementation |
-| Shared transport, stream, or I/O contract | Maintainers of every affected I/O implementation |
-| Tokio feature behavior or integration | [@JerrySu5379](https://github.com/JerrySu5379) and the affected component maintainer |
-| `no_std` or embedded compatibility | [@JerrySu5379](https://github.com/JerrySu5379), plus [@zkmaojack](https://github.com/zkmaojack) when Embassy runtime or embedded I/O is affected |
-| Protocol or routing contract | Routing maintainer and maintainers of affected protocol implementations |
-| Public facade API or Cargo feature wiring | Facade maintainer and maintainers of affected implementations |
-| HTTP/TLS security behavior | HTTP/TLS maintainer |
+| **Forbidden** | Design, proofs, semantics, and novel logic are human-authored. |
+| **Author-Owned** | AI may assist with drafts or completion; the human owns the design and committed work. |
+| **Human-Led** | The human writes the structure and load-bearing logic; AI may assist with helpers and boilerplate. |
+| **Co-Authored** | AI may assist with design and implementation; the human must fully internalize the result. |
 
-For example, a change entirely inside `hotaru_rt_embassy/**` is routed to Jack.
-A change to a runtime trait in `hotaru_core/**` is routed first to the core
-maintainer and also requires review from Jack and any other affected runtime
-maintainers.
+In every tier, contributors must understand, explain, modify, and debug their
+work. AI may assist with tests, documentation, and mechanical typing after the
+relevant human decisions are settled.
 
-## Routing a question or change
+Each Family Maintainer chooses and updates the declarations for components in
+their family. When scopes inside one component use different tiers, the more
+specific declaration applies.
 
-1. Find the most specific path in the ownership map.
-2. Contact the primary component maintainer.
-3. Add the relevant cross-cutting reviewers if the behavior crosses component
-   boundaries.
-4. If no path matches, contact the Project-wide coordination family
-   maintainer, who will assign the component before the change is merged.
+| Family | Component or scope | Tier |
+| --- | --- | --- |
+| Core framework | Core `app`, `connection`, `executable`, and `protocol` | **Author-Owned** |
+| Core framework | Remaining core contracts and semantics | **Human-Led** |
+| Core framework | DSL `endpoint`, `outpoint`, and `middleware` | **Author-Owned** |
+| Core framework | Remaining DSL and procedural macros | **Human-Led** |
+| Facade and tooling | Routing and URL semantics | **Author-Owned** |
+| Facade and tooling | Facade and public feature surface | **Co-Authored** |
+| Facade and tooling | CLI and project templates | **Co-Authored** |
+| Facade and tooling | Shared utilities | **Human-Led** |
+| Protocol implementations | HTTP, CORS, and session middleware | **Human-Led** |
+| Protocol implementations | TLS, remaining middleware, and `ahttpm` | **Co-Authored** |
+| Protocol implementations | MQTT client and general implementation | **Human-Led** |
+| Protocol implementations | MQTT broker and traits | **Co-Authored** |
+| Protocol implementations | Experimental protocol integrations | **Co-Authored** |
+| Runtime implementations | Tokio and Embassy runtimes | **Co-Authored** |
+| I/O implementations | Tokio, Futures, and embedded I/O | **Co-Authored** |
 
-Tests located inside a crate inherit that crate or subcomponent's ownership.
-Changes spanning multiple rows require review from each affected primary or an
-explicit delegate.
+## 4. Eligibility and succession
+
+The Project Maintainer must be an active FDS member. A Family or Component
+Maintainer may qualify through either active FDS membership or active PMINE
+membership. PMINE membership is independent and does not imply FDS membership.
+
+| Role | Eligibility and appointment |
+| --- | --- |
+| Project Maintainer | An active FDS member appointed and succeeded under FDS policy |
+| Family Maintainer | An active FDS or PMINE member appointed or removed by the Project Maintainer |
+| Component Maintainer | An active FDS or PMINE member appointed or removed by the Family Maintainer |
+| Reviewer or Steward | Open to trusted contributors; organizational membership is not required |
+| Contributor | Open to everyone |
+
+The Project Maintainer follows the
+[FDS Charter](https://doc.fds.moe/policies/constitution/). Family and Component
+Maintainers are Hotaru technical roles with two independent eligibility paths:
+[FDS membership](https://doc.fds.moe/policies/join/) or
+[PMINE membership](https://pmine.rs).
+
+A maintainer planning to resign or take leave must arrange a successor or
+acting candidate for confirmation by the next higher authority. For an
+unexpected vacancy, authority temporarily moves upward. Loss or expiration of
+the membership required for a role suspends maintainer authority immediately;
+a Family or Component Maintainer remains eligible while actively belonging to
+at least one of FDS or PMINE. Every transition must be recorded here and
+reflected in code ownership and repository permissions.
+
+This applies the succession principle in the
+[FDS Administrator Rules](https://doc.fds.moe/policies/admin/) to Hotaru.
