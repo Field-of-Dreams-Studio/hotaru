@@ -1,9 +1,9 @@
 use crate::prelude::String;
 use crate::url::UrlError;
 
-/// Contextual error returned by `Server::bind` / `Client::bind` and
-/// by the batch variants. Carries the offending route identity so a
-/// large blueprint can name which item failed.
+/// Contextual error returned by `App::bind` / `bind_all`. Carries the
+/// offending route identity so a large blueprint can name which item
+/// failed.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BindError {
     route_name: String,

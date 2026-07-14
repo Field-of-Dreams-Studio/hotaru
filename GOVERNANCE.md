@@ -73,12 +73,12 @@ listed below. **Not yet declared** is a tracking status, not a tier.
 | --- | --- | --- | --- | --- |
 | Core contracts and semantics | `hotaru_core/**`, except the routing paths listed below | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | **Author-Owned** for `app`, `connection`, `executable`, and `protocol`; remaining paths not yet declared |
 | DSL and procedural macros | `hotaru_trans/**` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | **Author-Owned** for `endpoint`, `outpoint`, and `middleware`, whose proof and language design must be human-understood; remaining paths not yet declared |
-| Routing and URL semantics | `hotaru_core/src/url.rs`, `hotaru_core/src/url/**` | [@JerrySu5379](https://github.com/JerrySu5379) | [@Redstone-D](https://github.com/Redstone-D) | **Author-Owned** |
 
 ### Facade and tooling
 
 | Component | Files and directories | Primary | Backup | AI declaration |
 | --- | --- | --- | --- | --- |
+| Routing and URL semantics | `hotaru_core/src/url.rs`, `hotaru_core/src/url/**` | [@JerrySu5379](https://github.com/JerrySu5379) | [@Redstone-D](https://github.com/Redstone-D) | **Author-Owned** |
 | Facade and public feature surface | `hotaru/src/lib.rs`, `hotaru/src/prelude.rs`, `hotaru/src/http.rs`, `hotaru/src/test.rs`, `hotaru/Cargo.toml`, `hotaru/readme.md` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | Not yet declared |
 | CLI and project templates | `hotaru/src/main.rs`, `templates/**`, `programfiles/**`, `hotaru_style_guide/**` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | Not yet declared |
 | Shared utilities | `hotaru_lib/**` | [@Redstone-D](https://github.com/Redstone-D) | [@JerrySu5379](https://github.com/JerrySu5379) | **Human-Led**; basic API access |

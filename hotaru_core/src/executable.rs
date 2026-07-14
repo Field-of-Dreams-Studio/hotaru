@@ -1,7 +1,7 @@
 /// Named access points for registered handlers (runtime lookup handles).
 pub mod access;
 
-/// Pre-registration route definitions (`AccessPointDef<P>`).
+/// Pre-registration route definitions (`AccessPointDef<P, T>`).
 pub mod def;
 
 /// Protocol entry builder and runtime entry types.
