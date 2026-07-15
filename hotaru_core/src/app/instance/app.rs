@@ -9,13 +9,14 @@ use crate::app::common::{AppInUse, OperationalConfig, RunMode, RuntimeConfig, Ti
 use crate::app::registry::ProtocolRegistryKind;
 use crate::app::runtime::RuntimeSpec;
 use crate::connection::TransportSpec;
+use crate::executable::def::{AccessPointDef, BindError, FinalHandlerDef};
 use crate::executable::ExecutableBinding;
 use crate::prelude::{Arc, String, Vec};
 use crate::protocol::Protocol;
 use crate::url::{PathPattern, UrlError, node::StepName};
 use crate::{debug_log, debug_warn};
 
-use super::target::AppTarget;
+use super::{flavour::Accepts, target::AppTarget};
 
 /// Unified application state.
 ///
@@ -85,6 +86,35 @@ impl<TS: TransportSpec, Rt: RuntimeSpec, T: AppTarget> App<TS, Rt, T> {
         key: &str,
     ) -> V {
         self.runtime.get_static::<V>(key).unwrap_or_default()
+    }
+
+    /// Bind one route definition accepted by this app role.
+    pub fn bind<P, H>(
+        self: &Arc<Self>,
+        def: AccessPointDef<P, H>,
+    ) -> Result<(), BindError>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        H: FinalHandlerDef<P>,
+        T: Accepts<H>,
+    {
+        self.registry.compile_and_register(def)
+    }
+
+    /// Bind a homogeneous batch, stopping at the first error.
+    pub fn bind_all<P, H, I>(self: &Arc<Self>, defs: I) -> Result<(), BindError>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        H: FinalHandlerDef<P>,
+        T: Accepts<H>,
+        I: IntoIterator<Item = AccessPointDef<P, H>>,
+    {
+        for (index, def) in defs.into_iter().enumerate() {
+            self.registry
+                .compile_and_register(def)
+                .map_err(|error| error.with_batch_index(index))?;
+        }
+        Ok(())
     }
 
     /// Registers a literal URL without applying the pattern grammar.

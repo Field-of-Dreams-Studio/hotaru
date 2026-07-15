@@ -30,6 +30,7 @@ use crate::{
     connection::{ConnStream, HotaruRead, HotaruWrite, TransportSpec},
     executable::{
         ExecutableBinding,
+        def::{AccessPointDef, BindError, FinalHandlerDef, MiddlewareSlots},
         entry::{ProtocolEntry, ProtocolEntryTrait},
         middleware::{AsyncMiddleware, AsyncMiddlewareChain},
         registry::ProtocolEntryRegistry,
@@ -191,6 +192,38 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         let entry = self.entry::<P>().ok_or(UrlError::ProtocolNotFound)?;
         entry.register(name, path, step_names, executable, config)
     } 
+
+    /// Compile an access-point definition and register the resulting binding.
+    ///
+    /// URL parsing and middleware-slot resolution stay with their owning
+    /// definition types; this method supplies the registry-owned middleware
+    /// snapshot and registration operation.
+    pub(crate) fn compile_and_register<P, T>(
+        &self,
+        def: AccessPointDef<P, T>,
+    ) -> Result<(), BindError>
+    where
+        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
+        T: FinalHandlerDef<P>,
+    {
+        let (path, step_names) = def.parse_url_pattern()?;
+        let inherited = self.get_protocol_middlewares::<P>();
+        let (address, middleware_slots, handler, config) = def.into_parts();
+        let (url, name, _) = address.into_parts();
+
+        let middlewares = MiddlewareSlots::into_chain(
+            middleware_slots,
+            &inherited,
+            handler.body_middleware(),
+        );
+        let binding = ExecutableBinding::new()
+            .with_handler(handler.final_handler())
+            .with_middlewares(middlewares);
+
+        self.register::<P, _>(name.as_str(), path, step_names, binding, config)
+            .map(|_| ())
+            .map_err(|error| BindError::new(name, url, error))
+    }
 
     /// Merges two registry wrappers, re-optimizing Single/Multi afterwards.
     pub fn combine(self, other: Self) -> Self {

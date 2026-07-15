@@ -12,6 +12,6 @@ pub mod runtime;
 pub mod server;
 
 pub use instance::{
-    App, AppTarget, Both, Client, Gateway, InboundOnly, InboundState, InboundTarget, OutboundOnly,
-    OutboundState, OutboundTarget, Server,
+    Accepts, App, AppTarget, Both, Client, Gateway, InboundOnly, InboundState, InboundTarget,
+    OutboundOnly, OutboundState, OutboundTarget, Server,
 };

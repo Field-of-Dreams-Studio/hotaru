@@ -5,9 +5,11 @@ use akari::extensions::ParamsClone;
 use crate::executable::middleware::{AsyncFinalHandler, AsyncMiddleware};
 use crate::prelude::{Arc, String, Vec};
 use crate::protocol::Protocol;
+use crate::url::{PathPattern, StepName, tokens_to_patterns};
 
+use super::error::BindError;
 use super::handler::{EndpointHandler, FinalHandlerDef, OutpointHandler};
-use super::middleware::MiddlewareSlot;
+use super::middleware::{MiddlewareSlot, MiddlewareSlots};
 use super::route_address::RouteAddress;
 use super::url_mode::UrlMode;
 
@@ -22,7 +24,7 @@ use super::url_mode::UrlMode;
 pub struct AccessPointDef<P: Protocol, T: FinalHandlerDef<P>> {
     address: RouteAddress,
     /// Defaults to `[Inherit]` for both endpoints and outpoints.
-    middlewares: Vec<MiddlewareSlot<P::Context>>,
+    middlewares: MiddlewareSlots<P::Context>,
     handler: T,
     config: ParamsClone,
     _protocol: PhantomData<fn() -> P>,
@@ -52,11 +54,7 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
     pub fn with_address(address: RouteAddress, handler: T) -> Self {
         Self {
             address,
-            middlewares: {
-                let mut v = Vec::with_capacity(1);
-                v.push(MiddlewareSlot::Inherit);
-                v
-            },
+            middlewares: MiddlewareSlots::inheriting(),
             handler,
             config: ParamsClone::default(),
             _protocol: PhantomData,
@@ -87,14 +85,14 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
     /// `with_middleware`, this reproduces `middleware = [A, B]`
     /// semantics.
     pub fn no_inherit(mut self) -> Self {
-        self.middlewares.retain(|m| !matches!(m, MiddlewareSlot::Inherit));
+        self.middlewares.remove_inherit();
         self
     }
 
     /// Replace the user chain wholesale. Outpoint bodies stay
     /// untouched — they live in `handler`, not `middlewares`.
     pub fn with_middlewares(mut self, middlewares: Vec<MiddlewareSlot<P::Context>>) -> Self {
-        self.middlewares = middlewares;
+        self.middlewares = MiddlewareSlots::new(middlewares);
         self
     }
 
@@ -109,17 +107,41 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
     pub fn url(&self) -> &str { self.address.url() }
     pub fn name(&self) -> &str { self.address.name() }
     pub fn url_mode(&self) -> UrlMode { self.address.url_mode() }
-    pub fn middlewares(&self) -> &[MiddlewareSlot<P::Context>] { &self.middlewares }
+    pub fn middlewares(&self) -> &[MiddlewareSlot<P::Context>] { self.middlewares.as_slice() }
     pub fn handler(&self) -> &T { &self.handler }
     pub fn config(&self) -> &ParamsClone { &self.config }
 
     // ----- crate-private accessors for preparation -----
 
+    /// Parse this definition's URL into the representation consumed by
+    /// the registry, retaining route identity in any parse error.
+    pub(crate) fn parse_url_pattern(
+        &self,
+    ) -> Result<(Vec<PathPattern>, StepName), BindError> {
+        match self.url_mode() {
+            UrlMode::Pattern => {
+                let tokens = P::tokenize_url(self.url())
+                    .map_err(|error| BindError::new(self.name(), self.url(), error.into()))?;
+                let (path, step_names) = tokens_to_patterns(&tokens)
+                    .map_err(|error| BindError::new(self.name(), self.url(), error.into()))?;
+
+                Ok((path, step_names.into()))
+            }
+            UrlMode::Literal => Ok((
+                P::lit_parser(self.url())
+                    .into_iter()
+                    .map(PathPattern::literal_path)
+                    .collect(),
+                StepName::default(),
+            )),
+        }
+    }
+
     pub(crate) fn into_parts(
         self,
     ) -> (
         RouteAddress,
-        Vec<MiddlewareSlot<P::Context>>,
+        MiddlewareSlots<P::Context>,
         T,
         ParamsClone,
     ) {

@@ -13,10 +13,14 @@ mod middleware;
 mod route_address;
 mod url_mode;
 
+#[cfg(test)]
+mod test;
+
 pub use access_point::{AccessPointDef, Endpoint, Outpoint};
 pub use error::BindError;
 pub use handler::{EndpointHandler, FinalHandlerDef, OutpointHandler};
 pub use middleware::MiddlewareSlot;
+pub(crate) use middleware::MiddlewareSlots;
 pub use route_address::RouteAddress;
 pub use url_mode::UrlMode;
 
