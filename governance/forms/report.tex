@@ -1,0 +1,101 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=18mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{tabularx}
+
+\setlength{\parindent}{0pt}
+\pagestyle{empty}
+
+\newcommand{\checkbox}{\(\square\)}
+\newcommand{\formsection}[1]{%
+  \vspace{0.65em}\noindent{\large\bfseries #1}\par\vspace{0.35em}}
+\newcommand{\fieldline}[1]{\textbf{#1}\ \hrulefill}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries Project-StarFall Code Update Report}\\[0.25em]
+  {\large Cover Sheet}
+\end{center}
+
+Complete one cover sheet for each pull request. Attach as many copies of
+\texttt{report\_sup.pdf} as needed to record its distinct changes.
+
+\begin{enumerate}[leftmargin=*,itemsep=0.15em,topsep=0.4em]
+  \item Print the form and complete it by hand in ink.
+  \item Submit it to the next technical authority with the pull request:
+        Contributor to Component Maintainer, Component Maintainer to Family
+        Maintainer, Family Maintainer to Project Maintainer, and Project
+        Maintainer to a different qualified Family Maintainer.
+  \item The PR author must keep the original for four months after merge,
+        unless it is sent earlier at the Project Maintainer's request. During
+        the first three months after merge, the Project Maintainer may request
+        delivery. The request must provide the address and required delivery
+        service, and the Hotaru maintenance team will cover the delivery fee.
+        Without such a request, no delivery is required. Failure to retain or
+        produce a requested original may cause the declaration to be treated
+        as unverified or potentially false and referred for governance review.
+  \item Write in English, Japanese, Traditional Chinese, or Simplified Chinese.
+\end{enumerate}
+
+\formsection{I. Pull request details}
+
+\begin{tabularx}{\textwidth}{@{}lX@{\hspace{1.5em}}lX@{}}
+  \textbf{Repository:} & \hrulefill &
+  \textbf{PR number:} & \hrulefill \\[0.9em]
+\end{tabularx}
+
+\begin{tabularx}{\textwidth}{@{}lX@{\hspace{1.5em}}lX@{}}
+  \textbf{PR author:} & \hrulefill & \textbf{Date:} & \hrulefill \\[0.9em]
+  \textbf{Family:} & \hrulefill & \textbf{Component:} & \hrulefill \\[0.9em]
+  \textbf{Submitted to:} & \hrulefill & \textbf{Detail pages:} & \hrulefill
+\end{tabularx}
+
+\formsection{II. Submission details}
+
+\textbf{Role:}\quad
+\checkbox\ Contributor \quad
+\checkbox\ Component Maintainer \quad
+\checkbox\ Family Maintainer
+
+\vspace{0.45em}
+\textbf{PR's declared AI tier:}\quad
+\checkbox\ Forbidden \quad
+\checkbox\ Author-Owned \quad
+\checkbox\ Human-Led \quad
+\checkbox\ Co-Authored
+
+\vspace{0.45em}
+\textbf{AI assistance used in this PR:}\quad
+\checkbox\ No \quad
+\checkbox\ Yes
+
+\quad If yes: \checkbox\ Design \quad \checkbox\ Code \quad
+\checkbox\ Tests \quad \checkbox\ Documentation
+
+\formsection{III. PR author declaration}
+
+I have personally reviewed and understand every submitted change, and I accept
+responsibility for the code covered by this report. The attached detail pages
+identify the affected code, the design used, and why that design should be
+adopted. I can explain, modify, test, and debug the work without asking an AI
+system to reconstruct it for me.
+
+\vspace{0.5em}
+I completed this report, including every attached page, by hand in ink and
+without AI assistance. The AI disclosure above applies only to work on the
+pull request.
+
+\vspace{1em}
+\fieldline{PR author signature:}
+\hspace{1.5em}
+\fieldline{Date:}
+
+\vfill
+\begin{center}
+  \small Page 1 of \underline{\hspace{1.3cm}}
+\end{center}
+
+\end{document}

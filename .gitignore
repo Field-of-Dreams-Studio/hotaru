@@ -4,6 +4,8 @@
 debug/
 release/
 
+**/latex_target/ 
+
 # Cargo lock file
 Cargo.lock
 

@@ -17,7 +17,8 @@ pub use crate::object;
 pub use crate::akari::prelude::*;
 
 pub use crate::{AnyPath, AnyUrl, LitUrl, RegUrl, TrailingSlash};
-pub use crate::{AppInUse, Client, RunMode, Server, TimeoutSetting};
+pub use crate::{AccessPointDef, BindError, Endpoint, MiddlewareSlot, Outpoint, UrlMode};
+pub use crate::{AppInUse, Client, Gateway, RunMode, Server, TimeoutSetting};
 pub use crate::{Inbound, Outbound};
 pub use crate::{
     ProtocolHandlerBuilder as ProtocolBuilder, ProtocolRegistryBuilder as HandlerBuilder,

@@ -22,6 +22,7 @@ members = [
     # "examples/multi_protocol_example",
     "examples/example_hotaru",
     "examples/combine_example",
+    "examples/api_registration_example",
     # "examples/example_hotaru_2",
     # "examples/hyper_hotaru_example",
     # "hotaru_style_guide",
@@ -52,5 +53,6 @@ default-members = [
     "htmstd",
     "examples/example_hotaru",
     "examples/combine_example",
+    "examples/api_registration_example",
 ]
 resolver = "3"

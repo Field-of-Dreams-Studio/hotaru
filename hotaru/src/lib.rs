@@ -2,6 +2,11 @@
 //! `hotaru_core`, `hotaru_http`, `hotaru_trans` and friends behind a
 //! single import root. Most users want [`prelude`]; HTTP users also
 //! want [`http`].
+//!
+//! # `no_std`
+//!
+//! Disabling `std` makes this crate `no_std` + `alloc`. The prelude's
+//! `Lazy` and `S*` aliases remain std-only.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -35,6 +40,14 @@ pub type Client<TS = hotaru_io_tokio::TcpTransport, Rt = hotaru_rt_tokio::TokioR
     hotaru_core::app::client::Client<TS, Rt>;
 #[cfg(not(feature = "tokio"))]
 pub type Client<TS, Rt> = hotaru_core::app::client::Client<TS, Rt>;
+
+/// Tokio-backed gateway alias for apps with inbound and outbound capabilities.
+#[cfg(feature = "tokio")]
+pub type Gateway<TS = hotaru_io_tokio::TcpTransport, Rt = hotaru_rt_tokio::TokioRuntime> =
+    hotaru_core::app::Gateway<TS, Rt>;
+#[cfg(not(feature = "tokio"))]
+pub type Gateway<TS, Rt> = hotaru_core::app::Gateway<TS, Rt>;
+
 pub use hotaru_core::app::common::{AppInUse, RunMode, TimeoutSetting};
 pub use hotaru_core::url::PathPattern;
 /// Umbrella alias for Hotaru's URL routing tree.
@@ -57,8 +70,13 @@ pub type ProtocolHandlerBuilder<P, TS = hotaru_io_tokio::TcpTransport> =
 #[cfg(not(feature = "io_tokio"))]
 pub type ProtocolHandlerBuilder<P, TS> = hotaru_core::executable::ProtocolEntryBuilder<P, TS>;
 pub use hotaru_core::app::server::ProtocolRegistryKind;
+pub use hotaru_core::executable::def::{
+    AccessPointDef, BindError, Endpoint, EndpointHandler, FinalHandlerDef, MiddlewareSlot, Outpoint,
+    OutpointHandler, RouteAddress, UrlMode,
+};
 pub use hotaru_core::executable::ProtocolRegistryBuilder;
 pub use hotaru_core::executable::middleware::AsyncMiddleware;
+pub use hotaru_core::{debug_error, debug_trace, debug_warn};
 
 #[cfg(feature = "template")]
 pub use hotaru_core::TemplateManager;
