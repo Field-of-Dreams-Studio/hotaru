@@ -140,12 +140,19 @@ pub fn expect_array_consume<T: AsRef<str>>(
             loop {
                 match inside_tokens.next() {
                     Some(TokenTree::Punct(punct)) if punct.as_char() == ',' => {
+                        if current.is_empty() {
+                            return Err(generate_compile_error(punct.span(), error.as_ref()));
+                        }
                         array.push(current);
                         current = TokenStream::new();
                     }
                     Some(token) => current.extend(core::iter::once(token)),
                     None => {
-                        array.push(current);
+                        // `[]` has no item, and `[item,]` has no item after
+                        // its trailing comma. Do not manufacture an empty one.
+                        if !current.is_empty() {
+                            array.push(current);
+                        }
                         break;
                     }
                 }

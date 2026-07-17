@@ -1,12 +1,13 @@
 use core::iter::Peekable;
-use proc_macro::{Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::{Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
 use crate::helper::{
-    expect_array_consume, expect_ident_consume, into_peekable_iter, use_core,
+    expect_array_consume, expect_punct_consume, generate_compile_error, into_peekable_iter,
+    use_core,
 };
 
 pub enum MWSlot{
-    Concrete(Literal),
+    Concrete(Ident),
     Inherit 
 }
 
@@ -17,10 +18,22 @@ impl MWSlot {
         let next_token = stream.next();
         match next_token {
             Some(TokenTree::Ident(ident)) => {
-                return Ok(MWSlot::Concrete(Literal::string(&ident.to_string())));
+                if let Some(token) = stream.peek() {
+                    return Err(generate_compile_error(
+                        token.span(),
+                        "Expected exactly one middleware identifier",
+                    ));
+                }
+                return Ok(MWSlot::Concrete(ident));
             }
             Some(TokenTree::Punct(punct)) if punct.as_char() == '.' => {
-                expect_ident_consume(stream, ".", "Expect `..` to represent inherited middleware")?; 
+                expect_punct_consume(stream, ".", "Expect `..` to represent inherited middleware")?;
+                if let Some(token) = stream.peek() {
+                    return Err(generate_compile_error(
+                        token.span(),
+                        "Expected exactly `..` for inherited middleware",
+                    ));
+                }
                 return Ok(MWSlot::Inherit);
             }
             _ => {
@@ -45,7 +58,7 @@ impl MWSlot {
 
     pub fn expand_slot(&self) -> TokenStream {
         match self {
-            MWSlot::Concrete(lit) => {
+            MWSlot::Concrete(ident) => {
                 let mut ts = TokenStream::new();
                 ts.extend(use_core(&[
                     "executable",
@@ -55,7 +68,14 @@ impl MWSlot {
                 ]));
                 ts.extend(TokenStream::from(TokenTree::Group(proc_macro::Group::new(
                     proc_macro::Delimiter::Parenthesis,
-                    TokenStream::from(TokenTree::Literal(lit.clone())),
+                    // ::hotaru::prelude::Arc::new(expr)
+                    TokenStream::from_iter(vec![
+                        use_core(&["prelude", "Arc", "new"]),
+                        TokenTree::Group(proc_macro::Group::new(
+                            proc_macro::Delimiter::Parenthesis,
+                            TokenStream::from(TokenTree::Ident(ident.clone()))
+                        )).into(),
+                    ]),
                 ))));
                 ts
             }

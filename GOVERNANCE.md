@@ -1,5 +1,7 @@
 # Hotaru Governance and Component Ownership
 
+**Effective since 2026.08.01** 
+
 ## 1. Project nature and purpose
 
 Hotaru is an FDS-led open-source project. Anyone may use the project, raise an

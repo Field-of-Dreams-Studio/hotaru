@@ -91,8 +91,11 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
 
     /// Replace the user chain wholesale. Outpoint bodies stay
     /// untouched — they live in `handler`, not `middlewares`.
-    pub fn with_middlewares(mut self, middlewares: Vec<MWSlot<P::Context>>) -> Self {
-        self.middlewares = MWChain::new(middlewares);
+    pub fn with_middlewares(
+        mut self,
+        middlewares: impl Into<MWChain<P::Context>>,
+    ) -> Self {
+        self.middlewares = middlewares.into();
         self
     }
 

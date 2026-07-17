@@ -15,6 +15,12 @@ pub enum MWSlot<C: RequestContext> {
 /// consumed into the concrete chain used by an executable binding.
 pub struct MWChain<C: RequestContext>(Vec<MWSlot<C>>);
 
+impl<C: RequestContext> From<Vec<MWSlot<C>>> for MWChain<C> {
+    fn from(slots: Vec<MWSlot<C>>) -> Self {
+        Self::new(slots)
+    }
+}
+
 impl<C: RequestContext> Clone for MWSlot<C> {
     // Manual: avoid a spurious `C: Clone` bound from the derive.
     fn clone(&self) -> Self {
