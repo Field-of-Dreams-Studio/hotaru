@@ -19,8 +19,7 @@ mod test;
 pub use access_point::{AccessPointDef, Endpoint, Outpoint};
 pub use error::BindError;
 pub use handler::{EndpointHandler, FinalHandlerDef, OutpointHandler};
-pub use middleware::MiddlewareSlot;
-pub(crate) use middleware::MiddlewareSlots;
+pub use middleware::{MWChain, MWSlot};
 pub use route_address::RouteAddress;
 pub use url_mode::UrlMode;
 

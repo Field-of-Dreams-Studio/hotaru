@@ -71,8 +71,8 @@ pub type ProtocolHandlerBuilder<P, TS = hotaru_io_tokio::TcpTransport> =
 pub type ProtocolHandlerBuilder<P, TS> = hotaru_core::executable::ProtocolEntryBuilder<P, TS>;
 pub use hotaru_core::app::server::ProtocolRegistryKind;
 pub use hotaru_core::executable::def::{
-    AccessPointDef, BindError, Endpoint, EndpointHandler, FinalHandlerDef, MiddlewareSlot, Outpoint,
-    OutpointHandler, RouteAddress, UrlMode,
+    AccessPointDef, BindError, Endpoint, EndpointHandler, FinalHandlerDef, MWChain, MWSlot,
+    Outpoint, OutpointHandler, RouteAddress, UrlMode,
 };
 pub use hotaru_core::executable::ProtocolRegistryBuilder;
 pub use hotaru_core::executable::middleware::AsyncMiddleware;

@@ -30,7 +30,7 @@ use crate::{
     connection::{ConnStream, HotaruRead, HotaruWrite, TransportSpec},
     executable::{
         ExecutableBinding,
-        def::{AccessPointDef, BindError, FinalHandlerDef, MiddlewareSlots},
+        def::{AccessPointDef, BindError, FinalHandlerDef, MWChain},
         entry::{ProtocolEntry, ProtocolEntryTrait},
         middleware::{AsyncMiddleware, AsyncMiddlewareChain},
         registry::ProtocolEntryRegistry,
@@ -211,7 +211,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
         let (address, middleware_slots, handler, config) = def.into_parts();
         let (url, name, _) = address.into_parts();
 
-        let middlewares = MiddlewareSlots::into_chain(
+        let middlewares = MWChain::into_chain(
             middleware_slots,
             &inherited,
             handler.body_middleware(),

@@ -4,7 +4,6 @@ use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenSt
 // Entry points will be moved here from hotaru_trans
 pub(crate) mod call;
 pub(crate) mod middleware;
-pub(crate) mod mw_chain; 
 pub(crate) mod url;
 
 pub(crate) mod helper;
@@ -117,6 +116,15 @@ pub fn run_server_no_block_until(input: TokenStream) -> TokenStream {
     )
     .parse()
     .expect("run_server_no_block_until! expansion")
+}
+
+/// `mw_chain!` — parse a middleware chain into a `MWChain` value.
+#[proc_macro]
+pub fn mw_chain(input: TokenStream) -> TokenStream {
+    match middleware::parse_mw_chain(&mut input.into_iter().peekable()) {
+        Ok(ts) => ts,
+        Err(err) => err,
+    }
 }
 
 // Splits `input` at the first top-level comma. Used by the two `_until`

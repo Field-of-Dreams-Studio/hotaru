@@ -33,7 +33,7 @@ use crate::{
     url::{PathPattern, UrlRoot},
 };
 
-use super::{AccessPointDef, Endpoint, EndpointHandler, MiddlewareSlot, Outpoint, UrlMode};
+use super::{AccessPointDef, Endpoint, EndpointHandler, MWSlot, Outpoint, UrlMode};
 
 #[derive(Debug)]
 struct TestError;
@@ -381,8 +381,8 @@ fn constructors_match_and_default_to_inherit() {
     assert_eq!(generic.url(), endpoint.url());
     assert_eq!(generic.name(), endpoint.name());
     assert_eq!(generic.url_mode(), endpoint.url_mode());
-    assert!(matches!(generic.middlewares(), [MiddlewareSlot::Inherit]));
-    assert!(matches!(endpoint.middlewares(), [MiddlewareSlot::Inherit]));
+    assert!(matches!(generic.middlewares(), [MWSlot::Inherit]));
+    assert!(matches!(endpoint.middlewares(), [MWSlot::Inherit]));
 }
 
 #[test]
@@ -396,9 +396,9 @@ fn middleware_builders_preserve_symbolic_order() {
     assert!(matches!(
         def.middlewares(),
         [
-            MiddlewareSlot::Concrete(_),
-            MiddlewareSlot::Inherit,
-            MiddlewareSlot::Concrete(_),
+            MWSlot::Concrete(_),
+            MWSlot::Inherit,
+            MWSlot::Concrete(_),
         ]
     ));
 }

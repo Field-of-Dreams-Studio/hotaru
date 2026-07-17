@@ -25,6 +25,7 @@ external-ctor = ["ctor"]
 trans = [] 
 semi-trans = [] 
 attr = [] 
+facade = [] 
 
 [lib]
 proc-macro = true

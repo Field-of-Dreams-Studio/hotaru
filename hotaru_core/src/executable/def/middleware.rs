@@ -4,7 +4,7 @@ use crate::protocol::RequestContext;
 
 /// One slot in the user's middleware chain. `Inherit` is expanded to
 /// the protocol root chain at preparation time.
-pub enum MiddlewareSlot<C: RequestContext> {
+pub enum MWSlot<C: RequestContext> {
     Concrete(Arc<dyn AsyncMiddleware<C>>),
     Inherit,
 }
@@ -13,9 +13,9 @@ pub enum MiddlewareSlot<C: RequestContext> {
 ///
 /// Symbolic `Inherit` entries remain unresolved until this collection is
 /// consumed into the concrete chain used by an executable binding.
-pub(crate) struct MiddlewareSlots<C: RequestContext>(Vec<MiddlewareSlot<C>>);
+pub struct MWChain<C: RequestContext>(Vec<MWSlot<C>>);
 
-impl<C: RequestContext> Clone for MiddlewareSlot<C> {
+impl<C: RequestContext> Clone for MWSlot<C> {
     // Manual: avoid a spurious `C: Clone` bound from the derive.
     fn clone(&self) -> Self {
         match self {
@@ -25,16 +25,16 @@ impl<C: RequestContext> Clone for MiddlewareSlot<C> {
     }
 }
 
-impl<C: RequestContext> core::fmt::Debug for MiddlewareSlot<C> {
+impl<C: RequestContext> core::fmt::Debug for MWSlot<C> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Concrete(_) => f.write_str("MiddlewareSlot::Concrete(..)"),
-            Self::Inherit => f.write_str("MiddlewareSlot::Inherit"),
+            Self::Concrete(_) => f.write_str("MWSlot::Concrete(..)"),
+            Self::Inherit => f.write_str("MWSlot::Inherit"),
         }
     }
 }
 
-impl<C: RequestContext> MiddlewareSlot<C> {
+impl<C: RequestContext> MWSlot<C> {
     /// Convenience constructor: boxes any `AsyncMiddleware` value into
     /// `Concrete(Arc::new(m))`. Emitted by `endpoint!` / `outpoint!`
     /// for `middleware = [X]` clauses so the expansion stays terse.
@@ -46,27 +46,27 @@ impl<C: RequestContext> MiddlewareSlot<C> {
     }
 }
 
-impl<C: RequestContext> MiddlewareSlots<C> {
-    pub(crate) fn new(slots: Vec<MiddlewareSlot<C>>) -> Self {
+impl<C: RequestContext> MWChain<C> {
+    pub fn new(slots: Vec<MWSlot<C>>) -> Self {
         Self(slots)
     }
 
     pub(crate) fn inheriting() -> Self {
         let mut slots = Vec::with_capacity(1);
-        slots.push(MiddlewareSlot::Inherit);
+        slots.push(MWSlot::Inherit);
         Self(slots)
     }
 
-    pub(crate) fn push(&mut self, slot: MiddlewareSlot<C>) {
+    pub fn push(&mut self, slot: MWSlot<C>) {
         self.0.push(slot);
     }
 
     pub(crate) fn remove_inherit(&mut self) {
         self.0
-            .retain(|slot| !matches!(slot, MiddlewareSlot::Inherit));
+            .retain(|slot| !matches!(slot, MWSlot::Inherit));
     }
 
-    pub(crate) fn as_slice(&self) -> &[MiddlewareSlot<C>] {
+    pub(crate) fn as_slice(&self) -> &[MWSlot<C>] {
         &self.0
     }
 
@@ -86,8 +86,8 @@ impl<C: RequestContext> MiddlewareSlots<C> {
 
         for slot in self.0 {
             match slot {
-                MiddlewareSlot::Concrete(middleware) => chain.push(middleware),
-                MiddlewareSlot::Inherit => chain.extend(inherited.iter().cloned()),
+                MWSlot::Concrete(middleware) => chain.push(middleware),
+                MWSlot::Inherit => chain.extend(inherited.iter().cloned()),
             }
         }
 

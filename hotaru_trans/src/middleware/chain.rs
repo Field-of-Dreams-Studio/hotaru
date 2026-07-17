@@ -1,0 +1,149 @@
+use core::iter::Peekable;
+use proc_macro::{Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
+
+use crate::helper::{
+    expect_array_consume, expect_ident_consume, into_peekable_iter, use_core,
+};
+
+pub enum MWSlot{
+    Concrete(Literal),
+    Inherit 
+}
+
+impl MWSlot {
+    pub fn get_next(
+        stream: &mut Peekable<impl Iterator<Item = TokenTree>>
+    ) -> Result<MWSlot, TokenStream> { 
+        let next_token = stream.next();
+        match next_token {
+            Some(TokenTree::Ident(ident)) => {
+                return Ok(MWSlot::Concrete(Literal::string(&ident.to_string())));
+            }
+            Some(TokenTree::Punct(punct)) if punct.as_char() == '.' => {
+                expect_ident_consume(stream, ".", "Expect `..` to represent inherited middleware")?; 
+                return Ok(MWSlot::Inherit);
+            }
+            _ => {
+                return Err(TokenStream::from_iter(vec![TokenTree::Ident(Ident::new("expected_ident", proc_macro::Span::call_site()))]));
+            }
+        }
+    }
+
+    pub fn is_concrete(&self) -> bool {
+        match self {
+            MWSlot::Concrete(_) => true,
+            MWSlot::Inherit => false,
+        }
+    }
+
+    pub fn is_inherited(&self) -> bool {
+        match self {
+            MWSlot::Concrete(_) => false,
+            MWSlot::Inherit => true,
+        }
+    }
+
+    pub fn expand_slot(&self) -> TokenStream {
+        match self {
+            MWSlot::Concrete(lit) => {
+                let mut ts = TokenStream::new();
+                ts.extend(use_core(&[
+                    "executable",
+                    "def",
+                    "MWSlot",
+                    "Concrete",
+                ]));
+                ts.extend(TokenStream::from(TokenTree::Group(proc_macro::Group::new(
+                    proc_macro::Delimiter::Parenthesis,
+                    TokenStream::from(TokenTree::Literal(lit.clone())),
+                ))));
+                ts
+            }
+            MWSlot::Inherit => {
+                let mut ts = TokenStream::new();
+                ts.extend(use_core(&[
+                    "executable",
+                    "def",
+                    "MWSlot",
+                    "Inherit",
+                ]));
+                ts
+            }
+        }
+    } 
+} 
+
+pub struct MWChain {
+    slots: Vec<MWSlot>
+} 
+
+impl MWChain { 
+    pub fn new(slots: Vec<MWSlot>) -> Self {
+        Self { slots }
+    } 
+
+    pub fn from_stream(
+        stream: &mut Peekable<impl Iterator<Item = TokenTree>>
+    ) -> Result<MWChain, TokenStream> {
+        let mut slots = Vec::new();
+        let v = expect_array_consume(stream, "expect an array of middleware slots")?;
+        for token in v {
+            slots.push(
+                MWSlot::get_next(&mut into_peekable_iter(token))?
+            ) 
+        }  
+        Ok(MWChain::new(slots)) 
+    } 
+
+    pub fn expand_middleware_chain(self) -> TokenStream { 
+        let mut body = TokenStream::new();
+
+        // let mut mw_chain = ::...::MWChain::new(::...::Vec::new());
+        body.extend([
+            TokenTree::Ident(Ident::new("let", Span::call_site())),
+            TokenTree::Ident(Ident::new("mut", Span::call_site())),
+            TokenTree::Ident(Ident::new("mw_chain", Span::call_site())),
+            TokenTree::Punct(Punct::new('=', Spacing::Alone)),
+        ]);
+        body.extend(use_core(&["executable", "def", "MWChain", "new"]));
+
+        let mut empty_slots = use_core(&["prelude", "Vec", "new"]);
+        empty_slots.extend([TokenTree::Group(proc_macro::Group::new(
+            proc_macro::Delimiter::Parenthesis,
+            TokenStream::new(),
+        ))]);
+        body.extend([
+            TokenTree::Group(proc_macro::Group::new(
+                proc_macro::Delimiter::Parenthesis,
+                empty_slots,
+            )),
+            TokenTree::Punct(Punct::new(';', Spacing::Alone)),
+        ]);
+
+        for slot in self.slots {
+            // mw_chain.push(<expanded slot>);
+            body.extend([
+                TokenTree::Ident(Ident::new("mw_chain", Span::call_site())),
+                TokenTree::Punct(Punct::new('.', Spacing::Alone)),
+                TokenTree::Ident(Ident::new("push", Span::call_site())),
+                TokenTree::Group(proc_macro::Group::new(
+                    proc_macro::Delimiter::Parenthesis,
+                    slot.expand_slot(),
+                )),
+                TokenTree::Punct(Punct::new(';', Spacing::Alone)),
+            ]);
+        }
+
+        // The final expression deliberately has no semicolon, so the
+        // brace-wrapped block evaluates to the completed MWChain.
+        body.extend([TokenTree::Ident(Ident::new(
+            "mw_chain",
+            Span::call_site(),
+        ))]);
+
+        TokenStream::from(TokenTree::Group(proc_macro::Group::new(
+            proc_macro::Delimiter::Brace,
+            body,
+        )))
+    }
+}

@@ -9,7 +9,7 @@ use crate::url::{PathPattern, StepName, tokens_to_patterns};
 
 use super::error::BindError;
 use super::handler::{EndpointHandler, FinalHandlerDef, OutpointHandler};
-use super::middleware::{MiddlewareSlot, MiddlewareSlots};
+use super::middleware::{MWChain, MWSlot};
 use super::route_address::RouteAddress;
 use super::url_mode::UrlMode;
 
@@ -24,7 +24,7 @@ use super::url_mode::UrlMode;
 pub struct AccessPointDef<P: Protocol, T: FinalHandlerDef<P>> {
     address: RouteAddress,
     /// Defaults to `[Inherit]` for both endpoints and outpoints.
-    middlewares: MiddlewareSlots<P::Context>,
+    middlewares: MWChain<P::Context>,
     handler: T,
     config: ParamsClone,
     _protocol: PhantomData<fn() -> P>,
@@ -54,7 +54,7 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
     pub fn with_address(address: RouteAddress, handler: T) -> Self {
         Self {
             address,
-            middlewares: MiddlewareSlots::inheriting(),
+            middlewares: MWChain::inheriting(),
             handler,
             config: ParamsClone::default(),
             _protocol: PhantomData,
@@ -72,12 +72,12 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
         mut self,
         middleware: Arc<dyn AsyncMiddleware<P::Context>>,
     ) -> Self {
-        self.middlewares.push(MiddlewareSlot::Concrete(middleware));
+        self.middlewares.push(MWSlot::Concrete(middleware));
         self
     }
 
     pub fn with_inherit(mut self) -> Self {
-        self.middlewares.push(MiddlewareSlot::Inherit);
+        self.middlewares.push(MWSlot::Inherit);
         self
     }
 
@@ -91,8 +91,8 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
 
     /// Replace the user chain wholesale. Outpoint bodies stay
     /// untouched — they live in `handler`, not `middlewares`.
-    pub fn with_middlewares(mut self, middlewares: Vec<MiddlewareSlot<P::Context>>) -> Self {
-        self.middlewares = MiddlewareSlots::new(middlewares);
+    pub fn with_middlewares(mut self, middlewares: Vec<MWSlot<P::Context>>) -> Self {
+        self.middlewares = MWChain::new(middlewares);
         self
     }
 
@@ -107,7 +107,7 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
     pub fn url(&self) -> &str { self.address.url() }
     pub fn name(&self) -> &str { self.address.name() }
     pub fn url_mode(&self) -> UrlMode { self.address.url_mode() }
-    pub fn middlewares(&self) -> &[MiddlewareSlot<P::Context>] { self.middlewares.as_slice() }
+    pub fn middlewares(&self) -> &[MWSlot<P::Context>] { self.middlewares.as_slice() }
     pub fn handler(&self) -> &T { &self.handler }
     pub fn config(&self) -> &ParamsClone { &self.config }
 
@@ -141,7 +141,7 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
         self,
     ) -> (
         RouteAddress,
-        MiddlewareSlots<P::Context>,
+        MWChain<P::Context>,
         T,
         ParamsClone,
     ) {

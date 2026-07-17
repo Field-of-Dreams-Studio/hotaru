@@ -1,9 +1,7 @@
-use hotaru_lib::random::random_alpha_string;
-use core::iter::Peekable;
+use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
-use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
-
-use crate::helper::*;
+use crate::helper::use_core;
+use crate::outer_attr::OuterAttr;
 
 pub struct MWFunc {
     pub is_pub: bool,
@@ -97,7 +95,10 @@ impl MWFunc {
             TokenTree::Punct(Punct::new('<', Spacing::Alone)),
             TokenTree::Ident(self.protocol.clone()),
             TokenTree::Ident(Ident::new("as", Span::call_site())),
-            TokenTree::Ident(Ident::new("Protocol", Span::call_site())),
+            TokenTree::Group(Group::new(
+                Delimiter::None,
+                use_core(&["protocol", "Protocol"]),
+            )),
             TokenTree::Punct(Punct::new('>', Spacing::Alone)),
             TokenTree::Punct(Punct::new(':', Spacing::Joint)),
             TokenTree::Punct(Punct::new(':', Spacing::Alone)),
@@ -109,7 +110,10 @@ impl MWFunc {
         let mut impl_head = TokenStream::new();
         impl_head.extend(vec![
             TokenTree::Ident(Ident::new("impl", Span::call_site())),
-            TokenTree::Ident(Ident::new("AsyncMiddleware", Span::call_site())),
+            TokenTree::Group(Group::new(
+                Delimiter::None,
+                use_core(&["executable", "middleware", "AsyncMiddleware"]),
+            )),
             TokenTree::Punct(Punct::new('<', Spacing::Alone)),
             TokenTree::Ident(Ident::new("_Ctx", Span::call_site())),
             TokenTree::Punct(Punct::new('>', Spacing::Alone)),
@@ -197,7 +201,7 @@ impl MWFunc {
             // next: Box< ... >
             let mut next_ty = TokenStream::new();
             // Box
-            next_ty.extend(path(&["Box"]));
+            next_ty.extend(use_core(&["prelude", "Box"]));
             // <
             next_ty.extend(core::iter::once(TokenTree::Punct(Punct::new(
                 '<',
@@ -239,7 +243,7 @@ impl MWFunc {
                 ))));
                 // Box<dyn Future<Output=Protocol> + Send>
                 let mut inner = TokenStream::new();
-                inner.extend(path(&["Box"]));
+                inner.extend(use_core(&["prelude", "Box"]));
                 inner.extend(core::iter::once(TokenTree::Punct(Punct::new(
                     '<',
                     Spacing::Alone,
@@ -261,7 +265,10 @@ impl MWFunc {
                     TokenTree::Punct(Punct::new('<', Spacing::Alone)),
                     TokenTree::Ident(Ident::new("_Ctx", Span::call_site())),
                     TokenTree::Ident(Ident::new("as", Span::call_site())),
-                    TokenTree::Ident(Ident::new("RequestContext", Span::call_site())),
+                    TokenTree::Group(Group::new(
+                        Delimiter::None,
+                        use_core(&["protocol", "RequestContext"]),
+                    )),
                     TokenTree::Punct(Punct::new('>', Spacing::Alone)),
                     TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                     TokenTree::Punct(Punct::new(':', Spacing::Alone)),
@@ -326,7 +333,7 @@ impl MWFunc {
             ))));
             // Box<dyn Future<Output=Result<_Ctx, <_Ctx as RequestContext>::Error>> + Send + 'static>
             let mut inner = TokenStream::new();
-            inner.extend(path(&["Box"]));
+            inner.extend(use_core(&["prelude", "Box"]));
             inner.extend(core::iter::once(TokenTree::Punct(Punct::new(
                 '<',
                 Spacing::Alone,
@@ -345,7 +352,10 @@ impl MWFunc {
                 TokenTree::Punct(Punct::new('<', Spacing::Alone)),
                 TokenTree::Ident(Ident::new("_Ctx", Span::call_site())),
                 TokenTree::Ident(Ident::new("as", Span::call_site())),
-                TokenTree::Ident(Ident::new("RequestContext", Span::call_site())),
+                TokenTree::Group(Group::new(
+                    Delimiter::None,
+                    use_core(&["protocol", "RequestContext"]),
+                )),
                 TokenTree::Punct(Punct::new('>', Spacing::Alone)),
                 TokenTree::Punct(Punct::new(':', Spacing::Joint)),
                 TokenTree::Punct(Punct::new(':', Spacing::Alone)),
@@ -378,7 +388,7 @@ impl MWFunc {
             // body: Box::pin(async move { let mut <req> = context; <user code> })
             let mut body = TokenStream::new();
             // Box::pin(
-            body.extend(path(&["Box", "pin"]));
+            body.extend(use_core(&["prelude", "Box", "pin"]));
             body.extend(core::iter::once(TokenTree::Group(Group::new(
                 Delimiter::Parenthesis,
                 {
@@ -469,69 +479,4 @@ impl MWFunc {
         ]);
         out
     }
-}
-
-pub fn parse_trans(input: TokenStream) -> Result<MWFunc, TokenStream> {
-    let mut tokens = into_peekable_iter(input);
-    let attrs = parse_outer_attrs(&mut tokens)?;
-    let is_pub = match_ident_consume(&mut tokens, "pub");
-    let name = expect_any_ident(&mut tokens, "Expect middleware name")?;
-    let _ = expect_punct_consume(&mut tokens, "<", "Expect '<' before the protocol type")?;
-    let protocol = expect_any_ident(&mut tokens, "Protocol Identifier is Expected")?;
-    let _ = expect_punct_consume(&mut tokens, ">", "Expect '>' after the protocol type")?;
-    let cont = expect_group_consume_return_inner(
-        &mut tokens,
-        Delimiter::Brace,
-        "Expect '{' for middleware content",
-    )?;
-    Ok(MWFunc::new(
-        is_pub,
-        name,
-        protocol,
-        Ident::new("req", Span::call_site()),
-        cont,
-        attrs,
-    ))
-}
-
-/// Parse middleware declaration by using proc_macro_attribute-like syntax
-/// e.g.
-/// #[middleware]
-/// pub fn my_middleware(req: Protocol) {
-///    // middleware body
-/// }
-pub fn parse_semi_trans_or_attr(input: TokenStream) -> Result<MWFunc, TokenStream> {
-    let mut tokens = into_peekable_iter(input);
-    let attrs = parse_outer_attrs(&mut tokens)?;
-    let is_pub = match_ident_consume(&mut tokens, "pub");
-    let _ = expect_ident_consume(&mut tokens, "fn", "Expect 'fn' for middleware function")?;
-    let name = expect_any_ident(&mut tokens, "Expect middleware function name")?;
-    let _ = expect_punct_consume(&mut tokens, "<", "Expected '<' after function name")?;
-    let protocol = expect_any_ident(&mut tokens, "Expected protocol identifier after '<'")?;
-    let _ = expect_punct_consume(&mut tokens, ">", "Expected '>' after protocol identifier")?;
-    let mut group = into_peekable_iter(expect_group_consume_return_inner(
-        &mut tokens,
-        Delimiter::Parenthesis,
-        "Expected function parameters inside parentheses",
-    )?);
-    let req_var_name = match expect_any_ident(
-        &mut group,
-        "Expected request variable name as first parameter",
-    ) {
-        Ok(id) => id,
-        Err(_) => Ident::new("req", Span::call_site()),
-    };
-    let cont = expect_group_consume_return_inner(
-        &mut tokens,
-        Delimiter::Brace,
-        "Expect '{' for middleware content",
-    )?;
-    Ok(MWFunc::new(
-        is_pub,
-        name,
-        protocol,
-        req_var_name,
-        cont,
-        attrs,
-    ))
 }

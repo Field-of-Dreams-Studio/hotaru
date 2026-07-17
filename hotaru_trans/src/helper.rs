@@ -1,6 +1,6 @@
 use core::iter::Peekable;
 
-use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::{Delimiter, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
 pub fn generate_compile_error(span: proc_macro::Span, message: &str) -> TokenStream {
     let mut tokens = TokenStream::new();
@@ -216,4 +216,32 @@ pub fn match_any_literal_consume(
 
 pub fn into_peekable_iter(tokens: TokenStream) -> Peekable<impl Iterator<Item = TokenTree>> {
     tokens.into_iter().peekable()
+}
+
+/// Convert a public `hotaru_core` path into an absolute token path.
+///
+/// For example, `["executable", "def", "MWChain"]` becomes
+/// `::hotaru::hotaru_core::executable::def::MWChain` with `facade`, or
+/// `::hotaru_core::executable::def::MWChain` without it.
+pub fn use_core<A: AsRef<str>>(path: &[A]) -> TokenStream {
+    let mut ts = TokenStream::new();
+    ts.extend([TokenTree::Punct(Punct::new(':', Spacing::Joint))]);
+    ts.extend([TokenTree::Punct(Punct::new(':', Spacing::Alone))]);
+    #[cfg(feature = "facade")]
+    {
+        ts.extend([TokenTree::Ident(Ident::new("hotaru", Span::call_site()))]);
+        ts.extend([TokenTree::Punct(Punct::new(':', Spacing::Joint))]);
+        ts.extend([TokenTree::Punct(Punct::new(':', Spacing::Alone))]);
+    }
+    ts.extend([TokenTree::Ident(Ident::new("hotaru_core", Span::call_site()))]);
+    ts.extend([TokenTree::Punct(Punct::new(':', Spacing::Joint))]);
+    ts.extend([TokenTree::Punct(Punct::new(':', Spacing::Alone))]);
+    for (index, segment) in path.iter().enumerate() {
+        ts.extend([TokenTree::Ident(Ident::new(&segment.as_ref(), Span::call_site()))]);
+        if index + 1 < path.len() {
+            ts.extend([TokenTree::Punct(Punct::new(':', Spacing::Joint))]);
+            ts.extend([TokenTree::Punct(Punct::new(':', Spacing::Alone))]);
+        }
+    }
+    ts
 }
