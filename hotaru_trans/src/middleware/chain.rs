@@ -100,7 +100,12 @@ pub struct MWChain {
 impl MWChain { 
     pub fn new(slots: Vec<MWSlot>) -> Self {
         Self { slots }
-    } 
+    }
+
+    /// Default AP chain when the DSL has no `middleware = [...]` clause.
+    pub(crate) fn inheriting() -> Self {
+        Self::new(vec![MWSlot::Inherit])
+    }
 
     pub fn from_stream(
         stream: &mut Peekable<impl Iterator<Item = TokenTree>>

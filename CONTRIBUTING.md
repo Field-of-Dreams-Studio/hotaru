@@ -4,7 +4,7 @@ Thank you for your interest in contributing to Hotaru. We're excited to build th
 
 ## Development Status
 
-Hotaru is currently in active development (0.8.3). The following areas are still being built:
+Hotaru is currently in active development (0.8.x). The following areas are still being built:
 
 ### In Development
 
@@ -87,6 +87,10 @@ We welcome contributions in the following areas:
    - Middleware chain testing
    - Integration tests
    - Feature-matrix checks for default Tokio, no-default facade builds, and core-only builds
+
+## Governance and PR requirements
+
+Substantive changes go through Hotaru's governance process — an Update Report and a live QA, with AI-collaboration tiers declared per component. See [GOVERNANCE.md](./GOVERNANCE.md) for the roles, PR routes, and tier definitions before opening a PR. Contributors who prefer not to run the canonical PR themselves may ask a Component or Family Maintainer to stage the change instead; in that case the maintainer handles the Update Report and live QA, and the contributor is still credited for authored work.
 
 ## Contribution Guidelines
 

@@ -61,6 +61,13 @@ two routes:
 | Standalone canonical PR | The Contributor or Maintainer who submits the complete change | The PR owner completes the Update Report and answers the live QA; the questioner assigned by the QA order above completes and keeps the QA record. |
 | Maintainer-staged integration | An authorized Component or Family Maintainer collects related contributions in a maintainer-controlled branch or fork, then submits a consolidated canonical PR | The integrating Maintainer completes one consolidated Update Report and answers the live QA; the questioner assigned by the integrating Maintainer's role completes and keeps the QA record. |
 
+Contributors who prefer not to run the canonical PR themselves — for
+example when the Update Report or live QA is a barrier — may ask a
+Component or Family Maintainer to use the maintainer-staged route. The
+contributor's authored work is still credited, but the Update Report and
+live QA belong to the integrating Maintainer. Individual maintainers may
+publish their own rules for accepting such requests.
+
 A merge into a staging branch or fork is not acceptance into Hotaru. The
 integrating Maintainer must personally review, understand, explain, modify,
 test, and debug every change in the consolidated PR. Original contributors

@@ -37,6 +37,7 @@ pub use crate::call;
 pub use crate::endpoint;
 pub use crate::middleware;
 pub use crate::outpoint;
+pub use crate::{params, params_clone};
 pub use crate::run;
 pub use crate::{LClient, LPattern, LServer, LUrl};
 

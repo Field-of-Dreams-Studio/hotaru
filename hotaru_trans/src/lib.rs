@@ -2,7 +2,11 @@ use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenSt
 
 // Procedural macros for Hotaru framework
 // Entry points will be moved here from hotaru_trans
+#[allow(dead_code, unused_imports)]
+pub(crate) mod ap;
 pub(crate) mod call;
+#[allow(dead_code)]
+pub(crate) mod config;
 pub(crate) mod middleware;
 pub(crate) mod url;
 
@@ -125,6 +129,18 @@ pub fn mw_chain(input: TokenStream) -> TokenStream {
         Ok(ts) => ts,
         Err(err) => err,
     }
+}
+
+/// `params!([value, ...])` — build a non-cloneable `Params` value.
+#[proc_macro]
+pub fn params(input: TokenStream) -> TokenStream {
+    config::parse_and_expand(input, config::Cloneable::No)
+}
+
+/// `params_clone!([value, ...])` — build a cloneable `ParamsClone` value.
+#[proc_macro]
+pub fn params_clone(input: TokenStream) -> TokenStream {
+    config::parse_and_expand(input, config::Cloneable::Yes)
 }
 
 // Splits `input` at the first top-level comma. Used by the two `_until`

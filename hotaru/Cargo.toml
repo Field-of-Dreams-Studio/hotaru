@@ -15,7 +15,7 @@ readme = "readme.md"
 [dependencies]
 akari = { version = "0.2.8", default-features = false }
 tokio = { version = "1.28", features = ["full"], optional = true }
-hotaru_trans = { path = "../hotaru_trans", version = "=0.8.4", default-features = false }
+hotaru_trans = { path = "../hotaru_trans", version = "=0.8.4", default-features = false, features = ["facade"] }
 hotaru_core = { path = "../hotaru_core", version = "=0.8.4", default-features = false }
 hotaru_rt_tokio = { path = "../hotaru_rt_tokio", version = "=0.8.4", optional = true }
 hotaru_io_tokio = { path = "../hotaru_io_tokio", version = "=0.8.4", optional = true }
