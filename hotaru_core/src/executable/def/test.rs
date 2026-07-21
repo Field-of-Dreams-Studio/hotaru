@@ -28,12 +28,15 @@ use crate::{
     marker::{MaybeSendBoxFuture, MaybeSendSync},
     prelude::{Arc, Box, Vec, vec},
     protocol::{
-        Channel, DefaultProtocolError, Protocol, ProtocolFlow, ProtocolRole, RequestContext,
+        Channel, DefaultProtocolError, EndpointOutcome, Protocol, ProtocolFlow, ProtocolRole,
+        RequestContext,
     },
     url::{PathPattern, UrlRoot},
 };
 
-use super::{AccessPointDef, Endpoint, EndpointHandler, MWSlot, Outpoint, UrlMode};
+use super::{
+    AccessPointDef, Endpoint, EndpointHandler, FinalHandlerDef, MWSlot, Outpoint, UrlMode,
+};
 
 #[derive(Debug)]
 struct TestError;
@@ -65,11 +68,16 @@ impl Channel for NoChannel {
 }
 
 #[derive(Default)]
-struct TestCtx;
+struct TestResponse(Option<&'static str>);
+
+#[derive(Default)]
+struct TestCtx {
+    response: TestResponse,
+}
 
 impl RequestContext for TestCtx {
     type Request = ();
-    type Response = ();
+    type Response = TestResponse;
     type Error = TestError;
     type Channel = NoChannel;
 
@@ -81,7 +89,9 @@ impl RequestContext for TestCtx {
 
     fn inject_request(&mut self, _: ()) {}
 
-    fn into_response(self) {}
+    fn into_response(self) -> Self::Response {
+        self.response
+    }
 }
 
 #[derive(Clone)]
@@ -178,7 +188,29 @@ fn final_handler() -> Arc<dyn AsyncFinalHandler<TestCtx>> {
 }
 
 fn endpoint(url: &str, name: &str) -> Endpoint<TestProto> {
-    Endpoint::endpoint(url, name, final_handler())
+    Endpoint::from_final_handler(url, name, final_handler())
+}
+
+impl EndpointOutcome<TestCtx> for TestResponse {
+    fn apply_to(self, context: &mut TestCtx) -> Result<(), TestError> {
+        context.response = self;
+        Ok(())
+    }
+}
+
+fn unit_body(context: &mut TestCtx) -> MaybeSendBoxFuture<'_, ()> {
+    Box::pin(async move {
+        core::future::ready(()).await;
+        context.response.0 = Some("body-ran");
+    })
+}
+
+fn response_body(_context: &mut TestCtx) -> MaybeSendBoxFuture<'_, TestResponse> {
+    Box::pin(async { TestResponse(Some("response")) })
+}
+
+fn result_body(_context: &mut TestCtx) -> MaybeSendBoxFuture<'_, Result<TestResponse, TestError>> {
+    Box::pin(async { Ok(TestResponse(Some("result"))) })
 }
 
 // `bind` itself is runtime-independent, but `App` carries a runtime type.
@@ -383,6 +415,69 @@ fn constructors_match_and_default_to_inherit() {
     assert_eq!(generic.url_mode(), endpoint.url_mode());
     assert!(matches!(generic.middlewares(), [MWSlot::Inherit]));
     assert!(matches!(endpoint.middlewares(), [MWSlot::Inherit]));
+}
+
+#[tokio::test]
+async fn endpoint_applies_unit_outcomes() {
+    let def = Endpoint::<TestProto>::endpoint("/unit", "unit", unit_body);
+
+    let context = def
+        .handler()
+        .final_handler()
+        .handle(TestCtx::default())
+        .await
+        .unwrap();
+
+    assert_eq!(context.response.0, Some("body-ran"));
+}
+
+#[tokio::test]
+async fn endpoint_applies_protocol_outcomes() {
+    let def = Endpoint::<TestProto>::endpoint("/response", "response", response_body);
+
+    let context = def
+        .handler()
+        .final_handler()
+        .handle(TestCtx::default())
+        .await
+        .unwrap();
+
+    assert_eq!(context.response.0, Some("response"));
+}
+
+#[tokio::test]
+async fn endpoint_applies_nested_result_outcomes() {
+    let def = Endpoint::<TestProto>::endpoint("/result", "result", result_body);
+
+    let context = def
+        .handler()
+        .final_handler()
+        .handle(TestCtx::default())
+        .await
+        .unwrap();
+
+    assert_eq!(context.response.0, Some("result"));
+}
+
+#[tokio::test]
+async fn endpoint_accepts_an_already_normalized_final_handler() {
+    let def = Endpoint::<TestProto>::from_final_handler(
+        "/raw",
+        "raw",
+        Arc::new(|mut context: TestCtx| async move {
+            context.response.0 = Some("raw");
+            Ok(context)
+        }),
+    );
+
+    let context = def
+        .handler()
+        .final_handler()
+        .handle(TestCtx::default())
+        .await
+        .unwrap();
+
+    assert_eq!(context.response.0, Some("raw"));
 }
 
 #[test]

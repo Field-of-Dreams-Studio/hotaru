@@ -3,8 +3,9 @@ use core::marker::PhantomData;
 use akari::extensions::ParamsClone;
 
 use crate::executable::middleware::{AsyncFinalHandler, AsyncMiddleware};
+use crate::marker::{MaybeSendBoxFuture, MaybeSendSync};
 use crate::prelude::{Arc, String, Vec};
-use crate::protocol::Protocol;
+use crate::protocol::{EndpointOutcome, Protocol};
 use crate::url::{PathPattern, StepName, tokens_to_patterns};
 
 use super::error::BindError;
@@ -152,11 +153,21 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
     }
 }
 
-// Convenience constructors on the two aliases so users can write
-// `Endpoint::endpoint(url, name, handler_arc)` instead of
-// turbofishing the generic parent.
+// Convenience constructors on the two aliases so users do not need to
+// turbofish the generic parent.
 impl<P: Protocol> Endpoint<P> {
-    pub fn endpoint(
+    /// Build an endpoint from a body that borrows its request context.
+    /// The returned outcome is applied to the context automatically.
+    pub fn endpoint<R, H>(url: impl Into<String>, name: impl Into<String>, body: H) -> Self
+    where
+        R: EndpointOutcome<P::Context> + 'static,
+        H: for<'a> Fn(&'a mut P::Context) -> MaybeSendBoxFuture<'a, R> + MaybeSendSync + 'static,
+    {
+        Self::new(url, name, EndpointHandler::from_async_fn(body))
+    }
+
+    /// Build an endpoint from an already-normalized owned-context handler.
+    pub fn from_final_handler(
         url: impl Into<String>,
         name: impl Into<String>,
         handler: Arc<dyn AsyncFinalHandler<P::Context>>,

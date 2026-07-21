@@ -8,8 +8,9 @@
 use core::marker::PhantomData;
 
 use crate::executable::middleware::{AsyncFinalHandler, AsyncMiddleware};
-use crate::prelude::Arc;
-use crate::protocol::Protocol;
+use crate::marker::{MaybeSendBoxFuture, MaybeSendSync};
+use crate::prelude::{Arc, Box};
+use crate::protocol::{EndpointOutcome, Protocol, RequestContext};
 
 /// Defines a route's final handler plus any body-middleware prefix
 /// the flavour requires. Endpoints have no prefix; outpoints have
@@ -29,6 +30,30 @@ pub struct EndpointHandler<P: Protocol> {
 impl<P: Protocol> EndpointHandler<P> {
     pub fn new(body: Arc<dyn AsyncFinalHandler<P::Context>>) -> Self {
         Self { body, _p: PhantomData }
+    }
+
+    /// Normalize a borrowed endpoint body into the owned final-handler
+    /// contract used by the executable middleware chain.
+    pub fn from_async_fn<R, H>(handler: H) -> Self
+    where
+        R: EndpointOutcome<P::Context> + 'static,
+        H: for<'a> Fn(&'a mut P::Context) -> MaybeSendBoxFuture<'a, R> + MaybeSendSync + 'static,
+    {
+        let handler = Arc::new(handler);
+
+        Self::new(Arc::new(
+            move |mut context: P::Context| -> MaybeSendBoxFuture<
+                'static,
+                Result<P::Context, <P::Context as RequestContext>::Error>,
+            > {
+                let handler = handler.clone();
+                Box::pin(async move {
+                    let outcome = handler(&mut context).await;
+                    outcome.apply_to(&mut context)?;
+                    Ok(context)
+                })
+            },
+        ))
     }
 }
 

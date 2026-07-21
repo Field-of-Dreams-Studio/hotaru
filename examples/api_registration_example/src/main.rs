@@ -16,12 +16,13 @@ use hotaru_core::{
         ProtocolEntryBuilder,
         def::{Endpoint, UrlMode},
     },
-    marker::Arc,
+    marker::MaybeSendBoxFuture,
+    prelude::Box,
     protocol::EndpointOutcome,
 };
 use hotaru_http::{
-    DefaultHttpTransport, HTTP, HttpError, context::HttpReqCtx,
-    response::response_templates::normal_response, safety::HttpSafety,
+    DefaultHttpTransport, HTTP, context::HttpReqCtx, response::response_templates::normal_response,
+    safety::HttpSafety,
 };
 use hotaru_rt_tokio::TokioRuntime;
 
@@ -42,34 +43,39 @@ fn main() {
 }
 
 fn index_route() -> Endpoint<HTTP> {
-    Endpoint::endpoint("/", "index", Arc::new(index_handler))
+    Endpoint::endpoint("/", "index", index_handler)
 }
 
 fn hello_route() -> Endpoint<HTTP> {
-    Endpoint::endpoint("/hello/<str:name>", "hello", Arc::new(hello_handler))
+    Endpoint::endpoint("/hello/<str:name>", "hello", hello_handler)
 }
 
 fn health_route() -> Endpoint<HTTP> {
-    Endpoint::endpoint("/health", "health", Arc::new(health_handler))
-        .with_url_mode(UrlMode::Literal)
+    Endpoint::endpoint("/health", "health", health_handler).with_url_mode(UrlMode::Literal)
 }
 
-async fn index_handler(mut ctx: HttpReqCtx) -> Result<HttpReqCtx, HttpError> {
-    normal_response(
-        200u16,
-        "Routes were registered through Endpoint::endpoint and App::bind.\n",
-    )
-    .apply_to(&mut ctx)?;
-    Ok(ctx)
+fn index_handler(
+    _context: &mut HttpReqCtx,
+) -> MaybeSendBoxFuture<'_, impl EndpointOutcome<HttpReqCtx> + 'static + use<>> {
+    Box::pin(async {
+        normal_response(
+            200u16,
+            "Routes were registered through Endpoint::endpoint and App::bind.\n",
+        )
+    })
 }
 
-async fn hello_handler(mut ctx: HttpReqCtx) -> Result<HttpReqCtx, HttpError> {
-    let name = ctx.pattern("name").unwrap_or_else(|| "world".to_string());
-    normal_response(200u16, format!("Hello, {name}!\n")).apply_to(&mut ctx)?;
-    Ok(ctx)
+fn hello_handler(
+    context: &mut HttpReqCtx,
+) -> MaybeSendBoxFuture<'_, impl EndpointOutcome<HttpReqCtx> + 'static + use<>> {
+    let name = context
+        .pattern("name")
+        .unwrap_or_else(|| "world".to_string());
+    Box::pin(async move { normal_response(200u16, format!("Hello, {name}!\n")) })
 }
 
-async fn health_handler(mut ctx: HttpReqCtx) -> Result<HttpReqCtx, HttpError> {
-    normal_response(200u16, "ok\n").apply_to(&mut ctx)?;
-    Ok(ctx)
+fn health_handler(
+    _context: &mut HttpReqCtx,
+) -> MaybeSendBoxFuture<'_, impl EndpointOutcome<HttpReqCtx> + 'static + use<>> {
+    Box::pin(async { normal_response(200u16, "ok\n") })
 }
