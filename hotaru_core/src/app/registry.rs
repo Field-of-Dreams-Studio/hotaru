@@ -200,7 +200,7 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
     /// snapshot and registration operation.
     pub(crate) fn compile_and_register<P, T>(
         &self,
-        def: AccessPointDef<P, T>,
+        def: &AccessPointDef<P, T>,
     ) -> Result<(), BindError>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
@@ -208,21 +208,22 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
     {
         let (path, step_names) = def.parse_url_pattern()?;
         let inherited = self.get_protocol_middlewares::<P>();
-        let (address, middleware_slots, handler, config) = def.into_parts();
-        let (url, name, _) = address.into_parts();
-
-        let middlewares = MWChain::into_chain(
-            middleware_slots,
+        let middlewares = def.middlewares().resolve(
             &inherited,
-            handler.body_middleware(),
+            def.handler().body_middleware(),
         );
         let binding = ExecutableBinding::new()
-            .with_handler(handler.final_handler())
+            .with_handler(def.handler().final_handler())
             .with_middlewares(middlewares);
-
-        self.register::<P, _>(name.as_str(), path, step_names, binding, config)
-            .map(|_| ())
-            .map_err(|error| BindError::new(name, url, error))
+        self.register::<P, _>(
+            def.name(),
+            path,
+            step_names,
+            binding,
+            def.config().clone(),
+        )
+        .map(|_| ())
+        .map_err(|error| BindError::new(def.name(), def.url(), error))
     }
 
     /// Merges two registry wrappers, re-optimizing Single/Multi afterwards.

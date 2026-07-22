@@ -1,3 +1,5 @@
+/// Reusable protocol and access-point definitions.
+pub mod blueprint;
 /// Outbound client runtime.
 pub mod client;
 /// Shared app builder and runtime configuration types.
@@ -11,6 +13,7 @@ pub mod runtime;
 /// Inbound server runtime.
 pub mod server;
 
+pub use blueprint::{Blueprint, BlueprintError, ConfiguredBlueprint};
 pub use instance::{
     Accepts, App, AppTarget, Both, Client, Gateway, InboundOnly, InboundState, InboundTarget,
     OutboundOnly, OutboundState, OutboundTarget, Server,

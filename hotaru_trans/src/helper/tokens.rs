@@ -108,3 +108,13 @@ pub fn match_any_literal_consume(
 pub fn into_peekable_iter(tokens: TokenStream) -> Peekable<impl Iterator<Item = TokenTree>> {
     tokens.into_iter().peekable()
 }
+
+pub fn expect_end<T: AsRef<str>>(
+    stream: &mut Peekable<impl Iterator<Item = TokenTree>>,
+    error: T,
+) -> Result<(), TokenStream> {
+    match stream.next() {
+        Some(token) => Err(generate_compile_error(token.span(), error.as_ref())),
+        None => Ok(()),
+    }
+}

@@ -49,6 +49,9 @@ pub type Gateway<TS = hotaru_io_tokio::TcpTransport, Rt = hotaru_rt_tokio::Tokio
 pub type Gateway<TS, Rt> = hotaru_core::app::Gateway<TS, Rt>;
 
 pub use hotaru_core::app::common::{AppInUse, RunMode, TimeoutSetting};
+pub use hotaru_core::app::{
+    Blueprint, BlueprintError, Both, ConfiguredBlueprint, InboundOnly, OutboundOnly,
+};
 pub use hotaru_core::url::PathPattern;
 /// Umbrella alias for Hotaru's URL routing tree.
 #[cfg(feature = "io_tokio")]

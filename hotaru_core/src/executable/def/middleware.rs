@@ -79,7 +79,7 @@ impl<C: RequestContext> MWChain<C> {
     /// Consume these slots and resolve every `Inherit` entry against one
     /// captured root-middleware snapshot. An optional flavour-specific
     /// middleware is always prepended.
-    pub(crate) fn into_chain(
+    pub(crate) fn resolve(
         self,
         inherited: &[Arc<dyn AsyncMiddleware<C>>],
         prefix: Option<Arc<dyn AsyncMiddleware<C>>>,
