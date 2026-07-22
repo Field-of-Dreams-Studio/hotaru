@@ -52,7 +52,7 @@ impl MWFunc {
             ts
         }
 
-        // #[...] pub struct <Name>;
+        // #[...] [pub] struct <Name>;
         let mut struct_decl = TokenStream::new();
         struct_decl.extend(self.attrs.reform());
 
@@ -74,9 +74,14 @@ impl MWFunc {
             TokenTree::Group(Group::new(Delimiter::Bracket, inner)),
         ]);
 
-        // pub struct name
+        // Generated outpoint middleware stays private.
+        if self.is_pub {
+            struct_decl.extend(core::iter::once(TokenTree::Ident(Ident::new(
+                "pub",
+                Span::call_site(),
+            ))));
+        }
         struct_decl.extend(vec![
-            TokenTree::Ident(Ident::new("pub", Span::call_site())),
             TokenTree::Ident(Ident::new("struct", Span::call_site())),
             TokenTree::Ident(self.name.clone()),
             TokenTree::Punct(Punct::new(';', Spacing::Alone)),
@@ -178,12 +183,12 @@ impl MWFunc {
             ]);
         }
 
-        // fn handle<'a>( &'a self, context: Protocol, next: Box<dyn Fn(Protocol) -> Pin<Box<dyn Future<Output=Protocol> + Send>> + Send + Sync + 'static>, ) -> Pin<Box<dyn Future<Output=Protocol> + Send + 'static>> { Box::pin(async move { let mut req = context; <user body> }) }
+        // Use core's aliases as the middleware ABI source of truth. They
+        // select the correct `spawn_send` or `spawn_local` trait objects.
         let mut handle_fn = TokenStream::new();
         {
-            // Params: &'a self, context: Protocol, next: Box<dyn Fn(Protocol) -> Pin<Box<dyn Future<Output=Protocol> + Send>> + Send + Sync + 'static>
+            // &'a self, context: _Ctx, next: Box<NextFn<_Ctx>>
             let mut params = TokenStream::new();
-            // &'a self
             params.extend(vec![
                 TokenTree::Punct(Punct::new('&', Spacing::Alone)),
                 TokenTree::Punct(Punct::new('\'', Spacing::Joint)),
@@ -191,216 +196,52 @@ impl MWFunc {
                 TokenTree::Ident(Ident::new("self", Span::call_site())),
                 TokenTree::Punct(Punct::new(',', Spacing::Alone)),
             ]);
-            // context: _Ctx
             params.extend(vec![
                 TokenTree::Ident(Ident::new("context", Span::call_site())),
                 TokenTree::Punct(Punct::new(':', Spacing::Alone)),
                 TokenTree::Ident(Ident::new("_Ctx", Span::call_site())),
                 TokenTree::Punct(Punct::new(',', Spacing::Alone)),
             ]);
-            // next: Box< ... >
             let mut next_ty = TokenStream::new();
-            // Box
             next_ty.extend(use_core(&["prelude", "Box"]));
-            // <
-            next_ty.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                '<',
-                Spacing::Alone,
-            ))));
-            // dyn Fn(Protocol) -> core::pin::Pin<Box<dyn core::future::Future<Output = Protocol> + Send>>
-            {
-                // dyn
-                next_ty.extend(core::iter::once(TokenTree::Ident(Ident::new(
-                    "dyn",
-                    Span::call_site(),
-                ))));
-                // Fn
-                next_ty.extend(core::iter::once(TokenTree::Ident(Ident::new(
-                    "Fn",
-                    Span::call_site(),
-                ))));
-                // (_Ctx)
-                next_ty.extend(core::iter::once(TokenTree::Group(Group::new(
-                    Delimiter::Parenthesis,
-                    {
-                        let mut g = TokenStream::new();
-                        g.extend(core::iter::once(TokenTree::Ident(Ident::new("_Ctx", Span::call_site()))));
-                        g
-                    },
-                ))));
-                // ->
-                next_ty.extend(vec![
-                    TokenTree::Punct(Punct::new('-', Spacing::Joint)),
-                    TokenTree::Punct(Punct::new('>', Spacing::Alone)),
-                ]);
-                // core::pin::Pin<Box<dyn core::future::Future<Output = Protocol> + Send>>
-                let mut pin_box = TokenStream::new();
-                // core::pin::Pin
-                pin_box.extend(path(&["core", "pin", "Pin"]));
-                pin_box.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                    '<',
-                    Spacing::Alone,
-                ))));
-                // Box<dyn Future<Output=Protocol> + Send>
-                let mut inner = TokenStream::new();
-                inner.extend(use_core(&["prelude", "Box"]));
-                inner.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                    '<',
-                    Spacing::Alone,
-                ))));
-
-                // dyn core::future::Future<Output = Result<_Ctx, <_Ctx as RequestContext>::Error>> + Send + 'static>
-                let mut dyn_future = TokenStream::new();
-                dyn_future.extend(vec![TokenTree::Ident(Ident::new("dyn", Span::call_site()))]);
-                dyn_future.extend(path(&["core", "future", "Future"]));
-                // <Output = Result<_Ctx, <_Ctx as RequestContext>::Error>>
-                dyn_future.extend(vec![
-                    TokenTree::Punct(Punct::new('<', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("Output", Span::call_site())),
-                    TokenTree::Punct(Punct::new('=', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("Result", Span::call_site())),
-                    TokenTree::Punct(Punct::new('<', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("_Ctx", Span::call_site())),
-                    TokenTree::Punct(Punct::new(',', Spacing::Alone)),
-                    TokenTree::Punct(Punct::new('<', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("_Ctx", Span::call_site())),
-                    TokenTree::Ident(Ident::new("as", Span::call_site())),
-                    TokenTree::Group(Group::new(
-                        Delimiter::None,
-                        use_core(&["protocol", "RequestContext"]),
-                    )),
-                    TokenTree::Punct(Punct::new('>', Spacing::Alone)),
-                    TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                    TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("Error", Span::call_site())),
-                    TokenTree::Punct(Punct::new('>', Spacing::Alone)), // close Result<
-                    TokenTree::Punct(Punct::new('>', Spacing::Alone)), // close Output=
-                    TokenTree::Punct(Punct::new('+', Spacing::Alone)),
-                    TokenTree::Ident(Ident::new("Send", Span::call_site())),
-                    TokenTree::Punct(Punct::new('+', Spacing::Alone)),
-                    TokenTree::Punct(Punct::new('\'', Spacing::Joint)),
-                    TokenTree::Ident(Ident::new("static", Span::call_site())),
-                ]);
-
-                inner.extend(core::iter::once(TokenTree::Group(Group::new(
-                    Delimiter::Parenthesis,
-                    dyn_future,
-                )))); // wrap to keep cohesion
-                inner.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                    '>',
-                    Spacing::Alone,
-                ))));
-                // close Pin< ... >
-                pin_box.extend(core::iter::once(TokenTree::Group(Group::new(
-                    Delimiter::Parenthesis,
-                    inner,
-                ))));
-                pin_box.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                    '>',
-                    Spacing::Alone,
-                ))));
-                next_ty.extend(pin_box);
-            }
-            // + Send + Sync + 'static
             next_ty.extend(vec![
-                TokenTree::Punct(Punct::new('+', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("Send", Span::call_site())),
-                TokenTree::Punct(Punct::new('+', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("Sync", Span::call_site())),
-                TokenTree::Punct(Punct::new('+', Spacing::Alone)),
-                TokenTree::Punct(Punct::new('\'', Spacing::Joint)),
-                TokenTree::Ident(Ident::new("static", Span::call_site())),
+                TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+                TokenTree::Group(Group::new(
+                    Delimiter::None,
+                    use_core(&["executable", "middleware", "NextFn"]),
+                )),
+                TokenTree::Punct(Punct::new('<', Spacing::Alone)),
+                TokenTree::Ident(Ident::new("_Ctx", Span::call_site())),
+                TokenTree::Punct(Punct::new('>', Spacing::Alone)),
+                TokenTree::Punct(Punct::new('>', Spacing::Alone)),
             ]);
-            // >
-            next_ty.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                '>',
-                Spacing::Alone,
-            ))));
-            // next: <next_ty>
             params.extend(vec![
                 TokenTree::Ident(Ident::new("next", Span::call_site())),
                 TokenTree::Punct(Punct::new(':', Spacing::Alone)),
             ]);
             params.extend(next_ty);
 
-            // Return type: -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<_Ctx, <_Ctx as RequestContext>::Error>> + Send + 'static>>
+            // -> BoxFuture<_Ctx>
             let mut ret_ty = TokenStream::new();
-            // core::pin::Pin
-            ret_ty.extend(path(&["core", "pin", "Pin"]));
-            ret_ty.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                '<',
-                Spacing::Alone,
-            ))));
-            // Box<dyn Future<Output=Result<_Ctx, <_Ctx as RequestContext>::Error>> + Send + 'static>
-            let mut inner = TokenStream::new();
-            inner.extend(use_core(&["prelude", "Box"]));
-            inner.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                '<',
-                Spacing::Alone,
-            ))));
-            let mut dyn_future = TokenStream::new();
-            dyn_future.extend(vec![TokenTree::Ident(Ident::new("dyn", Span::call_site()))]);
-            dyn_future.extend(path(&["core", "future", "Future"]));
-            dyn_future.extend(vec![
-                TokenTree::Punct(Punct::new('<', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("Output", Span::call_site())),
-                TokenTree::Punct(Punct::new('=', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("Result", Span::call_site())),
+            ret_ty.extend(use_core(&["executable", "middleware", "BoxFuture"]));
+            ret_ty.extend(vec![
                 TokenTree::Punct(Punct::new('<', Spacing::Alone)),
                 TokenTree::Ident(Ident::new("_Ctx", Span::call_site())),
-                TokenTree::Punct(Punct::new(',', Spacing::Alone)),
-                TokenTree::Punct(Punct::new('<', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("_Ctx", Span::call_site())),
-                TokenTree::Ident(Ident::new("as", Span::call_site())),
-                TokenTree::Group(Group::new(
-                    Delimiter::None,
-                    use_core(&["protocol", "RequestContext"]),
-                )),
                 TokenTree::Punct(Punct::new('>', Spacing::Alone)),
-                TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-                TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("Error", Span::call_site())),
-                TokenTree::Punct(Punct::new('>', Spacing::Alone)), // close Result<
-                TokenTree::Punct(Punct::new('>', Spacing::Alone)), // close Output=
-                TokenTree::Punct(Punct::new('+', Spacing::Alone)),
-                TokenTree::Ident(Ident::new("Send", Span::call_site())),
-                TokenTree::Punct(Punct::new('+', Spacing::Alone)),
-                TokenTree::Punct(Punct::new('\'', Spacing::Joint)),
-                TokenTree::Ident(Ident::new("static", Span::call_site())),
             ]);
-            inner.extend(core::iter::once(TokenTree::Group(Group::new(
-                Delimiter::Parenthesis,
-                dyn_future,
-            ))));
-            inner.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                '>',
-                Spacing::Alone,
-            ))));
-            ret_ty.extend(core::iter::once(TokenTree::Group(Group::new(
-                Delimiter::Parenthesis,
-                inner,
-            ))));
-            ret_ty.extend(core::iter::once(TokenTree::Punct(Punct::new(
-                '>',
-                Spacing::Alone,
-            ))));
 
-            // body: Box::pin(async move { let mut <req> = context; <user code> })
+            // Box::pin(async move { let mut <req> = context; <user body> })
             let mut body = TokenStream::new();
-            // Box::pin(
             body.extend(use_core(&["prelude", "Box", "pin"]));
             body.extend(core::iter::once(TokenTree::Group(Group::new(
                 Delimiter::Parenthesis,
                 {
-                    // async move { ... }
                     let mut async_move = TokenStream::new();
                     async_move.extend(vec![
                         TokenTree::Ident(Ident::new("async", Span::call_site())),
                         TokenTree::Ident(Ident::new("move", Span::call_site())),
                     ]);
-                    // { let mut <req> = context; <fn body> }
                     let mut block = TokenStream::new();
-                    // let mut <req> = context;
                     block.extend(vec![
                         TokenTree::Ident(Ident::new("let", Span::call_site())),
                         TokenTree::Ident(Ident::new("mut", Span::call_site())),
@@ -409,7 +250,6 @@ impl MWFunc {
                         TokenTree::Ident(Ident::new("context", Span::call_site())),
                         TokenTree::Punct(Punct::new(';', Spacing::Alone)),
                     ]);
-                    // user body
                     block.extend(self.cont.clone());
                     async_move.extend(core::iter::once(TokenTree::Group(Group::new(
                         Delimiter::Brace,
@@ -422,23 +262,16 @@ impl MWFunc {
             handle_fn.extend(vec![
                 TokenTree::Ident(Ident::new("fn", Span::call_site())),
                 TokenTree::Ident(Ident::new("handle", Span::call_site())),
-                // Lifetimes: <'a>
                 TokenTree::Punct(Punct::new('<', Spacing::Alone)),
                 TokenTree::Punct(Punct::new('\'', Spacing::Joint)),
                 TokenTree::Ident(Ident::new("a", Span::call_site())),
                 TokenTree::Punct(Punct::new('>', Spacing::Alone)),
-                // (params)
                 TokenTree::Group(Group::new(Delimiter::Parenthesis, params)),
-                // ->
                 TokenTree::Punct(Punct::new('-', Spacing::Joint)),
                 TokenTree::Punct(Punct::new('>', Spacing::Alone)),
-                // return type
             ]);
             handle_fn.extend(ret_ty);
-            handle_fn.extend(vec![
-                // { body }
-                TokenTree::Group(Group::new(Delimiter::Brace, body)),
-            ]);
+            handle_fn.extend(vec![TokenTree::Group(Group::new(Delimiter::Brace, body))]);
         }
 
         // impl body { as_any .. return_self .. handle .. }

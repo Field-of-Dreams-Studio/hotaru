@@ -1,4 +1,4 @@
-use hotaru_core::{app::runtime::AsyncMutexCap, marker::MaybeSend};
+use hotaru_core::{app::runtime::AsyncMutexCap, prelude::*};
 
 use embassy_sync::blocking_mutex::raw::RawMutex;
 

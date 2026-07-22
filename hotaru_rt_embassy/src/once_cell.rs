@@ -1,10 +1,6 @@
-use alloc::boxed::Box;
 use core::future::Future;
 
-use hotaru_core::{
-    app::runtime::{BoxFuture, OnceCellCap},
-    marker::MaybeSend,
-};
+use hotaru_core::{app::runtime::OnceCellCap, prelude::*};
 
 use embassy_sync::blocking_mutex::raw::RawMutex;
 
@@ -38,7 +34,7 @@ where
 #[cfg(feature = "spawn_send")]
 impl<T, M> OnceCellCap<T> for EmbassyOnceCell<T, M>
 where
-    T: MaybeSend + Sync + 'static,
+    T: MaybeSendSync + 'static,
     M: RawMutex + Send + Sync + 'static,
 {
     fn get(&self) -> Option<&T> {
@@ -76,7 +72,7 @@ where
 #[cfg(feature = "spawn_local")]
 impl<T, M> OnceCellCap<T> for EmbassyOnceCell<T, M>
 where
-    T: MaybeSend + Sync + 'static,
+    T: MaybeSendSync + 'static,
     M: RawMutex + 'static,
 {
     fn get(&self) -> Option<&T> {
