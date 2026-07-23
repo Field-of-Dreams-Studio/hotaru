@@ -1,4 +1,4 @@
-\documentclass[10pt]{article}
+\documentclass[12pt]{article}
 \usepackage[a4paper,margin=16mm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{amssymb}
@@ -8,7 +8,7 @@
 \pagestyle{empty}
 
 \newcommand{\checkbox}{\(\square\)}
-\newcommand{\writingline}{\par\vspace{0.40cm}\hrule\vspace{0.03cm}}
+\newcommand{\writingline}{\par\vspace{0.45cm}\hrule\vspace{0.10cm}}
 \newcommand{\qaentry}[1]{%
   \vspace{0.45em}
   \textbf{#1. Module or symbol:}\ \hrulefill
@@ -30,10 +30,13 @@
   \writingline
   \writingline
 
-  \vspace{1\baselineskip}
+  \vspace{0.40\baselineskip}
 }
 
 \begin{document}
+
+\noindent\hfill\fbox{\strut\textbf{QA QUESTION SHEET}}\par
+\vspace{0.4em}
 
 \begin{tabularx}{\textwidth}{@{}lX@{\hspace{1.5em}}lX@{}}
   \textbf{Repository:} & \hrulefill &
@@ -47,7 +50,6 @@
 \qaentry{3}
 \qaentry{4}
 \qaentry{5}
-\qaentry{6}
 
 \vfill
 \begin{center}

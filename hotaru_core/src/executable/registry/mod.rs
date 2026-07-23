@@ -9,8 +9,9 @@ use crate::{
     debug_log,
     executable::{
         ExecutableBinding,
+        def::ProtocolDef,
         entry::{ProtocolEntry, ProtocolEntryTrait},
-        middleware::{AsyncMiddleware, AsyncMiddlewareChain},
+        middleware::AsyncMiddleware,
     },
     extensions::ParamsClone,
     protocol::Protocol,
@@ -37,15 +38,10 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
     /// Register a protocol entry.
     pub fn register<P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static>(
         &mut self,
-        protocol: P,
-        root_handler: Arc<UrlRoot<P::Context, TS>>,
-        middleware_chain: AsyncMiddlewareChain<P::Context>,
+        def: &ProtocolDef<P>,
     ) {
-        self.handlers.push(Arc::new(ProtocolEntry::new(
-            protocol,
-            root_handler,
-            middleware_chain,
-        )));
+        self.handlers
+            .push(Arc::new(ProtocolEntry::<P, TS>::from_def(def)));
     }
 
     pub async fn serve(&self, runtime: Arc<RuntimeConfig>, conn: TS::Wire) {

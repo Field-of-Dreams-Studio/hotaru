@@ -1,4 +1,4 @@
-\documentclass[10pt]{article}
+\documentclass[12pt]{article}
 \usepackage[a4paper,margin=16mm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{amssymb}
@@ -8,7 +8,7 @@
 \pagestyle{empty}
 
 \newcommand{\checkbox}{\(\square\)}
-\newcommand{\writingline}{\par\vspace{0.40cm}\hrule\vspace{0.03cm}}
+\newcommand{\writingline}{\par\vspace{0.45cm}\hrule\vspace{0.10cm}}
 \newcommand{\reportentry}[1]{%
   \vspace{0.55em}
   \textbf{#1. Module or symbol:}\ \hrulefill
@@ -21,19 +21,22 @@
   \checkbox\ No functional change
 
   \vspace{0.25em}
-  \textbf{Design approach and rationale}
+  \textbf{Design approach}
   \writingline
   \writingline
 
   \vspace{0.15em}
-  \textbf{Why this design should be used}
+  \textbf{Justification of the approach}
   \writingline
   \writingline
 
-  \vspace{1.25\baselineskip}
+  \vspace{0.55\baselineskip}
 }
 
 \begin{document}
+
+\noindent\hfill\fbox{\strut\textbf{CODE UPDATE REPORT SHEET}}\par
+\vspace{0.4em}
 
 \begin{tabularx}{\textwidth}{@{}lX@{\hspace{1.5em}}lX@{}}
   \textbf{Repository:} & \hrulefill &
@@ -47,7 +50,6 @@
 \reportentry{3}
 \reportentry{4}
 \reportentry{5}
-\reportentry{6}
 
 \vfill
 \begin{center}

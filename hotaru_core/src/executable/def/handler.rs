@@ -3,9 +3,7 @@
 //! `FinalHandlerDef<P>` separates endpoints from outpoints at the type
 //! level. `EndpointHandler<P>` supplies just a final handler (the
 //! user's body); `OutpointHandler<P>` supplies a body-as-middleware
-//! plus `<P as Protocol>::send` as the fixed final handler.
-
-use core::marker::PhantomData;
+//! plus `<P as Protocol>::send` as the fixed final handler. 
 
 use crate::executable::middleware::{AsyncFinalHandler, AsyncMiddleware};
 use crate::marker::{MaybeSendBoxFuture, MaybeSendSync};
@@ -17,21 +15,21 @@ use crate::protocol::{EndpointOutcome, Protocol, RequestContext};
 /// exactly one prefix entry (the user's outpoint body wrapped as
 /// middleware).
 pub trait FinalHandlerDef<P: Protocol>: 'static {
+    // Final handler is in the center of the executable middleware chain. 
     fn final_handler(&self) -> Arc<dyn AsyncFinalHandler<P::Context>>;
+    // Body middleware is in the most outside of the middleware chain 
     fn body_middleware(&self) -> Option<Arc<dyn AsyncMiddleware<P::Context>>>;
 }
 
 /// Endpoint flavour: user body is the final handler; no prefix.
 pub struct EndpointHandler<P: Protocol> {
-    body: Arc<dyn AsyncFinalHandler<P::Context>>,
-    _p: PhantomData<fn() -> P>,
+    body: Arc<dyn AsyncFinalHandler<P::Context>> 
 }
 
 impl<P: Protocol> EndpointHandler<P> {
     pub fn new(body: Arc<dyn AsyncFinalHandler<P::Context>>) -> Self {
         Self {
-            body,
-            _p: PhantomData,
+            body 
         }
     }
 
@@ -74,15 +72,13 @@ impl<P: Protocol> FinalHandlerDef<P> for EndpointHandler<P> {
 /// coerced through the `AsyncFinalHandler` blanket impl at
 /// `hotaru_core/src/executable/middleware.rs:44`).
 pub struct OutpointHandler<P: Protocol> {
-    body: Arc<dyn AsyncMiddleware<P::Context>>,
-    _p: PhantomData<fn() -> P>,
+    body: Arc<dyn AsyncMiddleware<P::Context>> 
 }
 
 impl<P: Protocol> OutpointHandler<P> {
     pub fn new(body: Arc<dyn AsyncMiddleware<P::Context>>) -> Self {
         Self {
-            body,
-            _p: PhantomData,
+            body 
         }
     }
 }

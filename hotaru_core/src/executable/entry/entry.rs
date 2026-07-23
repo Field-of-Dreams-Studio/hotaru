@@ -17,7 +17,7 @@ use crate::{
     executable::{
         ExecutableBinding,
         access::{access_point::AccessPoint, table::AccessPointTable},
-        def::{AccessPointDef, BindError, FinalHandlerDef},
+        def::{AccessPointDef, BindError, FinalHandlerDef, ProtocolDef},
         entry::ProtocolEntryTrait,
         middleware::AsyncMiddlewareChain,
     },
@@ -54,6 +54,14 @@ where
             middlewares,
             access_points: AccessPointTable::new(),
         }
+    }
+
+    pub(crate) fn from_def(def: &ProtocolDef<P>) -> Self {
+        Self::new(
+            def.protocol.clone(),
+            Arc::new(UrlRoot::new()),
+            def.root_middlewares.clone(),
+        )
     }
 
     /// Register a binding at the given pre-parsed path under `name`, and

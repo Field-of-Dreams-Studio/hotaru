@@ -1,12 +1,12 @@
 mod chain;
-mod func; 
+mod func;
 
 use core::iter::Peekable;
 
 use proc_macro::{Delimiter, Ident, Span, TokenStream, TokenTree};
 
 use crate::helper::{
-    expect_any_ident, expect_group_consume_return_inner, expect_ident_consume,
+    expect_any_ident, expect_end, expect_group_consume_return_inner, expect_ident_consume,
     expect_punct_consume, into_peekable_iter, match_ident_consume,
 };
 use crate::outer_attr::parse_outer_attrs;
@@ -83,5 +83,6 @@ pub(crate) fn parse_mw_chain(
     stream: &mut Peekable<impl Iterator<Item = TokenTree>>,
 ) -> Result<TokenStream, TokenStream> {
     let chain = MWChain::from_stream(stream)?;
+    expect_end(stream, "unexpected token after the middleware chain")?;
     Ok(chain.expand_middleware_chain())
 }

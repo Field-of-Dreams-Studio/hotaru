@@ -1,15 +1,17 @@
-//! Pre-registration route definitions.
+//! Pre-registration definitions for protocol entries and access points.
 //!
-//! Route flavour is encoded at the type level via `FinalHandlerDef<P>`:
-//! `Endpoint<P>` = `AccessPointDef<P, EndpointHandler<P>>`, `Outpoint<P>`
-//! = `AccessPointDef<P, OutpointHandler<P>>`. `App::bind` accepts only
-//! the flavours its role permits (`Server` = endpoints, `Client` =
-//! outpoints, `Gateway` = both). Mismatches fail to compile.
+//! `ProtocolDef<P>` describes one protocol-entry recipe. Route flavour is
+//! encoded at the type level via `FinalHandlerDef<P>`:
+//! `Endpoint<P>` = `AccessPointDef<P, EndpointHandler<P>>`, `Outpoint<P>` =
+//! `AccessPointDef<P, OutpointHandler<P>>`. `App::bind` accepts only the
+//! flavours its role permits (`Server` = endpoints, `Client` = outpoints,
+//! `Gateway` = both). Mismatches fail to compile.
 
 mod access_point;
 mod error;
 mod handler;
 mod middleware;
+mod protocol;
 mod route_address;
 mod url_mode;
 
@@ -20,6 +22,7 @@ pub use access_point::{AccessPointDef, Endpoint, Outpoint};
 pub use error::BindError;
 pub use handler::{EndpointHandler, FinalHandlerDef, OutpointHandler};
 pub use middleware::{MWChain, MWSlot};
+pub use protocol::ProtocolDef;
 pub use route_address::RouteAddress;
 pub use url_mode::UrlMode;
 

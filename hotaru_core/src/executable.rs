@@ -1,7 +1,7 @@
 /// Named access points for registered handlers (runtime lookup handles).
 pub mod access;
 
-/// Pre-registration route definitions (`AccessPointDef<P, T>`).
+/// Pre-registration definitions (`ProtocolDef<P>`, `AccessPointDef<P, T>`).
 pub mod def;
 
 /// Protocol entry builder and runtime entry types.
@@ -15,7 +15,7 @@ pub mod registry;
 
 pub use def::{
     AccessPointDef, BindError, Endpoint, EndpointHandler, FinalHandlerDef, MWChain, MWSlot,
-    Outpoint, OutpointHandler, RouteAddress, UrlMode,
+    Outpoint, OutpointHandler, ProtocolDef, RouteAddress, UrlMode,
 };
 pub use entry::ProtocolEntryBuilder;
 pub use executable::{ExecutableBinding, ExecutionChain, run_chain};

@@ -109,6 +109,7 @@ pub fn into_peekable_iter(tokens: TokenStream) -> Peekable<impl Iterator<Item = 
     tokens.into_iter().peekable()
 }
 
+/// Succeeds only when no token remains in this cursor.
 pub fn expect_end<T: AsRef<str>>(
     stream: &mut Peekable<impl Iterator<Item = TokenTree>>,
     error: T,
@@ -116,5 +117,38 @@ pub fn expect_end<T: AsRef<str>>(
     match stream.next() {
         Some(token) => Err(generate_compile_error(token.span(), error.as_ref())),
         None => Ok(()),
+    }
+}
+
+/// Consumes and returns the next Rust string literal.
+pub(crate) fn expect_string_literal_consume(
+    tokens: &mut Peekable<impl Iterator<Item = TokenTree>>,
+) -> Result<Literal, TokenStream> {
+    match tokens.next() {
+        Some(TokenTree::Literal(literal)) => {
+            ensure_string_literal(&literal)?;
+            Ok(literal)
+        }
+        Some(token) => Err(generate_compile_error(
+            token.span(),
+            "expected a string literal",
+        )),
+        None => Err(generate_compile_error(
+            Span::call_site(),
+            "expected a string literal",
+        )),
+    }
+}
+
+/// Rejects literal tokens that are not ordinary or raw Rust strings.
+pub(crate) fn ensure_string_literal(literal: &Literal) -> Result<(), TokenStream> {
+    let source = literal.to_string();
+    if source.starts_with('"') || source.starts_with("r\"") || source.starts_with("r#") {
+        Ok(())
+    } else {
+        Err(generate_compile_error(
+            literal.span(),
+            "expected a string literal",
+        ))
     }
 }
