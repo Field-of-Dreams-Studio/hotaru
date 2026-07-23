@@ -1,6 +1,6 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use crate::prelude::Arc;
 
 use crate::protocol::RequestContext;
 
@@ -128,15 +128,17 @@ impl<C: RequestContext> ExecutableBinding<C> {
 }
 
 /// The execution-chain builder and executor.
-pub struct ExecutionChain<C> 
-where 
-    C: RequestContext + 'static {
+pub struct ExecutionChain<C>
+where
+    C: RequestContext + 'static,
+{
     inner: Arc<NextFn<C>>,
 }
 
-impl<C> Clone for ExecutionChain<C> 
-where 
-    C: RequestContext + 'static { 
+impl<C> Clone for ExecutionChain<C>
+where
+    C: RequestContext + 'static,
+{
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -153,8 +155,7 @@ where
         middlewares: Vec<Arc<dyn AsyncMiddleware<C>>>,
         final_handler: Arc<dyn AsyncFinalHandler<C>>,
     ) -> Self {
-        let final_fn: Arc<NextFn<C>> =
-            Arc::new(move |ctx| final_handler.handle(ctx));
+        let final_fn: Arc<NextFn<C>> = Arc::new(move |ctx| final_handler.handle(ctx));
 
         let chain = middlewares.into_iter().rev().fold(final_fn, |next, mw| {
             let next_clone = next.clone();
@@ -170,7 +171,7 @@ where
     /// Drive the chain to completion, returning the final context.
     pub async fn run(&self, ctx: C) -> Result<C, <C as RequestContext>::Error> {
         (self.inner)(ctx).await
-    } 
+    }
 }
 
 impl<C> TryFrom<ExecutableBinding<C>> for ExecutionChain<C>
@@ -195,4 +196,4 @@ pub async fn run_chain<C: RequestContext + 'static>(
 ) -> Result<C, <C as RequestContext>::Error> {
     let chain = ExecutionChain::new(middlewares, final_handler);
     chain.run(ctx).await
-} 
+}

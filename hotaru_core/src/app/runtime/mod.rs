@@ -2,8 +2,7 @@
 
 pub mod spec;
 pub use spec::{
-    AsyncMutexCap, BlockingRuntimeCap, BoxFuture, Either, MaybeSendFuture, OnceCellCap,
-    RuntimeSpec,
+    AsyncMutexCap, BlockingRuntimeCap, BoxFuture, Either, MaybeSendFuture, OnceCellCap, RuntimeSpec,
 };
 
 // Core intentionally does not define or export concrete runtime backends.

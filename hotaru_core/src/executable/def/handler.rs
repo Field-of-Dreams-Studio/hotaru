@@ -29,7 +29,10 @@ pub struct EndpointHandler<P: Protocol> {
 
 impl<P: Protocol> EndpointHandler<P> {
     pub fn new(body: Arc<dyn AsyncFinalHandler<P::Context>>) -> Self {
-        Self { body, _p: PhantomData }
+        Self {
+            body,
+            _p: PhantomData,
+        }
     }
 
     /// Normalize a borrowed endpoint body into the owned final-handler
@@ -77,7 +80,10 @@ pub struct OutpointHandler<P: Protocol> {
 
 impl<P: Protocol> OutpointHandler<P> {
     pub fn new(body: Arc<dyn AsyncMiddleware<P::Context>>) -> Self {
-        Self { body, _p: PhantomData }
+        Self {
+            body,
+            _p: PhantomData,
+        }
     }
 }
 

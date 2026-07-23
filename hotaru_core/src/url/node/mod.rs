@@ -1,6 +1,6 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use crate::prelude::Arc;
 use core::slice::Iter;
 
 use crate::{
@@ -242,7 +242,9 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlNode<C, TS> {
     }
 
     #[av::ver(
-        unstable, since = "0.8.4", note = "Safety proof: src/url/node/COMBINE_SAFETY.md"
+        unstable,
+        since = "0.8.4",
+        note = "Safety proof: src/url/node/COMBINE_SAFETY.md"
     )]
     /// Left-biased merge: keeps self's payload whole; recursively merges children.
     pub fn combine(self: &Arc<Self>, other: &Arc<UrlNode<C, TS>>) {
@@ -480,7 +482,11 @@ mod tests {
         ));
 
         // Other's table is only read, never mutated.
-        assert!(right.find_child(&PathPattern::literal_path("left")).is_none());
+        assert!(
+            right
+                .find_child(&PathPattern::literal_path("left"))
+                .is_none()
+        );
     }
 
     #[test]
@@ -509,7 +515,9 @@ mod tests {
         assert!(Arc::ptr_eq(&users, &left_users));
 
         // Other's unique subtree is adopted by sharing its Arc.
-        let orders = api.find_child(&PathPattern::literal_path("orders")).unwrap();
+        let orders = api
+            .find_child(&PathPattern::literal_path("orders"))
+            .unwrap();
         assert!(Arc::ptr_eq(&orders, &right_orders));
     }
 }

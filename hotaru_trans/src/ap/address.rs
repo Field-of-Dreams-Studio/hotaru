@@ -1,4 +1,12 @@
-use proc_macro::{Ident, Literal};
+use core::iter::Peekable;
+use proc_macro::{
+    Delimiter, Ident, Literal, Span, TokenStream, TokenTree,
+};
+
+use crate::helper::{
+    expect_any_ident, expect_end, expect_group_consume_return_inner,
+    generate_compile_error,
+};
 
 /// How core should interpret the URL literal when the definition is bound.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

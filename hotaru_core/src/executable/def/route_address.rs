@@ -32,13 +32,13 @@ impl RouteAddress {
         self
     }
 
-    pub fn url(&self) -> &str { &self.url }
-    pub fn name(&self) -> &str { &self.name }
-    pub fn url_mode(&self) -> UrlMode { self.url_mode }
-
-    /// Crate-private accessor — `compile_and_register` moves the parts
-    /// out to hand into `registry.register`.
-    pub(crate) fn into_parts(self) -> (String, String, UrlMode) {
-        (self.url, self.name, self.url_mode)
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn url_mode(&self) -> UrlMode {
+        self.url_mode
     }
 }

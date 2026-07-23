@@ -13,10 +13,10 @@ pub mod stream;
 /// Protocol role and index helper types.
 pub mod types;
 
+pub use channel::{Channel, ProtocolFlow};
 pub use context::{EndpointOutcome, RequestContext};
 pub use error::{BoxProtocolError, DefaultProtocolError, EmptyError, ProtocolError};
 pub use message::Message;
-pub use protocol::{Protocol, CtxError};
+pub use protocol::{CtxError, Protocol};
 pub use stream::Stream;
-pub use channel::{Channel, ProtocolFlow};
 pub use types::{ProtocolIndex, ProtocolRole};

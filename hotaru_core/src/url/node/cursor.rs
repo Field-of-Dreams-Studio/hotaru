@@ -5,9 +5,9 @@
 //! [`WalkCursor::find_next`] calls. Built on [`Children::match_step`];
 //! existing walk paths are untouched.
 
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use crate::prelude::Arc;
 
 use crate::{
     connection::TransportSpec,
@@ -20,7 +20,12 @@ use crate::{
 
 /// One in-progress child-iteration. Depth is implicit in the stack
 /// index: `cursor.frames()[i]` matches `segments[i]`.
-#[av::ver(unstable, since = "0.8.1", note = "Resumable URL traversal — surface may change", date = "2026-05-25")]
+#[av::ver(
+    unstable,
+    since = "0.8.1",
+    note = "Resumable URL traversal — surface may change",
+    date = "2026-05-25"
+)]
 pub struct WalkFrame<C: RequestContext, TS: TransportSpec> {
     pub node: FrameNode<C, TS>,
     pub state: PartialState,
@@ -28,7 +33,12 @@ pub struct WalkFrame<C: RequestContext, TS: TransportSpec> {
 
 /// Which `Children` table a frame iterates. Root-rooted walks start
 /// with `Root`; every deeper frame (and node-rooted walks) use `Node`.
-#[av::ver(unstable, since = "0.8.1", note = "Resumable URL traversal — surface may change", date = "2026-05-25")]
+#[av::ver(
+    unstable,
+    since = "0.8.1",
+    note = "Resumable URL traversal — surface may change",
+    date = "2026-05-25"
+)]
 pub enum FrameNode<C: RequestContext, TS: TransportSpec> {
     Root(Arc<RootNode<C, TS>>),
     Node(Arc<UrlNode<C, TS>>),
@@ -44,7 +54,12 @@ impl<C: RequestContext, TS: TransportSpec> FrameNode<C, TS> {
 }
 
 /// Resumable depth-first traversal. Thin newtype around `Vec<WalkFrame>`.
-#[av::ver(unstable, since = "0.8.1", note = "Resumable URL traversal — surface may change", date = "2026-05-25")]
+#[av::ver(
+    unstable,
+    since = "0.8.1",
+    note = "Resumable URL traversal — surface may change",
+    date = "2026-05-25"
+)]
 pub struct WalkCursor<C: RequestContext, TS: TransportSpec> {
     frames: Vec<WalkFrame<C, TS>>,
 }
@@ -94,8 +109,7 @@ where
             }
             let state = self.frames[idx].state;
             let segment = segments[depth];
-            let (matched, next_state) =
-                self.frames[idx].node.children().match_step(segment, state);
+            let (matched, next_state) = self.frames[idx].node.children().match_step(segment, state);
             self.frames[idx].state = next_state;
 
             let Some(child) = matched else {

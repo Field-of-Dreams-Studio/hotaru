@@ -90,7 +90,29 @@ We welcome contributions in the following areas:
 
 ## Governance and PR requirements
 
-Substantive changes go through Hotaru's governance process — an Update Report and a live QA, with AI-collaboration tiers declared per component. See [GOVERNANCE.md](./GOVERNANCE.md) for the roles, PR routes, and tier definitions before opening a PR. Contributors who prefer not to run the canonical PR themselves may ask a Component or Family Maintainer to stage the change instead; in that case the maintainer handles the Update Report and live QA, and the contributor is still credited for authored work.
+All changes that reach the canonical repository go through Hotaru's governance
+process — an Update Report and a live QA, with AI-collaboration tiers declared
+per component. Being small or routine does not exempt a change; it changes only
+how much the report records and, usually, who owns the PR. See
+[GOVERNANCE.md](./GOVERNANCE.md) for the roles, PR routes, and tier definitions
+before opening a PR.
+
+**Report granularity.** Record one Update Report entry per non-trivial design
+unit — typically a function, struct, enum, trait, or impl that carries its own
+design decision — and justify both its design and why that design should be
+used. Mechanical one-step work may be grouped into a single entry: plain
+getters and setters, renames, re-exports, and similar obvious glue. If a
+function performs several independently meaningful operations, prefer splitting
+it into smaller single-purpose functions rather than writing one large entry;
+the per-unit report is intended to keep functions small and focused.
+
+**Easy contributions.** Small or routine PRs should normally use the
+maintainer-staged integration route: a Component or Family Maintainer other
+than the author integrates the change and owns the consolidated Update Report
+and live QA, while the contributor is still credited for authored work. This
+keeps trivial work inside governance without placing the full report-and-QA
+burden on the contributor. The rules against self-approval and the approval
+required for cross-family changes still apply.
 
 ## Contribution Guidelines
 

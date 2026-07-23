@@ -1,6 +1,6 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use crate::prelude::Arc;
 use core::slice::Iter;
 
 use akari::extensions::ParamsClone;
@@ -673,7 +673,11 @@ mod tests {
         left.literal_url("/api/users", binding_with_handler(), ParamsClone::default())
             .unwrap();
         let right_orders = match right
-            .literal_url("/api/orders", binding_with_handler(), ParamsClone::default())
+            .literal_url(
+                "/api/orders",
+                binding_with_handler(),
+                ParamsClone::default(),
+            )
             .unwrap()
         {
             UrlRegistration::Node(n) => n,

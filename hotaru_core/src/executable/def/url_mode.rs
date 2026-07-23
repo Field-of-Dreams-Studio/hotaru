@@ -5,5 +5,4 @@ pub enum UrlMode {
     #[default]
     Pattern,
     Literal,
-} 
-
+}

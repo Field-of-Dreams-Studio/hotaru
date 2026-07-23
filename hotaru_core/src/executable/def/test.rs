@@ -413,8 +413,14 @@ fn constructors_match_and_default_to_inherit() {
     assert_eq!(generic.url(), endpoint.url());
     assert_eq!(generic.name(), endpoint.name());
     assert_eq!(generic.url_mode(), endpoint.url_mode());
-    assert!(matches!(generic.middlewares(), [MWSlot::Inherit]));
-    assert!(matches!(endpoint.middlewares(), [MWSlot::Inherit]));
+    assert!(matches!(
+        generic.middlewares().as_slice(),
+        [MWSlot::Inherit]
+    ));
+    assert!(matches!(
+        endpoint.middlewares().as_slice(),
+        [MWSlot::Inherit]
+    ));
 }
 
 #[tokio::test]
@@ -489,12 +495,8 @@ fn middleware_builders_preserve_symbolic_order() {
         .with_middleware(middleware("route-b"));
 
     assert!(matches!(
-        def.middlewares(),
-        [
-            MWSlot::Concrete(_),
-            MWSlot::Inherit,
-            MWSlot::Concrete(_),
-        ]
+        def.middlewares().as_slice(),
+        [MWSlot::Concrete(_), MWSlot::Inherit, MWSlot::Concrete(_),]
     ));
 }
 

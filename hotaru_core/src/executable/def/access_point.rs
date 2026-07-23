@@ -41,11 +41,7 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
     /// Generic constructor. Sets the normative `[Inherit]` default
     /// user chain. Prefer `Endpoint::endpoint` / `Outpoint::outpoint`
     /// at call sites; use this only when the flavour is generic.
-    pub fn new(
-        url: impl Into<String>,
-        name: impl Into<String>,
-        handler: T,
-    ) -> Self {
+    pub fn new(url: impl Into<String>, name: impl Into<String>, handler: T) -> Self {
         Self::with_address(RouteAddress::new(url, name), handler)
     }
 
@@ -69,10 +65,7 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
         self
     }
 
-    pub fn with_middleware(
-        mut self,
-        middleware: Arc<dyn AsyncMiddleware<P::Context>>,
-    ) -> Self {
+    pub fn with_middleware(mut self, middleware: Arc<dyn AsyncMiddleware<P::Context>>) -> Self {
         self.middlewares.push(MWSlot::Concrete(middleware));
         self
     }
@@ -92,10 +85,7 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
 
     /// Replace the user chain wholesale. Outpoint bodies stay
     /// untouched — they live in `handler`, not `middlewares`.
-    pub fn with_middlewares(
-        mut self,
-        middlewares: impl Into<MWChain<P::Context>>,
-    ) -> Self {
+    pub fn with_middlewares(mut self, middlewares: impl Into<MWChain<P::Context>>) -> Self {
         self.middlewares = middlewares.into();
         self
     }
@@ -107,21 +97,33 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
 
     // ----- read-only inspection (delegating to sub-structs) -----
 
-    pub fn address(&self) -> &RouteAddress { &self.address }
-    pub fn url(&self) -> &str { self.address.url() }
-    pub fn name(&self) -> &str { self.address.name() }
-    pub fn url_mode(&self) -> UrlMode { self.address.url_mode() }
-    pub fn middlewares(&self) -> &[MWSlot<P::Context>] { self.middlewares.as_slice() }
-    pub fn handler(&self) -> &T { &self.handler }
-    pub fn config(&self) -> &ParamsClone { &self.config }
+    pub fn address(&self) -> &RouteAddress {
+        &self.address
+    }
+    pub fn url(&self) -> &str {
+        self.address.url()
+    }
+    pub fn name(&self) -> &str {
+        self.address.name()
+    }
+    pub fn url_mode(&self) -> UrlMode {
+        self.address.url_mode()
+    }
+    pub fn middlewares(&self) -> &MWChain<P::Context> {
+        &self.middlewares
+    }
+    pub fn handler(&self) -> &T {
+        &self.handler
+    }
+    pub fn config(&self) -> &ParamsClone {
+        &self.config
+    }
 
     // ----- crate-private accessors for preparation -----
 
     /// Parse this definition's URL into the representation consumed by
     /// the registry, retaining route identity in any parse error.
-    pub(crate) fn parse_url_pattern(
-        &self,
-    ) -> Result<(Vec<PathPattern>, StepName), BindError> {
+    pub(crate) fn parse_url_pattern(&self) -> Result<(Vec<PathPattern>, StepName), BindError> {
         match self.url_mode() {
             UrlMode::Pattern => {
                 let tokens = P::tokenize_url(self.url())
@@ -139,17 +141,6 @@ impl<P: Protocol, T: FinalHandlerDef<P>> AccessPointDef<P, T> {
                 StepName::default(),
             )),
         }
-    }
-
-    pub(crate) fn into_parts(
-        self,
-    ) -> (
-        RouteAddress,
-        MWChain<P::Context>,
-        T,
-        ParamsClone,
-    ) {
-        (self.address, self.middlewares, self.handler, self.config)
     }
 }
 
@@ -184,4 +175,4 @@ impl<P: Protocol> Outpoint<P> {
     ) -> Self {
         Self::new(url, name, OutpointHandler::new(body))
     }
-} 
+}

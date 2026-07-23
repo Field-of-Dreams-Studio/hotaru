@@ -31,10 +31,18 @@ impl BindError {
         self
     }
 
-    pub fn route_name(&self) -> &str { &self.route_name }
-    pub fn route_url(&self) -> &str { &self.route_url }
-    pub fn source_error(&self) -> &UrlError { &self.source }
-    pub fn batch_index(&self) -> Option<usize> { self.batch_index }
+    pub fn route_name(&self) -> &str {
+        &self.route_name
+    }
+    pub fn route_url(&self) -> &str {
+        &self.route_url
+    }
+    pub fn source_error(&self) -> &UrlError {
+        &self.source
+    }
+    pub fn batch_index(&self) -> Option<usize> {
+        self.batch_index
+    }
 }
 
 impl core::fmt::Display for BindError {
@@ -58,4 +66,4 @@ impl core::error::Error for BindError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         Some(&self.source)
     }
-} 
+}

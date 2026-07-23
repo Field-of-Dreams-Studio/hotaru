@@ -1,7 +1,7 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
 use core::any::TypeId;
-use crate::prelude::Arc;
 
 use crate::{
     app::common::RuntimeConfig,
@@ -63,7 +63,9 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         };
 
         if let Some(handler) = selected {
-            handler.serve(runtime, reader, writer.into_buf_write(), meta).await;
+            handler
+                .serve(runtime, reader, writer.into_buf_write(), meta)
+                .await;
         } else {
             let _ = writer.shutdown().await;
         }
@@ -84,7 +86,9 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         };
 
         if let Some(handler) = selected {
-            handler.request(runtime, reader, writer.into_buf_write(), meta).await;
+            handler
+                .request(runtime, reader, writer.into_buf_write(), meta)
+                .await;
         } else {
             let _ = writer.shutdown().await;
         }

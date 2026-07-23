@@ -19,9 +19,9 @@
 //! wrapper should shrink to just the enum + `from`/`into` + the two
 //! dispatchers + `default_connection_timeout`.
 
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use crate::prelude::Arc;
 use core::any::TypeId;
 use core::time::Duration;
 
@@ -30,14 +30,14 @@ use crate::{
     connection::{ConnStream, HotaruRead, HotaruWrite, TransportSpec},
     executable::{
         ExecutableBinding,
-        def::{AccessPointDef, BindError, FinalHandlerDef, MWChain},
+        def::{AccessPointDef, BindError, FinalHandlerDef},
         entry::{ProtocolEntry, ProtocolEntryTrait},
         middleware::{AsyncMiddleware, AsyncMiddlewareChain},
         registry::ProtocolEntryRegistry,
     },
     extensions::ParamsClone,
     protocol::Protocol,
-    url::{PathPattern, UrlError, UrlRegistration, UrlRoot, node::StepName},
+    url::{UrlError, UrlRegistration, UrlRoot},
 };
 
 /// Optimization for single-protocol apps, which are common in practice.
@@ -175,55 +175,20 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
     /// the URL tree and the entry's `AccessPointTable`.
     ///
     /// Both pattern parsing (`url::parser::parse`) and literal splitting
-    /// are wrapper-level concerns done by `Server::url` / `Server::lit_url`
-    /// (and the `Client` mirrors) before reaching here.
-    pub fn register<P, N>(
-        &self,
-        name: N,
-        path: Vec<PathPattern>,
-        step_names: StepName,
-        executable: ExecutableBinding<P::Context>,
-        config: ParamsClone,
-    ) -> Result<UrlRegistration<P::Context, TS>, UrlError>
-    where
-        P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
-        N: Into<String>,
-    {
-        let entry = self.entry::<P>().ok_or(UrlError::ProtocolNotFound)?;
-        entry.register(name, path, step_names, executable, config)
-    } 
-
-    /// Compile an access-point definition and register the resulting binding.
+    /// are wrapper-level concerns done before reaching here.
     ///
-    /// URL parsing and middleware-slot resolution stay with their owning
-    /// definition types; this method supplies the registry-owned middleware
-    /// snapshot and registration operation.
-    pub(crate) fn compile_and_register<P, T>(
-        &self,
-        def: &AccessPointDef<P, T>,
-    ) -> Result<(), BindError>
+    /// Compile one `AccessPointDef` and register it against the matching
+    /// protocol entry. Lookup + delegate only: the real compile/register
+    /// invariant lives on `ProtocolEntry::register`.
+    pub(crate) fn register<P, H>(&self, def: &AccessPointDef<P, H>) -> Result<(), BindError>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
-        T: FinalHandlerDef<P>,
+        H: FinalHandlerDef<P>,
     {
-        let (path, step_names) = def.parse_url_pattern()?;
-        let inherited = self.get_protocol_middlewares::<P>();
-        let middlewares = def.middlewares().resolve(
-            &inherited,
-            def.handler().body_middleware(),
-        );
-        let binding = ExecutableBinding::new()
-            .with_handler(def.handler().final_handler())
-            .with_middlewares(middlewares);
-        self.register::<P, _>(
-            def.name(),
-            path,
-            step_names,
-            binding,
-            def.config().clone(),
-        )
-        .map(|_| ())
-        .map_err(|error| BindError::new(def.name(), def.url(), error))
+        let entry = self
+            .entry::<P>()
+            .ok_or_else(|| BindError::new(def.name(), def.url(), UrlError::ProtocolNotFound))?;
+        entry.register(def)
     }
 
     /// Merges two registry wrappers, re-optimizing Single/Multi afterwards.
@@ -377,7 +342,7 @@ mod tests {
         },
         executable::middleware::AsyncFinalHandler,
         protocol::{Channel, DefaultProtocolError, ProtocolFlow, ProtocolRole},
-        url::{PathPattern, UrlRoot},
+        url::{PathPattern, UrlRoot, node::StepName},
     };
 
     use super::*;
@@ -485,19 +450,17 @@ mod tests {
     }
 
     fn single<const N: u8>(route: &str, ap_name: &str) -> ProtocolRegistryKind<TestTransport> {
-        let kind = ProtocolRegistryKind::single(
-            TestProto::<N>,
-            Arc::new(UrlRoot::new()),
-            vec![],
-        );
-        kind.register::<TestProto<N>, _>(
-            ap_name,
-            vec![PathPattern::literal_path(route)],
-            StepName::default(),
-            binding_with_handler(),
-            ParamsClone::default(),
-        )
-        .unwrap();
+        let kind = ProtocolRegistryKind::single(TestProto::<N>, Arc::new(UrlRoot::new()), vec![]);
+        kind.entry::<TestProto<N>>()
+            .unwrap()
+            .register_internal(
+                ap_name,
+                vec![PathPattern::literal_path(route)],
+                StepName::default(),
+                binding_with_handler(),
+                ParamsClone::default(),
+            )
+            .unwrap();
         kind
     }
 
@@ -508,7 +471,9 @@ mod tests {
         let left = single::<0>("left", "shared");
         let right = single::<0>("right", "shared");
         right
-            .register::<TestProto<0>, _>(
+            .entry::<TestProto<0>>()
+            .unwrap()
+            .register_internal(
                 "extra",
                 vec![PathPattern::literal_path("extra")],
                 StepName::default(),

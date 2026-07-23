@@ -14,14 +14,14 @@ use core::cell::{Ref, RefCell, RefMut};
 
 // ============ Shared Pointer ============
 
+#[cfg(feature = "spawn_local_no_atomic")]
+pub use alloc::rc::Rc as Arc;
 /// Shared pointer alias used throughout Hotaru core.
 ///
 /// Normal shared builds use `Arc`. No-atomic local builds use `Rc`, because
 /// that mode intentionally avoids atomic shared ownership.
 #[cfg(not(feature = "spawn_local_no_atomic"))]
 pub use alloc::sync::Arc;
-#[cfg(feature = "spawn_local_no_atomic")]
-pub use alloc::rc::Rc as Arc;
 
 // ============ Concurrency Primitives ============
 

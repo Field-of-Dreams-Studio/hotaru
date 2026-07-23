@@ -1,7 +1,7 @@
-#[cfg(not(feature = "std"))]
-use crate::prelude::*;
 use super::super::pattern::PathPattern;
 use super::lexer::{RawToken, TypeKind};
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PatternError {

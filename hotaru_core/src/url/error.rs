@@ -3,7 +3,7 @@ use crate::prelude::*;
 use core::fmt;
 
 use super::PathPattern;
-use super::parser::PatternError; 
+use super::parser::PatternError;
 
 /// Errors produced by the URL tree during registration or traversal setup.
 #[derive(Debug, Clone, PartialEq)]
@@ -18,8 +18,8 @@ pub enum UrlError {
     NotImplemented(&'static str),
     /// No protocol of the requested type is registered in this registry.
     ProtocolNotFound,
-    /// Errors produced by the URL pattern parser during registration. 
-    ParseError(PatternError),   
+    /// Errors produced by the URL pattern parser during registration.
+    ParseError(PatternError),
 }
 
 impl fmt::Display for UrlError {
@@ -29,7 +29,7 @@ impl fmt::Display for UrlError {
                 write!(f, "child already exists: {}", pattern)
             }
             UrlError::ChildNotFound(pattern) => write!(f, "child not found: {}", pattern),
-            UrlError::InvalidPath(path) => write!(f, "invalid path: {}", path), 
+            UrlError::InvalidPath(path) => write!(f, "invalid path: {}", path),
             UrlError::DepthLimitExceeded { max, actual } => {
                 write!(f, "depth limit exceeded: max={}, actual={}", max, actual)
             }
@@ -46,5 +46,4 @@ impl From<PatternError> for UrlError {
     fn from(error: PatternError) -> Self {
         UrlError::ParseError(error)
     }
-} 
-
+}

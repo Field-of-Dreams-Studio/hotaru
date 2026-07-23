@@ -1,6 +1,6 @@
+use super::parser::PatternError;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use super::parser::PatternError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RawToken {
@@ -80,9 +80,9 @@ impl TypeKind {
             TypeKind::UInt => Some(r"[0-9]+"),
             TypeKind::Decimal => Some(r"-?[0-9]+(?:\.[0-9]+)?"),
             TypeKind::Str => Some(r"[^/]+"),
-            TypeKind::Uuid => Some(
-                r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
-            ),
+            TypeKind::Uuid => {
+                Some(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+            }
             TypeKind::Path => None, // special: handled outside regex-building (e.g., greedy capture)
         }
     }

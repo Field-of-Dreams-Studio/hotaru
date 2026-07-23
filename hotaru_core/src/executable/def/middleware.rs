@@ -68,19 +68,23 @@ impl<C: RequestContext> MWChain<C> {
     }
 
     pub(crate) fn remove_inherit(&mut self) {
-        self.0
-            .retain(|slot| !matches!(slot, MWSlot::Inherit));
+        self.0.retain(|slot| !matches!(slot, MWSlot::Inherit));
     }
 
-    pub(crate) fn as_slice(&self) -> &[MWSlot<C>] {
+    pub fn as_slice(&self) -> &[MWSlot<C>] {
         &self.0
     }
 
-    /// Consume these slots and resolve every `Inherit` entry against one
-    /// captured root-middleware snapshot. An optional flavour-specific
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Resolve every `Inherit` slot against one captured root-middleware
+    /// snapshot, cloning `Arc`s only. Borrowed so one definition can be
+    /// compiled into many registries. An optional flavour-specific
     /// middleware is always prepended.
     pub(crate) fn resolve(
-        self,
+        &self,
         inherited: &[Arc<dyn AsyncMiddleware<C>>],
         prefix: Option<Arc<dyn AsyncMiddleware<C>>>,
     ) -> AsyncMiddlewareChain<C> {
@@ -90,9 +94,9 @@ impl<C: RequestContext> MWChain<C> {
             chain.push(prefix);
         }
 
-        for slot in self.0 {
+        for slot in self.as_slice() {
             match slot {
-                MWSlot::Concrete(middleware) => chain.push(middleware),
+                MWSlot::Concrete(middleware) => chain.push(middleware.clone()),
                 MWSlot::Inherit => chain.extend(inherited.iter().cloned()),
             }
         }

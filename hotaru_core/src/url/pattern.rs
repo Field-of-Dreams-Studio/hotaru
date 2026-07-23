@@ -1,7 +1,7 @@
-#[cfg(not(feature = "std"))]
-use crate::prelude::*;
 #[cfg(any(feature = "full_regex", feature = "lite_regex"))]
 use crate::prelude::Arc;
+#[cfg(not(feature = "std"))]
+use crate::prelude::*;
 
 use crate::debug_warn;
 
@@ -44,11 +44,7 @@ impl RegexSegment {
             let re = match CompiledRegex::new(&anchored) {
                 Ok(re) => Some(Arc::new(re)),
                 Err(_err) => {
-                    debug_warn!(
-                        "PathPattern: failed to compile regex {:?}: {}",
-                        src,
-                        _err
-                    );
+                    debug_warn!("PathPattern: failed to compile regex {:?}: {}", src, _err);
                     None
                 }
             };
@@ -298,10 +294,7 @@ mod tests {
     /// The empty-string literal is the root-endpoint case — important for
     /// `UrlRegistration::Root` / `register_lit_named("", ...)` workflows.
     fn literal_empty_string_is_equal_to_itself() {
-        assert_eq!(
-            PathPattern::literal_path(""),
-            PathPattern::literal_path(""),
-        );
+        assert_eq!(PathPattern::literal_path(""), PathPattern::literal_path(""),);
     }
 
     #[test]

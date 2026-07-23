@@ -1,7 +1,7 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
 use akari::hash::HashMap;
-use crate::prelude::Arc;
 use core::marker::PhantomData;
 
 use crate::{
@@ -487,8 +487,8 @@ impl<C: RequestContext, TS: TransportSpec> Clone for RegexChild<C, TS> {
 
 #[cfg(test)]
 mod tests {
-    use akari::hash::HashMap;
     use crate::prelude::Arc;
+    use akari::hash::HashMap;
 
     use crate::{
         connection::test_support::TestTransport,
