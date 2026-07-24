@@ -90,9 +90,12 @@ where
         self.config.set_max_connection_time(max_connection_time);
     }
 
-    pub fn set_max_frame_process_time(&mut self, max_frame_process_time: usize) {
-        self.config
-            .set_max_frame_process_time(max_frame_process_time);
+    pub fn set_max_frame_process_timeout(&mut self, timeout: TimeoutSetting) {
+        self.config.set_max_frame_process_timeout(timeout);
+    }
+
+    pub fn get_max_frame_process_timeout(&self) -> TimeoutSetting {
+        self.config.max_frame_process_timeout()
     }
 
     /// Get the default protocol type (first registered protocol)

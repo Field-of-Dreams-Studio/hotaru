@@ -3,6 +3,7 @@ use crate::prelude::Arc;
 use crate::prelude::*;
 use core::marker::PhantomData;
 
+use crate::app::blueprint::{Blueprint, BlueprintError, ConfiguredBlueprint};
 use crate::{
     app::{
         instance::{
@@ -37,7 +38,12 @@ pub struct AppBuilder<R, TS: TransportSpec, Rt: RuntimeSpec> {
     mode: Option<RunMode>,
     worker: Option<usize>,
     max_connection_time: Option<TimeoutSetting>,
-    max_frame_process_time: Option<usize>,
+    /// Server-side: budget for processing one request/frame inside a live
+    /// connection. Consumed by [`ServerRole::build`]; ignored by clients.
+    max_frame_process_timeout: Option<TimeoutSetting>,
+    /// Client-side: end-to-end request timeout. Consumed by
+    /// [`ClientRole::build`]; ignored by servers.
+    request_timeout: Option<TimeoutSetting>,
     config: Params,
     statics: Locals,
     _role: PhantomData<R>,
@@ -53,7 +59,8 @@ impl<R, TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<R, TS, Rt> {
             mode: None,
             worker: None,
             max_connection_time: None,
-            max_frame_process_time: None,
+            max_frame_process_timeout: None,
+            request_timeout: None,
             config: Params::new(),
             statics: Locals::new(),
             _role: PhantomData,
@@ -115,8 +122,15 @@ impl<R, TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<R, TS, Rt> {
         self
     }
 
-    pub fn max_frame_process_time(mut self, max_frame_process_time: usize) -> Self {
-        self.max_frame_process_time = Some(max_frame_process_time);
+    /// Server-side per-frame processing budget. Ignored by `ClientRole::build`.
+    pub fn max_frame_process_timeout(mut self, timeout: TimeoutSetting) -> Self {
+        self.max_frame_process_timeout = Some(timeout);
+        self
+    }
+
+    /// Client-side end-to-end request timeout. Ignored by `ServerRole::build`.
+    pub fn request_timeout(mut self, timeout: TimeoutSetting) -> Self {
+        self.request_timeout = Some(timeout);
         self
     }
 
@@ -143,6 +157,55 @@ impl<R, TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<R, TS, Rt> {
         self.config.set(value);
         self
     }
+
+    // -----------------------------------------------------------------------
+    // Read-only accessors.
+    //
+    // Setters share the field name (`.mode(...)`, `.worker(...)`, …) so
+    // getters take the `get_` prefix. Same convention as `App::get_*`.
+    // Options are returned as-is: `None` means "no explicit value yet; the
+    // role's `build()` will fall back to its own default."
+    // -----------------------------------------------------------------------
+
+    pub fn get_registry(&self) -> Option<&ProtocolEntryRegistry<TS>> {
+        self.registry.as_ref()
+    }
+
+    pub fn get_binding(&self) -> Option<&<TS::Inbound as Inbound>::BindTarget> {
+        self.binding.as_ref()
+    }
+
+    pub fn get_target(&self) -> Option<&<TS::Outbound as Outbound>::ConnectTarget> {
+        self.target.as_ref()
+    }
+
+    pub fn get_mode(&self) -> Option<&RunMode> {
+        self.mode.as_ref()
+    }
+
+    pub fn get_worker(&self) -> Option<usize> {
+        self.worker
+    }
+
+    pub fn get_max_connection_time(&self) -> Option<TimeoutSetting> {
+        self.max_connection_time
+    }
+
+    pub fn get_max_frame_process_timeout(&self) -> Option<TimeoutSetting> {
+        self.max_frame_process_timeout
+    }
+
+    pub fn get_request_timeout(&self) -> Option<TimeoutSetting> {
+        self.request_timeout
+    }
+
+    pub fn get_config(&self) -> &Params {
+        &self.config
+    }
+
+    pub fn get_statics(&self) -> &Locals {
+        &self.statics
+    }
 }
 
 impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ServerRole, TS, Rt> {
@@ -163,12 +226,14 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ServerRole, TS, Rt> {
         let mode = self.mode.unwrap_or(RunMode::Development);
         let worker = self.worker.unwrap_or_else(num_cpus);
         let max_connection_time = self.max_connection_time.unwrap_or(TimeoutSetting::Inherit);
-        let max_frame_process_time = self.max_frame_process_time.unwrap_or(5);
+        let max_frame_process_timeout = self
+            .max_frame_process_timeout
+            .unwrap_or(TimeoutSetting::Seconds(5));
         let runtime = RuntimeConfig::from_parts(mode, self.config, self.statics);
         let config = OperationalConfig::from_server_parts(
             worker,
             max_connection_time,
-            max_frame_process_time,
+            max_frame_process_timeout,
         );
         let runtime = Arc::new(runtime);
 
@@ -186,6 +251,39 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ServerRole, TS, Rt> {
         });
 
         app
+    }
+
+    /// Materializes the Blueprint, then installs or left-biased-merges it.
+    pub fn apply(mut self, blueprint: &Blueprint<TS, InboundOnly>) -> Result<Self, BlueprintError> {
+        let materialized_blueprint_registry = blueprint.materialize_registry()?;
+        match self.registry.as_mut() {
+            Some(existing) => existing.combine(materialized_blueprint_registry),
+            None => self.registry = Some(materialized_blueprint_registry),
+        }
+        Ok(self)
+    }
+
+    /// `apply` plus defaults written only into unset builder fields.
+    pub fn apply_configured(
+        mut self,
+        configured: &ConfiguredBlueprint<TS, InboundOnly>,
+    ) -> Result<Self, BlueprintError> {
+        self = self.apply(configured.blueprint())?;
+        if self.mode.is_none() {
+            self.mode = configured.mode().cloned();
+        }
+        if let Some(operational) = configured.operational() {
+            if self.worker.is_none() {
+                self.worker = Some(operational.worker());
+            }
+            if self.max_connection_time.is_none() {
+                self.max_connection_time = Some(operational.max_connection_time());
+            }
+            if self.max_frame_process_timeout.is_none() {
+                self.max_frame_process_timeout = Some(operational.max_frame_process_timeout());
+            }
+        }
+        Ok(self)
     }
 }
 
@@ -208,10 +306,7 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ClientRole, TS, Rt> {
         let connect_timeout = self
             .max_connection_time
             .unwrap_or(TimeoutSetting::Seconds(30));
-        let request_timeout = self
-            .max_frame_process_time
-            .map(|n| TimeoutSetting::Seconds(n))
-            .unwrap_or(TimeoutSetting::Seconds(30));
+        let request_timeout = self.request_timeout.unwrap_or(TimeoutSetting::Seconds(5));
         let runtime = Arc::new(RuntimeConfig::from_parts(mode, self.config, self.statics));
         let config = OperationalConfig::from_client_parts(connect_timeout, request_timeout);
 
@@ -227,6 +322,39 @@ impl<TS: TransportSpec, Rt: RuntimeSpec> AppBuilder<ClientRole, TS, Rt> {
             _rt: PhantomData,
             _target: PhantomData,
         })
+    }
+
+    /// Materializes the Blueprint, then installs or left-biased-merges it.
+    pub fn apply(
+        mut self,
+        blueprint: &Blueprint<TS, OutboundOnly>,
+    ) -> Result<Self, BlueprintError> {
+        let materialized_blueprint_registry = blueprint.materialize_registry()?;
+        match self.registry.as_mut() {
+            Some(existing) => existing.combine(materialized_blueprint_registry),
+            None => self.registry = Some(materialized_blueprint_registry),
+        }
+        Ok(self)
+    }
+
+    /// `apply` plus defaults written only into unset builder fields.
+    pub fn apply_configured(
+        mut self,
+        configured: &ConfiguredBlueprint<TS, OutboundOnly>,
+    ) -> Result<Self, BlueprintError> {
+        self = self.apply(configured.blueprint())?;
+        if self.mode.is_none() {
+            self.mode = configured.mode().cloned();
+        }
+        if let Some(operational) = configured.operational() {
+            if self.max_connection_time.is_none() {
+                self.max_connection_time = Some(operational.connect_timeout());
+            }
+            if self.request_timeout.is_none() {
+                self.request_timeout = Some(operational.request_timeout());
+            }
+        }
+        Ok(self)
     }
 }
 

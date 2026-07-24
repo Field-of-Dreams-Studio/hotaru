@@ -232,6 +232,12 @@ where
             return false;
         };
         self.root_handler.combine(&other.root_handler);
+        // TODO(blueprint-merge): URL-tree adoption and AP-name adoption are
+        // currently independent. When `other` loses a path collision but its
+        // AP name is new, copying that AccessPoint retains an Arc to a live
+        // but non-canonical node outside `self.root_handler`. Re-point adopted
+        // names at the canonical surviving node, matching normal
+        // register/rebind behavior. Characterized by Blueprint test T20.
         for name in other.access_points.names() {
             if !self.access_points.contains(&name) {
                 if let Some(ap) = other.access_points.get(&name) {

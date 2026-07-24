@@ -538,7 +538,7 @@ fn bind_splices_every_inherit_slot_in_place() {
         .with_middleware(middleware("route-b"))
         .with_inherit();
 
-    app.bind(def).unwrap();
+    app.insert(def).unwrap();
 
     let access_point = app
         .registry
@@ -562,7 +562,7 @@ fn outpoint_body_survives_an_empty_user_chain() {
         .with_url_mode(UrlMode::Literal)
         .with_middlewares(Vec::new());
 
-    app.bind(def).unwrap();
+    app.insert(def).unwrap();
 
     let node = app
         .registry
@@ -582,7 +582,7 @@ fn bind_error_keeps_route_identity() {
     let app = server(Vec::new());
 
     let error = app
-        .bind(endpoint("/users/<int:id", "broken-user"))
+        .insert(endpoint("/users/<int:id", "broken-user"))
         .expect_err("malformed route must fail to bind");
 
     assert_eq!(error.route_name(), "broken-user");
@@ -600,7 +600,7 @@ fn bind_all_stops_at_first_error_and_reports_its_index() {
     ];
 
     let error = app
-        .bind_all(defs)
+        .extend(defs)
         .expect_err("the malformed middle definition must stop the batch");
 
     assert_eq!(error.batch_index(), Some(1));
@@ -614,19 +614,19 @@ fn bind_all_stops_at_first_error_and_reports_its_index() {
 #[tokio::test]
 async fn same_path_rebind_is_last_wins_and_refreshes_named_entries() {
     let app = server(Vec::new());
-    app.bind(
+    app.insert(
         endpoint("/same", "first")
             .no_inherit()
             .with_middleware(middleware("old")),
     )
     .unwrap();
-    app.bind(
+    app.insert(
         endpoint("/same", "second")
             .no_inherit()
             .with_middleware(middleware("new")),
     )
     .unwrap();
-    app.bind(
+    app.insert(
         endpoint("/same", "second")
             .no_inherit()
             .with_middleware(middleware("newest")),

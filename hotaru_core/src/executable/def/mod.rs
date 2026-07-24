@@ -3,9 +3,10 @@
 //! `ProtocolDef<P>` describes one protocol-entry recipe. Route flavour is
 //! encoded at the type level via `FinalHandlerDef<P>`:
 //! `Endpoint<P>` = `AccessPointDef<P, EndpointHandler<P>>`, `Outpoint<P>` =
-//! `AccessPointDef<P, OutpointHandler<P>>`. `App::bind` accepts only the
-//! flavours its role permits (`Server` = endpoints, `Client` = outpoints,
-//! `Gateway` = both). Mismatches fail to compile.
+//! `AccessPointDef<P, OutpointHandler<P>>`. `App::insert` / `App::extend`
+//! (and the `App::bind(constructor)` wrapper) accept only the flavours their
+//! role permits (`Server` = endpoints, `Client` = outpoints, `Gateway` =
+//! both). Mismatches fail to compile.
 
 mod access_point;
 mod error;

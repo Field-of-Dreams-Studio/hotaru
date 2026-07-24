@@ -34,8 +34,8 @@ fn main() {
         )))
         .build();
 
-    app.bind(index_route()).expect("index route must bind");
-    app.bind_all([hello_route(), health_route()])
+    app.insert(index_route()).expect("index route must bind");
+    app.extend([hello_route(), health_route()])
         .expect("API routes must bind");
 
     println!("API-only server listening on http://127.0.0.1:3010");
@@ -60,7 +60,7 @@ fn index_handler(
     Box::pin(async {
         normal_response(
             200u16,
-            "Routes were registered through Endpoint::endpoint and App::bind.\n",
+            "Routes were registered through Endpoint::endpoint and App::insert.\n",
         )
     })
 }

@@ -1,8 +1,8 @@
 //! Reusable protocol and access-point definitions.
 //!
-//! Skeleton stage: this module currently declares the storage data model
-//! and its re-exports only. Behavioral `impl` blocks land one at a time in
-//! the following segments.
+//! A Blueprint retains typed access-point definitions grouped by concrete
+//! protocol and AP flavour. It can be cloned cheaply and materialized
+//! repeatedly into independent protocol registries.
 
 mod access_points;
 mod blueprint;
@@ -11,6 +11,9 @@ mod erased;
 mod error;
 mod homo;
 mod target;
+
+#[cfg(test)]
+mod test;
 
 pub use crate::executable::def::ProtocolDef;
 pub use access_points::AccessPoints;

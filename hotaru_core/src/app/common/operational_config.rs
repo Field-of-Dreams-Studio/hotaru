@@ -44,7 +44,7 @@ impl TimeoutSetting {
 pub struct OperationalConfig {
     worker: usize,
     max_connection_time: TimeoutSetting,
-    max_frame_process_time: usize,
+    max_frame_process_timeout: TimeoutSetting,
     connect_timeout: TimeoutSetting,
     request_timeout: TimeoutSetting,
 }
@@ -54,9 +54,9 @@ impl Default for OperationalConfig {
         Self {
             worker: 1,
             max_connection_time: TimeoutSetting::Seconds(30),
-            max_frame_process_time: 5,
+            max_frame_process_timeout: TimeoutSetting::Seconds(5),
             connect_timeout: TimeoutSetting::Seconds(30),
-            request_timeout: TimeoutSetting::Seconds(30),
+            request_timeout: TimeoutSetting::Seconds(5),
         }
     }
 }
@@ -71,14 +71,14 @@ impl OperationalConfig {
     pub fn from_parts(
         worker: usize,
         max_connection_time: TimeoutSetting,
-        max_frame_process_time: usize,
+        max_frame_process_timeout: TimeoutSetting,
         connect_timeout: TimeoutSetting,
         request_timeout: TimeoutSetting,
     ) -> Self {
         Self {
             worker,
             max_connection_time,
-            max_frame_process_time,
+            max_frame_process_timeout,
             connect_timeout,
             request_timeout,
         }
@@ -88,12 +88,12 @@ impl OperationalConfig {
     pub fn from_server_parts(
         worker: usize,
         max_connection_time: TimeoutSetting,
-        max_frame_process_time: usize,
+        max_frame_process_timeout: TimeoutSetting,
     ) -> Self {
         Self {
             worker,
             max_connection_time,
-            max_frame_process_time,
+            max_frame_process_timeout,
             ..Self::default()
         }
     }
@@ -111,11 +111,19 @@ impl OperationalConfig {
     }
 
     /// Consumes the config and returns all stored parts.
-    pub fn into_parts(self) -> (usize, TimeoutSetting, usize, TimeoutSetting, TimeoutSetting) {
+    pub fn into_parts(
+        self,
+    ) -> (
+        usize,
+        TimeoutSetting,
+        TimeoutSetting,
+        TimeoutSetting,
+        TimeoutSetting,
+    ) {
         (
             self.worker,
             self.max_connection_time,
-            self.max_frame_process_time,
+            self.max_frame_process_timeout,
             self.connect_timeout,
             self.request_timeout,
         )
@@ -131,9 +139,9 @@ impl OperationalConfig {
         self.max_connection_time
     }
 
-    /// Returns the maximum frame processing time in seconds.
-    pub fn max_frame_process_time(&self) -> usize {
-        self.max_frame_process_time
+    /// Returns the lossless frame-processing timeout setting.
+    pub fn max_frame_process_timeout(&self) -> TimeoutSetting {
+        self.max_frame_process_timeout
     }
 
     /// Returns the outbound connect timeout setting.
@@ -156,9 +164,9 @@ impl OperationalConfig {
         self.max_connection_time = max_connection_time;
     }
 
-    /// Replaces the maximum frame processing time in seconds.
-    pub fn set_max_frame_process_time(&mut self, max_frame_process_time: usize) {
-        self.max_frame_process_time = max_frame_process_time;
+    /// Replaces the lossless frame-processing timeout setting.
+    pub fn set_max_frame_process_timeout(&mut self, timeout: TimeoutSetting) {
+        self.max_frame_process_timeout = timeout;
     }
 
     /// Replaces the outbound connect timeout setting.
@@ -174,16 +182,15 @@ impl OperationalConfig {
     /// Merges two configs, keeping the stricter timeout of each pair.
     ///
     /// - Timeout fields delegate to [`TimeoutSetting::combine`].
-    /// - `max_frame_process_time` takes the smaller value (tighter deadline wins).
     /// - `worker` takes the larger value: it is a capacity request, not a constraint,
     ///   so the merged config must satisfy whichever caller asked for more.
     pub fn combine(self, other: Self) -> Self {
         Self {
             worker: self.worker.max(other.worker),
             max_connection_time: self.max_connection_time.combine(other.max_connection_time),
-            max_frame_process_time: self
-                .max_frame_process_time
-                .min(other.max_frame_process_time),
+            max_frame_process_timeout: self
+                .max_frame_process_timeout
+                .combine(other.max_frame_process_timeout),
             connect_timeout: self.connect_timeout.combine(other.connect_timeout),
             request_timeout: self.request_timeout.combine(other.request_timeout),
         }
@@ -235,14 +242,14 @@ mod tests {
         let a = OperationalConfig::from_parts(
             2,
             TimeoutSetting::Seconds(60),
-            10,
+            TimeoutSetting::Seconds(10),
             TimeoutSetting::Inherit,
             TimeoutSetting::Seconds(20),
         );
         let b = OperationalConfig::from_parts(
             4,
             TimeoutSetting::Seconds(15),
-            3,
+            TimeoutSetting::Seconds(3),
             TimeoutSetting::Seconds(8),
             TimeoutSetting::Disabled,
         );
@@ -250,10 +257,12 @@ mod tests {
         let merged = a.combine(b);
 
         assert_eq!(merged.worker(), 4, "worker takes max (capacity)");
-        assert_eq!(
-            merged.max_frame_process_time(),
-            3,
-            "frame time takes min (tighter deadline)"
+        assert!(
+            matches!(
+                merged.max_frame_process_timeout(),
+                TimeoutSetting::Fixed(d) if d == Duration::from_secs(3)
+            ),
+            "frame timeout delegates to TimeoutSetting::combine (tighter deadline wins)"
         );
         assert!(matches!(
             merged.max_connection_time(),
