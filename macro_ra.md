@@ -170,4 +170,4 @@ We are a small team building something ambitious. If you are interested in:
 - Web framework internals
 - Or just want to debate syntax decisions with us
 
-We would love to hear from you. Check out our GitHub at https://github.com/Field-of-Dreams-Studio/hotaru or open an issue to start a conversation.
+We would love to hear from you. Check out our GitHub at https://github.com/Field-of-Dream-Studio/hotaru or open an issue to start a conversation.

@@ -1,18 +1,18 @@
 [package]
 name = "hotaru_tls"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "TLS transport for the Hotaru framework"
 license = "MIT"
-repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
+repository = "https://github.com/Field-of-Dream-Studio/hotaru"
 homepage = "https://hotaru.rs"
 categories = ["network-programming", "cryptography", "asynchronous"]
 keywords = ["hotaru", "tls", "https", "rustls", "async"]
 
 [dependencies]
-hotaru_core = { version = "=0.8.3", path = "../hotaru_core" }
-hotaru_io_tokio = { version = "=0.8.3", path = "../hotaru_io_tokio" }
+hotaru_core = { version = "=0.8.4", path = "../hotaru_core" }
+hotaru_io_tokio = { version = "=0.8.4", path = "../hotaru_io_tokio" }
 tokio = { version = "1.28", features = ["full"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
@@ -22,14 +22,11 @@ webpki-roots = "1"
 [features]
 default = []
 
+# Hotaru TLS is currently Tokio/std-only; embedded, futures-io, embedded-io, and spawn-local modes are not supported.
 tokio = ["hotaru_core/std", "hotaru_core/spawn_send", "hotaru_io_tokio/std"]
 std = ["hotaru_core/std"]
-embedded = ["hotaru_core/embedded"]
-io_futures = []
 io_tokio = ["hotaru_io_tokio/std"]
-io_embedded = []
 spawn_send = ["hotaru_core/spawn_send"]
-spawn_local = ["hotaru_core/spawn_local"]
 
 [dev-dependencies]
 rcgen = "0.13"

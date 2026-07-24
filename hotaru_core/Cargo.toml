@@ -1,11 +1,11 @@
 [package]
 name = "hotaru_core"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "Protocol-neutral routing, runtime, and transport traits for the Hotaru web framework (no_std + alloc)"
 license = "MIT"
-repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
+repository = "https://github.com/Field-of-Dream-Studio/hotaru"
 homepage = "https://hotaru.rs"
 categories = ["network-programming", "web-programming", "asynchronous", "no-std"]
 keywords = ["web-framework", "hotaru", "async", "router", "no-std"]
@@ -14,45 +14,38 @@ keywords = ["web-framework", "hotaru", "async", "router", "no-std"]
 akari = { version = "0.2.8", default-features = false, features = ["dynamic", "extension", "object_macro"] }
 parking_lot = { version = "0.12", optional = true }
 spin = { version = "0.12", default-features = false, features = ["mutex", "spin_mutex", "rwlock"], optional = true }
-av = "0.1"
-
-# Regex — plain `regex` under both `full` and `lite`/`embedded`. Since
-# `regex` 1.9 the crate has genuine `no_std + alloc` support when
-# `default-features = false`. The `full` feature layer adds Unicode
-# tables on top (`regex/unicode` — larger binary, needed for `\p{...}`
-# style classes). `regex-lite` was tried but its 0.1.x line still
-# hard-requires `std` via a compile_error, so it can't run bare-metal.
 regex = { version = "1.12", default-features = false, features = [
     "perf-dfa",
     "perf-onepass",
     "perf-backtrack",
     "perf-inline",
     "perf-cache",
-] }
+], optional = true }
+av = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread"] }
 
 [features]
-default = ["full", "std", "spawn_send"]
+default = ["full_regex", "std", "spawn_send"]
 
-# Feature-set flavour. Exactly one of `full` / `lite` should be active.
-# `full` layers `regex/unicode` on top for `\p{...}` support (larger
-# binary). `lite` skips unicode tables — the `regex` crate stays but
-# only its perf features + core matcher compile in.
-# `full` is purely a regex/unicode size choice. It deliberately does NOT
-# pull `akari/full`, because that enables akari's std-only template engine
-# (`hotaru_core` never uses `TemplateManager`), which breaks no_std builds.
-full = ["regex/unicode"]
-lite = ["akari/no_std"]
+# Regex style (additive): `lite_regex` enables the `regex` backend;
+# `full_regex` also adds Unicode tables. If both are on, `full_regex`
+# wins. If neither is on, routing uses Hotaru's own stub (regex segments
+# compile but never match) and the `regex` dep is dropped.
+lite_regex = ["dep:regex"]
+full_regex = ["dep:regex", "regex/unicode"]
 dev-log = []
 
-# Platform/sync axis: choose exactly one (`std` uses parking_lot, `embedded` uses spin).
+# Platform/sync axis (exactly one): `std` uses parking_lot, `embedded` uses no_std.
 std = ["dep:parking_lot"]
-# `embedded` is the no_std platform; akari must go no_std with it so its
-# `alloc` prelude (`String`/`format!`/…) is available regardless of `full`/`lite`.
-embedded = ["dep:spin", "akari/no_std"]
+embedded = ["akari/no_std"]
+spin = ["dep:spin"]
 
 # Task-mobility axis: multi-thread/executor-moving tasks use `spawn_send`; single-thread/local tasks use `spawn_local`.
-spawn_send = []
+spawn_send = ["spin"]
 spawn_local = []
+
+# Refinements of `spawn_local` for embedded targets; no-atomic uses Hotaru's RefCell locks.
+spawn_local_atomic = ["spawn_local", "spin"]
+spawn_local_no_atomic = ["spawn_local"]

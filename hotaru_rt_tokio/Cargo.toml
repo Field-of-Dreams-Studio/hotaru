@@ -1,17 +1,17 @@
 [package]
 name = "hotaru_rt_tokio"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 authors = ["Redstone <redstone@fds.moe>"]
 description = "Tokio runtime backend for Hotaru"
 license = "MIT"
-repository = "https://github.com/Field-of-Dreams-Studio/hotaru"
+repository = "https://github.com/Field-of-Dream-Studio/hotaru"
 homepage = "https://hotaru.rs"
 categories = ["asynchronous", "network-programming"]
 keywords = ["hotaru", "tokio", "runtime", "async", "backend"]
 
 [dependencies]
-hotaru_core = { path = "../hotaru_core", version = "=0.8.3", default-features = false }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.4", default-features = false }
 tokio = { version = "1.28", features = ["full"] }
 
 [features]

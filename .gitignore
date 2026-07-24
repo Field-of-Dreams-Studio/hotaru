@@ -4,6 +4,8 @@
 debug/
 release/
 
+**/latex_target/ 
+
 # Cargo lock file
 Cargo.lock
 
@@ -20,6 +22,7 @@ hotaru_core/OUTPOINT_TEAM_PLAN.md
 hotaru_core/QA_FINDINGS.md
 hotaru_core/no_std_plan.md
 hotaru_core/endpoint_patch.md
+hotaru_core/trans_update.md
 htji3e/
 proposal/*
 

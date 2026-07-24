@@ -36,4 +36,4 @@ impl Stream for () {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
-} 
+}

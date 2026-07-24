@@ -1,8 +1,8 @@
-use std::iter::Peekable;
+use core::iter::Peekable;
 
 use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
-use crate::helper::generate_compile_error;
+use crate::helper::{expect_end, generate_compile_error};
 
 #[derive(Clone)]
 pub struct OuterAttr {
@@ -46,12 +46,80 @@ impl OuterAttr {
         }
     }
 
+    pub(crate) fn remove_unique_inner(
+        &mut self,
+        name: &str,
+    ) -> Result<Option<TokenStream>, TokenStream> {
+        let matching: Vec<_> = self
+            .attrs
+            .iter()
+            .enumerate()
+            .filter_map(|(index, attr)| attr_is_named(attr, name).then_some(index))
+            .collect();
+
+        if let Some(second) = matching.get(1).copied() {
+            let span = self.attrs[second]
+                .clone()
+                .into_iter()
+                .next()
+                .map(|token| token.span())
+                .unwrap_or_else(Span::call_site);
+            return Err(generate_compile_error(
+                span,
+                &format!("duplicate `#[{name}(...)]` attribute"),
+            ));
+        }
+
+        let Some(index) = matching.first().copied() else {
+            return Ok(None);
+        };
+        let attr = self.attrs.remove(index);
+        let mut tokens = attr.into_iter().peekable();
+        tokens.next();
+
+        let inner = match tokens.next() {
+            Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis => {
+                group.stream()
+            }
+            Some(token) => {
+                return Err(generate_compile_error(
+                    token.span(),
+                    &format!("expected `#[{name}(...)]`"),
+                ));
+            }
+            None => {
+                return Err(generate_compile_error(
+                    Span::call_site(),
+                    &format!("expected `#[{name}(...)]`"),
+                ));
+            }
+        };
+
+        expect_end(
+            &mut tokens,
+            format!("unexpected token after `{name}` attribute arguments"),
+        )?;
+        Ok(Some(inner))
+    }
+
+    /// Re-emit only conditions that decide whether generated companion items exist.
+    pub(crate) fn reform_cfg(&self) -> TokenStream {
+        Self::new(
+            self.attrs
+                .iter()
+                .filter(|attr| attr_is_named(attr, "cfg") || attr_is_named(attr, "cfg_attr"))
+                .cloned()
+                .collect(),
+        )
+        .reform()
+    }
+
     pub fn get_inners<T: AsRef<str>>(
         tokens: TokenStream,
         error: T,
     ) -> Result<TokenStream, TokenStream> {
         let mut iter = tokens.into_iter().peekable();
-        iter.next(); // consume ident 
+        iter.next(); // consume ident
         match iter.next() {
             Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Parenthesis => Ok(g.stream()),
             Some(tt) => Err(generate_compile_error(tt.span(), error.as_ref())),
@@ -101,6 +169,13 @@ impl OuterAttr {
 
         tokens
     }
+}
+
+fn attr_is_named(attr: &TokenStream, name: &str) -> bool {
+    matches!(
+        attr.clone().into_iter().next(),
+        Some(TokenTree::Ident(ident)) if ident.to_string() == name
+    )
 }
 
 /// Parses outer attributes (e.g., `#[attr]`) from the start of the token stream.
@@ -156,7 +231,7 @@ pub fn parse_outer_attrs(
 
 #[cfg(test)]
 mod tests {
-    use std::iter::Peekable;
+    use core::iter::Peekable;
 
     use proc_macro2::{
         Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree,
@@ -338,7 +413,7 @@ fn split_top_level_until_comma(input: TokenStream) -> Vec<TokenStream> {
                 next_stream = TokenStream::new();
             }
             Some(tt) => {
-                next_stream.extend(std::iter::once(tt));
+                next_stream.extend(core::iter::once(tt));
             }
             None => break,
         }

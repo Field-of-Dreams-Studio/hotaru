@@ -2,20 +2,26 @@
 //! `Client`, the `endpoint!` / `outpoint!` / `middleware!` macros, the
 //! lazy-static `S*` aliases, and the core protocol traits.
 
-// `EmbeddedIo` is not surfaced through the umbrella in 0.8.x — `hotaru` is
-// std-only. For no_std, use `hotaru_core` + `hotaru_io_embedded` directly.
-// #[cfg(feature = "io_embedded")]
-// pub use crate::EmbeddedIo;
 #[cfg(feature = "io_futures")]
 pub use crate::FuturesIo;
+#[cfg(feature = "io_embedded")]
+pub use crate::EmbeddedIo;
 pub use crate::PathPattern;
 #[cfg(feature = "tokio")]
 pub use crate::TokioRuntime;
 pub use crate::Url;
 pub use crate::Value;
 pub use crate::object;
+
+#[cfg(feature = "embedded")]
+pub use crate::akari::prelude::*;
+
 pub use crate::{AnyPath, AnyUrl, LitUrl, RegUrl, TrailingSlash};
-pub use crate::{Client, RunMode, Server, TimeoutSetting};
+pub use crate::{AccessPointDef, BindError, Endpoint, MWChain, MWSlot, Outpoint, UrlMode};
+pub use crate::{
+    AppInUse, Blueprint, BlueprintError, Both, Client, ConfiguredBlueprint, Gateway, InboundOnly,
+    OutboundOnly, RunMode, Server, TimeoutSetting,
+};
 pub use crate::{Inbound, Outbound};
 pub use crate::{
     ProtocolHandlerBuilder as ProtocolBuilder, ProtocolRegistryBuilder as HandlerBuilder,
@@ -23,7 +29,6 @@ pub use crate::{
 };
 #[cfg(feature = "io_tokio")]
 pub use crate::{TcpTransport, TokioIo};
-pub use once_cell::sync::Lazy;
 
 // Core protocol traits (protocol-agnostic)
 pub use crate::{
@@ -35,6 +40,7 @@ pub use crate::call;
 pub use crate::endpoint;
 pub use crate::middleware;
 pub use crate::outpoint;
+pub use crate::{params, params_clone};
 pub use crate::run;
 pub use crate::{LClient, LPattern, LServer, LUrl};
 
@@ -51,30 +57,45 @@ pub use crate::ahttpm::akari_json;
 pub use crate::ahttpm::akari_render;
 pub use crate::{Locals, LocalsClone, Params, ParamsClone}; // Always keep this in prelude
 
-pub use std::sync::Arc;
-pub use std::thread::sleep;
-pub use std::time::Duration;
-#[cfg(feature = "tokio")]
-pub use tokio;
+// Portable across std/no_std: `Arc` routes through hotaru_core's marker
+// alias (which flips to `alloc::rc::Rc` under `spawn_local_no_atomic`);
+// `Duration` comes from `core::time`, which is always available.
+pub use core::time::Duration;
+pub use hotaru_core::marker::Arc;
 
-/// Lazy-static `Arc<Server<TS>>` — pair with `LServer!` to declare
-/// a process-wide server.
-#[cfg(feature = "tokio")]
-pub type SServer<TS = TcpTransport, Rt = TokioRuntime> = Lazy<Arc<Server<TS, Rt>>>;
-#[cfg(not(feature = "tokio"))]
-pub type SServer<TS, Rt> = Lazy<Arc<Server<TS, Rt>>>;
-/// Lazy-static `Arc<Client<TS>>` — pair with `LClient!` to declare
-/// a process-wide outbound client.
-#[cfg(feature = "tokio")]
-pub type SClient<TS = TcpTransport, Rt = TokioRuntime> = Lazy<Arc<Client<TS, Rt>>>;
-#[cfg(not(feature = "tokio"))]
-pub type SClient<TS, Rt> = Lazy<Arc<Client<TS, Rt>>>;
-/// Lazy-static `Arc<Url<C>>` — pair with `LUrl!` to declare a
-/// process-wide registered URL node.
-#[cfg(feature = "io_tokio")]
-pub type SUrl<C, TS = TcpTransport> = Lazy<Arc<Url<C, TS>>>;
-#[cfg(not(feature = "io_tokio"))]
-pub type SUrl<C, TS> = Lazy<Arc<Url<C, TS>>>;
-/// Lazy-static `PathPattern` — pair with `LPattern!` to declare a
-/// process-wide compiled URL pattern.
-pub type SPattern = Lazy<PathPattern>;
+// -- std-only block ------------------------------------------------
+// Everything below relies on std: `thread::sleep`, `LazyLock` (used as
+// `Lazy` in the `S*` static aliases), the tokio re-export, and the
+// process-wide `S*` types built on `Lazy`.
+#[cfg(feature = "std")]
+mod std_only {
+    use super::*;
+    pub use std::sync::LazyLock as Lazy;
+    pub use std::thread::sleep;
+    #[cfg(feature = "tokio")]
+    pub use tokio;
+
+    /// Lazy-static `Arc<Server<TS>>` — pair with `LServer!` to declare
+    /// a process-wide server.
+    #[cfg(feature = "tokio")]
+    pub type SServer<TS = TcpTransport, Rt = TokioRuntime> = Lazy<Arc<Server<TS, Rt>>>;
+    #[cfg(not(feature = "tokio"))]
+    pub type SServer<TS, Rt> = Lazy<Arc<Server<TS, Rt>>>;
+    /// Lazy-static `Arc<Client<TS>>` — pair with `LClient!` to declare
+    /// a process-wide outbound client.
+    #[cfg(feature = "tokio")]
+    pub type SClient<TS = TcpTransport, Rt = TokioRuntime> = Lazy<Arc<Client<TS, Rt>>>;
+    #[cfg(not(feature = "tokio"))]
+    pub type SClient<TS, Rt> = Lazy<Arc<Client<TS, Rt>>>;
+    /// Lazy-static `Arc<Url<C>>` — pair with `LUrl!` to declare a
+    /// process-wide registered URL node.
+    #[cfg(feature = "io_tokio")]
+    pub type SUrl<C, TS = TcpTransport> = Lazy<Arc<Url<C, TS>>>;
+    #[cfg(not(feature = "io_tokio"))]
+    pub type SUrl<C, TS> = Lazy<Arc<Url<C, TS>>>;
+    /// Lazy-static `PathPattern` — pair with `LPattern!` to declare a
+    /// process-wide compiled URL pattern.
+    pub type SPattern = Lazy<PathPattern>;
+}
+#[cfg(feature = "std")]
+pub use std_only::*;

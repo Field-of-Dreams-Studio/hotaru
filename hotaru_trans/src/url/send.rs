@@ -27,7 +27,7 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 pub fn send_expansion(req_var_name: &Ident) -> Vec<TokenTree> {
     // next(<req_var_name>)
     let mut call_args = TokenStream::new();
-    call_args.extend(std::iter::once(TokenTree::Ident(req_var_name.clone())));
+    call_args.extend(core::iter::once(TokenTree::Ident(req_var_name.clone())));
 
     vec![
         // <req_var_name> = next(<req_var_name>).await?;
@@ -68,19 +68,19 @@ pub fn rewrite_send(input: TokenStream, req_var_name: &Ident) -> TokenStream {
                     output.extend(send_expansion(req_var_name));
                 } else {
                     // Bare `send` — not the marker, emit unchanged.
-                    output.extend(std::iter::once(tok));
+                    output.extend(core::iter::once(tok));
                 }
             }
             // Recurse into nested groups (braces, parens, brackets).
             TokenTree::Group(group) => {
                 let new_inner = rewrite_send(group.stream(), req_var_name);
-                output.extend(std::iter::once(TokenTree::Group(Group::new(
+                output.extend(core::iter::once(TokenTree::Group(Group::new(
                     group.delimiter(),
                     new_inner,
                 ))));
             }
             _ => {
-                output.extend(std::iter::once(tok));
+                output.extend(core::iter::once(tok));
             }
         }
     }

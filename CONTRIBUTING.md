@@ -4,7 +4,7 @@ Thank you for your interest in contributing to Hotaru. We're excited to build th
 
 ## Development Status
 
-Hotaru is currently in active development (0.8.3). The following areas are still being built:
+Hotaru is currently in active development (0.8.x). The following areas are still being built:
 
 ### In Development
 
@@ -45,8 +45,8 @@ We welcome contributions in the following areas:
 
 ## Get Involved
 
-- **GitHub Issues**: https://github.com/Field-of-Dreams-Studio/hotaru/issues
-- **Discussions**: https://github.com/Field-of-Dreams-Studio/hotaru/discussions
+- **GitHub Issues**: https://github.com/Field-of-Dream-Studio/hotaru/issues
+- **Discussions**: https://github.com/Field-of-Dream-Studio/hotaru/discussions
 - **Email**: redstone@fds.moe
 - **Discord Group**: https://discord.gg/Y6b9KRUCux
 - **QQ Group**: 860691370
@@ -88,6 +88,32 @@ We welcome contributions in the following areas:
    - Integration tests
    - Feature-matrix checks for default Tokio, no-default facade builds, and core-only builds
 
+## Governance and PR requirements
+
+All changes that reach the canonical repository go through Hotaru's governance
+process — an Update Report and a live QA, with AI-collaboration tiers declared
+per component. Being small or routine does not exempt a change; it changes only
+how much the report records and, usually, who owns the PR. See
+[GOVERNANCE.md](./GOVERNANCE.md) for the roles, PR routes, and tier definitions
+before opening a PR.
+
+**Report granularity.** Record one Update Report entry per non-trivial design
+unit — typically a function, struct, enum, trait, or impl that carries its own
+design decision — and justify both its design and why that design should be
+used. Mechanical one-step work may be grouped into a single entry: plain
+getters and setters, renames, re-exports, and similar obvious glue. If a
+function performs several independently meaningful operations, prefer splitting
+it into smaller single-purpose functions rather than writing one large entry;
+the per-unit report is intended to keep functions small and focused.
+
+**Easy contributions.** Small or routine PRs should normally use the
+maintainer-staged integration route: a Component or Family Maintainer other
+than the author integrates the change and owns the consolidated Update Report
+and live QA, while the contributor is still credited for authored work. This
+keeps trivial work inside governance without placing the full report-and-QA
+burden on the contributor. The rules against self-approval and the approval
+required for cross-family changes still apply.
+
 ## Contribution Guidelines
 
 1. **Fork the repository** and create a feature branch
@@ -115,6 +141,9 @@ We welcome contributions in the following areas:
 - Run `cargo clippy` and fix warnings
 - Add doc comments (`///`) for public APIs
 - Write descriptive variable and function names
+
+For framework code style and formatting requirements, see
+[CONTRIBUTOR_STYLE.md](./CONTRIBUTOR_STYLE.md).
 
 ## Project Roadmap
 

@@ -1,0 +1,10 @@
+[package]
+name = "api_registration_example"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hotaru_core = { path = "../../hotaru_core", version = "=0.8.4" }
+hotaru_http = { path = "../../hotaru_http", version = "=0.8.4" }
+hotaru_rt_tokio = { path = "../../hotaru_rt_tokio", version = "=0.8.4" }

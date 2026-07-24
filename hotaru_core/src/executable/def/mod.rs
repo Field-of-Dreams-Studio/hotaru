@@ -1,0 +1,32 @@
+//! Pre-registration definitions for protocol entries and access points.
+//!
+//! `ProtocolDef<P>` describes one protocol-entry recipe. Route flavour is
+//! encoded at the type level via `FinalHandlerDef<P>`:
+//! `Endpoint<P>` = `AccessPointDef<P, EndpointHandler<P>>`, `Outpoint<P>` =
+//! `AccessPointDef<P, OutpointHandler<P>>`. `App::insert` / `App::extend`
+//! (and the `App::bind(constructor)` wrapper) accept only the flavours their
+//! role permits (`Server` = endpoints, `Client` = outpoints, `Gateway` =
+//! both). Mismatches fail to compile.
+
+mod access_point;
+mod error;
+mod handler;
+mod middleware;
+mod protocol;
+mod route_address;
+mod url_mode;
+
+#[cfg(test)]
+mod test;
+
+pub use access_point::{AccessPointDef, Endpoint, Outpoint};
+pub use error::BindError;
+pub use handler::{EndpointHandler, FinalHandlerDef, OutpointHandler};
+pub use middleware::{MWChain, MWSlot};
+pub use protocol::ProtocolDef;
+pub use route_address::RouteAddress;
+pub use url_mode::UrlMode;
+
+// Re-exported for convenience so downstream code can spell prepared
+// bindings through the def module in migration examples.
+pub use super::executable::ExecutableBinding;

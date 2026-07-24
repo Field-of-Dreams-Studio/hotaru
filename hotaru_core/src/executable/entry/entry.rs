@@ -1,7 +1,7 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
 use core::{any::Any, time::Duration};
-use alloc::sync::Arc;
 
 use crate::{
     alias::PRwLock,
@@ -10,11 +10,21 @@ use crate::{
     },
 };
 
-use akari::extensions::{Locals, Params, ParamsClone};
-use crate::{
-    app::common::RuntimeConfig, connection::{ConnStream, TransportSpec}, executable::{ExecutableBinding, access::{access_point::AccessPoint, table::AccessPointTable}, entry::ProtocolEntryTrait, middleware::AsyncMiddlewareChain}, protocol::Protocol, url::{PathPattern, UrlError, UrlRegistration, UrlRoot, node::StepName}
-};
 use crate::protocol::{Channel, ProtocolFlow};
+use crate::{
+    app::common::RuntimeConfig,
+    connection::{ConnStream, TransportSpec},
+    executable::{
+        ExecutableBinding,
+        access::{access_point::AccessPoint, table::AccessPointTable},
+        def::{AccessPointDef, BindError, FinalHandlerDef, ProtocolDef},
+        entry::ProtocolEntryTrait,
+        middleware::AsyncMiddlewareChain,
+    },
+    protocol::Protocol,
+    url::{PathPattern, UrlError, UrlRegistration, UrlRoot, node::StepName},
+};
+use akari::extensions::{Locals, Params, ParamsClone};
 
 /// Concrete handler for a specific protocol.
 pub struct ProtocolEntry<P, TS>
@@ -24,8 +34,8 @@ where
 {
     pub protocol: P,
     pub root_handler: Arc<UrlRoot<P::Context, TS>>,
-    pub middlewares: AsyncMiddlewareChain<P::Context>, 
-    pub access_points: AccessPointTable<P::Context, TS>, 
+    pub middlewares: AsyncMiddlewareChain<P::Context>,
+    pub access_points: AccessPointTable<P::Context, TS>,
 }
 
 impl<P, TS> ProtocolEntry<P, TS>
@@ -42,9 +52,17 @@ where
             protocol,
             root_handler,
             middlewares,
-            access_points: AccessPointTable::new(), 
+            access_points: AccessPointTable::new(),
         }
-    } 
+    }
+
+    pub(crate) fn from_def(def: &ProtocolDef<P>) -> Self {
+        Self::new(
+            def.protocol.clone(),
+            Arc::new(UrlRoot::new()),
+            def.root_middlewares.clone(),
+        )
+    }
 
     /// Register a binding at the given pre-parsed path under `name`, and
     /// refresh any existing access-point entries pointing at that path.
@@ -58,7 +76,11 @@ where
     /// `step_names` carries named-capture metadata from pattern parsing
     /// (e.g. the `id` in `/users/<id>`). Pass `StepName::default()` for
     /// purely literal paths that have no captures.
-    pub fn register<N: Into<String>>(
+    ///
+    /// Low-level primitive: the caller already produced the pre-parsed path
+    /// and a finished `ExecutableBinding`. `register` (the `AccessPointDef`
+    /// path) is the normal entry point and funnels through here.
+    pub(crate) fn register_internal<N: Into<String>>(
         &self,
         name: N,
         path: Vec<PathPattern>,
@@ -66,15 +88,42 @@ where
         binding: ExecutableBinding<P::Context>,
         config: ParamsClone,
     ) -> Result<UrlRegistration<P::Context, TS>, UrlError> {
-        let reg = self.root_handler.register(path.clone(), binding, config, step_names)?;
+        let reg = self
+            .root_handler
+            .register(path.clone(), binding, config, step_names)?;
         if let UrlRegistration::Node(arc) = &reg {
             self.access_points.refresh_path(&path, arc);
         }
         self.access_points.insert(
             name,
-            AccessPoint { path, target: reg.clone() },
+            AccessPoint {
+                path,
+                target: reg.clone(),
+            },
         );
         Ok(reg)
+    }
+
+    /// Compile one `AccessPointDef` and register the resulting binding.
+    ///
+    /// URL parsing lives on the definition; middleware-slot resolution runs
+    /// against this entry's own protocol-root snapshot. This is the single
+    /// canonical `AccessPointDef` registration path; `register_internal`
+    /// stays the low-level parsed-path primitive it funnels through.
+    pub(crate) fn register<H>(&self, def: &AccessPointDef<P, H>) -> Result<(), BindError>
+    where
+        H: FinalHandlerDef<P>,
+    {
+        let (path, step_names) = def.parse_url_pattern()?;
+        let middlewares = def
+            .middlewares()
+            .resolve(&self.middlewares, def.handler().body_middleware());
+        let binding = ExecutableBinding::new()
+            .with_handler(def.handler().final_handler())
+            .with_middlewares(middlewares);
+        self.register_internal(def.name(), path, step_names, binding, def.config().clone())
+            .map(|_| ())
+            .map_err(|error| BindError::new(def.name(), def.url(), error))
     }
 
     /// Wrap an acquired wire in this protocol's channel handle.
@@ -176,7 +225,29 @@ where
         _locals: PRwLock<Locals>,
     ) -> MaybeSendBoxFuture<'static, ()> {
         self.request(runtime, reader, writer, meta)
-    } 
+    }
+
+    fn combine_from(&self, other: &dyn ProtocolEntryTrait<TS>) -> bool {
+        let Some(other) = other.as_any().downcast_ref::<Self>() else {
+            return false;
+        };
+        self.root_handler.combine(&other.root_handler);
+        // TODO(blueprint-merge): URL-tree adoption and AP-name adoption are
+        // currently independent. When `other` loses a path collision but its
+        // AP name is new, copying that AccessPoint retains an Arc to a live
+        // but non-canonical node outside `self.root_handler`. Re-point adopted
+        // names at the canonical surviving node, matching normal
+        // register/rebind behavior. Characterized by Blueprint test T20.
+        for name in other.access_points.names() {
+            if !self.access_points.contains(&name) {
+                if let Some(ap) = other.access_points.get(&name) {
+                    self.access_points.insert(name, ap);
+                }
+            }
+        }
+        // middlewares: left-biased, self's chain kept untouched
+        true
+    }
 
     fn as_any(&self) -> &dyn Any {
         self

@@ -1,6 +1,6 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
 
 use crate::{
     connection::TransportSpec,

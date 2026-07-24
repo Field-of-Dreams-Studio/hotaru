@@ -1,0 +1,59 @@
+\documentclass[12pt]{article}
+\usepackage[a4paper,margin=16mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amssymb}
+\usepackage{tabularx}
+
+\setlength{\parindent}{0pt}
+\pagestyle{empty}
+
+\newcommand{\checkbox}{\(\square\)}
+\newcommand{\writingline}{\par\vspace{0.45cm}\hrule\vspace{0.10cm}}
+\newcommand{\qaentry}[1]{%
+  \vspace{0.45em}
+  \textbf{#1. Module or symbol:}\ \hrulefill
+
+  \vspace{0.2em}
+  \textbf{Question Asked}
+  \writingline
+  \writingline
+
+  \vspace{0.25em}
+  \textbf{Evaluation:}\quad
+  Change required: \checkbox\ No \quad \checkbox\ Yes
+  \hfill
+  PR author:
+  \checkbox\ Fully \quad \checkbox\ Partly \quad \checkbox\ Unable
+
+  \vspace{0.3em}
+  \textbf{Supplementary clarification (optional)}
+  \writingline
+  \writingline
+
+  \vspace{0.40\baselineskip}
+}
+
+\begin{document}
+
+\noindent\hfill\fbox{\strut\textbf{QA QUESTION SHEET}}\par
+\vspace{0.4em}
+
+\begin{tabularx}{\textwidth}{@{}lX@{\hspace{1.5em}}lX@{}}
+  \textbf{Repository:} & \hrulefill &
+  \textbf{PR number:} & \hrulefill
+\end{tabularx}
+
+\vspace{0.5em}
+
+\qaentry{1}
+\qaentry{2}
+\qaentry{3}
+\qaentry{4}
+\qaentry{5}
+
+\vfill
+\begin{center}
+  \small Page \underline{\hspace{1.3cm}} of \underline{\hspace{1.3cm}}
+\end{center}
+
+\end{document}

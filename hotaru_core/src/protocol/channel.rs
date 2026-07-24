@@ -24,4 +24,4 @@ pub trait Channel: Clone + Send + Sync + 'static {
 pub enum ProtocolFlow {
     Continue,
     Close,
-} 
+}

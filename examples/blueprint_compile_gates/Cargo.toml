@@ -1,0 +1,19 @@
+[package]
+name = "blueprint_compile_gates"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Intentionally failing public-API fixtures must compile in isolation from the
+# parent workspace's unified feature graph.
+[workspace]
+
+[dependencies]
+hotaru = { path = "../../hotaru" }
+
+[features]
+inbound_rejects_outpoint = []
+outbound_rejects_endpoint = []
+erased_trait_is_private = []
+blueprint_has_no_build = []
+configured_has_no_build = []

@@ -1,4 +1,4 @@
-use alloc::sync::Arc;
+use crate::prelude::{Arc, MaybeSendSync};
 use core::{any::Any, time::Duration};
 
 use crate::{
@@ -17,7 +17,7 @@ use akari::extensions::{Locals, Params};
 /// protocol instance, root URL tree, and protocol-scoped middleware defaults.
 /// The role-specific difference is expressed by method families like `serve`
 /// and `request`, not by duplicating the entry type itself.
-pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
+pub trait ProtocolEntryTrait<TS: TransportSpec>: MaybeSendSync {
     /// Test if this protocol can handle the connection.
     fn test(&self, buf: &[u8]) -> bool;
 
@@ -63,6 +63,10 @@ pub trait ProtocolEntryTrait<TS: TransportSpec>: Send + Sync {
     ///
     /// Used to resolve [`TimeoutSetting::Inherit`](crate::app::common::TimeoutSetting::Inherit) at connection time.
     fn default_connection_timeout(&self) -> Option<Duration>;
+
+    /// Merges `other` into `self` if it is the same concrete protocol entry
+    /// type. Returns false (no-op) on type mismatch.
+    fn combine_from(&self, other: &dyn ProtocolEntryTrait<TS>) -> bool;
 
     /// Allows downcasting.
     fn as_any(&self) -> &dyn Any;

@@ -1,4 +1,3 @@
-use alloc::{boxed::Box, sync::Arc};
 use core::{
     cell::Cell,
     fmt,
@@ -11,10 +10,7 @@ use core::{
 use embassy_futures::select;
 use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::{channel::Channel, signal::Signal};
-use hotaru_core::{
-    app::runtime::{BoxFuture, Either},
-    marker::MaybeSend,
-};
+use hotaru_core::{app::runtime::Either, prelude::*};
 
 use crate::mutex::EmbassyRawMutex;
 
@@ -573,9 +569,7 @@ macro_rules! define_runtime_worker_pool {
                 }
 
                 type OnceCell<
-                    T: $crate::__private::hotaru_core::marker::MaybeSend
-                        + Sync
-                        + 'static,
+                    T: $crate::__private::hotaru_core::marker::MaybeSendSync + 'static,
                 > = $crate::__private::EmbassyOnceCell<T, RawMutex>;
                 type AsyncMutex<
                     T: $crate::__private::hotaru_core::marker::MaybeSend + 'static,

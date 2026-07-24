@@ -1,6 +1,6 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
 use akari::hash::HashMap;
 
 use crate::{
@@ -39,7 +39,7 @@ use super::access_point::AccessPoint;
 ///
 /// - **Sharded locking** (`dashmap` or hand-rolled) — partitions the
 ///   keyspace so different names don't contend.
-///   Refrain from using DashMap directly. 
+///   Refrain from using DashMap directly.
 /// - **Copy-on-write `Arc<HashMap>` + atomic swap on write** — best fit
 ///   here since registrations are rare and reads dominate. Lookups become
 ///   lock-free (just an Arc load).
@@ -55,7 +55,9 @@ pub struct AccessPointTable<C: RequestContext, TS: TransportSpec> {
 
 impl<C: RequestContext, TS: TransportSpec> AccessPointTable<C, TS> {
     pub fn new() -> Self {
-        Self { inner: PRwLock::new(HashMap::default()) }
+        Self {
+            inner: PRwLock::new(HashMap::default()),
+        }
     }
 
     /// Insert a named access point, returning the previous entry under that
@@ -72,11 +74,7 @@ impl<C: RequestContext, TS: TransportSpec> AccessPointTable<C, TS> {
     /// equals `path`. Root-variant entries are skipped — their `RootNode`
     /// indirection picks up rebinds automatically via `AccessPoint::resolve`.
     /// Returns the number of entries refreshed.
-    pub fn refresh_path(
-        &self,
-        path: &[PathPattern],
-        node: &Arc<UrlNode<C, TS>>,
-    ) -> usize {
+    pub fn refresh_path(&self, path: &[PathPattern], node: &Arc<UrlNode<C, TS>>) -> usize {
         let mut guard = self.inner.write();
         let mut count = 0;
         for ap in guard.values_mut() {

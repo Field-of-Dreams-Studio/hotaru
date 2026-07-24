@@ -2,19 +2,22 @@ The Hotaru 0.8 era starts from 23/May/2026.
 
 # Hotaru Web Framework
 
-![Latest Version](https://img.shields.io/badge/version-0.8.3-brightgreen)
+![Latest Version](https://img.shields.io/badge/version-0.8.4-brightgreen)
 [![Crates.io](https://img.shields.io/crates/v/hotaru)](https://crates.io/crates/hotaru)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
 
-> Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
-
 ## Overview
 
-The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly.
+<!--The name 'Hotaru' comes from the Japanese Character '蛍（ほたる）' represents the firefly.--> 
 
-**[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
+> Small, sweet, easy framework with a protocol-neutral, no_std-ready core 
 
-MSRV: 1.86
+**[Official Website](https://hotaru.rs)** | **[Example Project](https://github.com/Field-of-Dream-Studio/hotaru-example)**
+
+> Repository transfer notice: the Hotaru repository has moved to
+> `https://github.com/Field-of-Dream-Studio/hotaru`.
+
+MSRV: 1.88
 
 ### Stability in 0.8.x
 
@@ -22,10 +25,10 @@ The **tokio + HTTP** stack (default features `trans`, `http`, `tokio`) is the te
 
 Everything else is **experimental** and will stabilize by 0.8.7:
 
-- `RuntimeSpec` trait surface (currently only `hotaru_rt_tokio` implements it; other runtime backends are planned, not shipped)
-- `no_std` builds of `hotaru_core` (Cortex-M / RISC-V bare-metal, CI-verified but not yet exercised by a real embedded backend)
-- IO adapter crates: `hotaru_io_futures` ships as a standalone crate (limited real-world use). `hotaru_io_embedded` is **not published in 0.8.3** — it stays in-repo until embedded stabilizes (targeted 0.8.5+). The `hotaru` umbrella is **std-only**; once the embedded backend ships, bare-metal projects will depend on `hotaru_core` + `hotaru_io_embedded` directly.
-- Embassy runtime backend (planned)
+- `RuntimeSpec` trait surface (`hotaru_rt_tokio` is the supported default; `hotaru_rt_embassy` is experimental)
+- `no_std` builds of `hotaru_core` (Cortex-M / RISC-V bare-metal, CI-verified and connected to experimental embedded backend crates, but not yet production-validated on hardware)
+- IO adapter crates: `hotaru_io_futures` ships as a standalone crate (limited real-world use). `hotaru_io_embedded` lives in the workspace and is still experimental and unpublished (crates.io). The `hotaru` facade exposes `EmbeddedIo` through its optional `io_embedded` feature.
+- Embassy runtime backend (`hotaru_rt_embassy`, experimental)
 
 If you are shipping something now, stick with the `tokio` default and revisit the experimental paths as they land.
 
@@ -35,7 +38,7 @@ If you are shipping something now, stick with the `tokio` default and revisit th
 
 - **Multi-Protocol**: HTTP/1.1 and HTTPS (TLS) ship out of the box. The `Protocol` trait is an open extension point for custom TCP-based protocols (WebSocket, MQTT, and other frames), though no non-HTTP protocol ships in this workspace today
 - **Server + Client**: Endpoints for inbound traffic, outpoints for outbound. Same protocol trait, same routing, same middleware
-- **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships today via `hotaru_rt_tokio` (the only runtime backend so far); other runtimes can plug in via the same sibling-crate pattern. IO adapters are further along, with `hotaru_io_tokio`, `hotaru_io_futures`, and `hotaru_io_embedded` already shipping
+- **Runtime-Neutral Core**: `hotaru_core` speaks to any async runtime through the `RuntimeSpec` trait. Tokio ships today via `hotaru_rt_tokio`; other runtimes can plug in via the same sibling-crate pattern. IO adapters are further along, with `hotaru_io_tokio`, `hotaru_io_futures`, and the experimental in-workspace `hotaru_io_embedded`
 - **`no_std`-Ready Core**: `hotaru_core` builds bare-metal on Cortex-M4/M7 and RISC-V (with atomics) under `alloc`. CI verified on `thumbv7em-none-eabihf` and `riscv32imac-unknown-none-elf`
 - **Sync main**: `fn main() { run_server!(APP); }`. No `async fn main`, no `#[tokio::main]`
 - **Ergonomic Macros**: `endpoint!` / `outpoint!` / `middleware!` DSL in three flavors (`trans`, `semi-trans`, `attr`)
@@ -293,7 +296,7 @@ endpoint! {
 
 ## Examples
 
-Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hotaru-example) for:
+Check out the [example repository](https://github.com/Field-of-Dream-Studio/hotaru-example) for:
 - Basic routing and handlers
 - Form processing and file uploads
 - Session management with cookies
@@ -312,17 +315,30 @@ Hotaru is built on a modular architecture:
 - **[hotaru_rt_tokio](https://crates.io/crates/hotaru_rt_tokio)** - Tokio runtime backend (`TokioRuntime`)
 - **[hotaru_io_tokio](https://crates.io/crates/hotaru_io_tokio)** - Tokio TCP/IO backend (`TcpTransport`, `TokioIo`)
 - **[hotaru_io_futures](https://crates.io/crates/hotaru_io_futures)** - `futures-io` adapter backend (`FuturesIo`, experimental)
-- **hotaru_io_embedded** - `embedded-io-async` adapter backend (`EmbeddedIo`) — *experimental; not published in 0.8.3, planned for 0.8.5+*
+- **hotaru_io_embedded** - `embedded-io-async` adapter backend (`EmbeddedIo`) — *experimental; in-workspace, unpublished (crates.io), and re-exported by `hotaru` when `io_embedded` is enabled*
 - **[hotaru_lib](https://crates.io/crates/hotaru_lib)** - Utility functions (compression, encoding, etc.)
 - **[htmstd](https://crates.io/crates/htmstd)** - Standard middleware library (CORS, sessions)
 
 ## Changelog
 
-### 0.8.3 (Current)
+### 0.8.4 (Current)
+- Continued backend split work by moving Tokio-specific IO/runtime support out of `hotaru_core`.
+- Clarified platform and task-mobility feature modes.
+- Added explicit local-executor refinements: `spawn_local_atomic` and `spawn_local_no_atomic`.
+- Made sync primitive selection feature-based: `parking_lot`, `spin`, or Hotaru `RefCell` fallback.
+- Removed hidden `target_has_atomic` behavior from core feature selection.
+- Replaced the old `full`/`lite` regex names with additive `full_regex` / `lite_regex`; when neither is enabled, Hotaru drops the `regex` dependency and uses its regex-stub path.
+- Split facade regex style from template support: `full_regex` / `lite_regex` control routing regex, while `template` controls Akari template support.
+- Added `hotaru` facade re-exports for `EmbeddedIo` behind `io_embedded`, and exposed the experimental Embassy backend crate behind `embassy`.
+- Added CI coverage for the `hotaru` facade on a no-atomic bare-metal target, and deduplicated the core feature matrix so each feature combination is compiled once.
+- Updated repository metadata and documentation links for the transfer to `https://github.com/Field-of-Dream-Studio/hotaru`.
+- Continued preparation for a smaller backend-neutral core.
+
+### 0.8.3
 - **Core/backend split**: `hotaru_core` is now backend-neutral at the public type layer. Concrete Tokio runtime and TCP/IO implementations moved into sibling crates (`hotaru_rt_tokio`, `hotaru_io_tokio`), while the umbrella `hotaru` crate keeps the familiar Tokio defaults.
 - **IO adapter crates**: futures-io and embedded-io-async adapters moved out of core into `hotaru_io_futures` and `hotaru_io_embedded`. Each backend uses local wrapper types (`TokioIo<T>`, `FuturesIo<T>`, `EmbeddedIo<T>`) so adapter impls stay additive and avoid trait-coherence conflicts.
-- **Simpler `hotaru_core` features**: core no longer owns `io_*`, `rt_*`, `tokio`, or `embassy` feature flags. It now keeps only the platform axis (`std` / `embedded`) and task-mobility axis (`spawn_send` / `spawn_local`); runtime and IO backends are selected through backend crates, or through the std-only `hotaru` umbrella (Tokio and futures backends only — the embedded backend is consumed directly).
-- **`hotaru` umbrella is std-only**: the umbrella no longer re-exports `hotaru_io_embedded` or exposes `embedded` / `io_embedded` features (its prelude pulls std-only items such as `std::thread::sleep` and `once_cell::sync::Lazy`). `hotaru_io_embedded` is **not published in 0.8.3** (targeted 0.8.5+); once it ships, `no_std` / bare-metal projects will depend on `hotaru_core` + `hotaru_io_embedded` directly.
+- **Simpler `hotaru_core` features**: core no longer owns `io_*`, `rt_*`, `tokio`, or `embassy` feature flags. It now keeps only the platform axis (`std` / `embedded`) and task-mobility axis (`spawn_send` / `spawn_local`); runtime and IO backends are selected through backend crates, or through optional facade features on `hotaru`.
+- **`hotaru` facade defaults to Tokio/std**: the umbrella keeps Tokio as the supported default path, while exposing experimental optional `embedded`, `embassy`, and `io_embedded` features for in-workspace backend work. `io_embedded` re-exports `EmbeddedIo`; the backend crate remains unpublished on crates.io.
 - **Runtime abstraction cleanup**: `RuntimeSpec` is the backend-neutral runtime trait, with Tokio implemented externally by `hotaru_rt_tokio::TokioRuntime`. Framework types (`Server`, `Client`, builders, and URL/protocol-entry types) now carry explicit transport/runtime parameters in core, while `hotaru` restores ergonomic defaults.
 - **`MaybeSend` task-mobility model**: async framework surfaces use `MaybeSend` so `spawn_send` builds keep real `Send` bounds and `spawn_local` builds can support local `!Send` futures. `hotaru_io_embedded` gates its actual embedded-io-async trait impls on `spawn_local`, not on the `embedded` platform flag.
 - **Framework-owned async IO traits**: `HotaruRead`, `HotaruWrite`, `HotaruBufRead`, `HotaruBufWrite`, `HotaruIOError`, `HotaruBufReader`, and `HotaruBufWriter` provide the common IO trait surface used by transports and protocols without hardcoding Tokio types in core.
@@ -330,7 +346,7 @@ Hotaru is built on a modular architecture:
 - **Protocol-agnostic endpoint outcomes**: `EndpointOutcome<C>` lets generated endpoints apply return values to any request context. HTTP keeps the existing `HttpResponse` endpoint style, while non-HTTP/inbound-only protocols can use `()` outcomes without placeholder responses.
 - **Per-protocol URL parsing hooks**: `Protocol` can customize URL tokenization/literal parsing, and URL parser internals such as `RawToken`, `TypeKind`, `tokenize`, and `tokens_to_patterns` are re-exported for protocol-specific routing work.
 - **Preferred-language middleware**: `htmstd` adds `PreferredLanguageMiddleware`, `PreferredLanguage`, settings, and request-extension helpers for parsing and negotiating the `Accept-Language` header.
-- **no_std preparation**: core continues moving toward `no_std` readiness with `alloc` usage, `core` imports, Akari `lite`/`no_std` alignment, generic IO errors, and backend-neutral abstractions. Real Embassy wiring remains deferred; embedded support is still experimental.
+- **no_std preparation**: core continues moving toward `no_std` readiness with `alloc` usage, `core` imports, Akari `embedded`/`no_std` alignment, generic IO errors, and backend-neutral abstractions. Embassy and embedded backend work exists in-tree but remains experimental.
 - **Sync-main entry macros**: `run_server!` / `run_server_until!` (blocking) and `run_server_no_block!` / `run_server_no_block_until!` (fire-and-forget) let users run a server from an ordinary `fn main()` — no `#[tokio::main]`, no `async fn main`. Backed by a new `BlockingRuntimeCap` capability trait implemented by `TokioRuntime`.
 
 ### 0.8.2
@@ -380,73 +396,17 @@ Hotaru is built on a modular architecture:
 - **Akari Template Engine**: https://crates.io/crates/akari
 - **Homepage**: https://hotaru.rs
 - **Documentation Home Page**: https://fds.rs
-- **GitHub**: https://github.com/Field-of-Dreams-Studio/hotaru
+- **GitHub**: https://github.com/Field-of-Dream-Studio/hotaru
 - **Documentation**: https://docs.rs/hotaru
 
 | Video Resources | URL |
 | --- | --- |
 | Quick Tutorial | Youtube: https://www.youtube.com/watch?v=8pV-o04GuKk&t=6s <br> Bilibili: https://www.bilibili.com/video/BV1BamFB7E8n/ |
 
-## AI Declaration of each Mod
+## AI-assisted development
 
-We believe in transparency about AI-assisted development. The framework is governed jointly by two maintainer groups using a shared four-tier system that prioritizes understanding over line counts.
-
-<details>
-<summary><b>Click for more details</b></summary>
-
-### Maintained by: PMINE/Research
-
-| Name | Tier | Comments |
-| --- | --- | --- |
-| hotaru_core/app | Author-Owned | |
-| hotaru_core/connection | Author-Owned | |
-| hotaru_core/executable | Author-Owned | |
-| hotaru_core/url | Author-Owned | |
-| hotaru_core/protocol | Author-Owned | |
-| hotaru_http/trails | Co-Authored | |
-| hotaru_http/* | Human-Led | |
-| hotaru_mqtt/broker | Co-Authored | |
-| hotaru_mqtt/traits | Co-Authored | |
-| hotaru_mqtt/* | Human-Led | |
-| hotaru_lib | Human-Led | Basic API Access |
-| h2per | Co-Authored | Integration of Hyper - Not stable yet |
-| htmstd/cors | Human-Led | |
-| htmstd/session | Human-Led | |
-
-### Maintained by: Project-StarFall
-
-| Name | Tier | Comments |
-| --- | --- | --- |
-| hotaru_trans/endpoint | Author-Owned | Proof and language design must be fully understood by humans |
-| hotaru_trans/outpoint | Author-Owned | Proof and language design must be fully understood by humans |
-| hotaru_trans/middleware | Author-Owned | Proof and language design must be fully understood by humans |
-| hotaru_trans/cors | Co-Authored | Trivial user-level abstraction |
-| ahttpm | Co-Authored | Imports akari_macro plus improvements |
-| SFX | Co-Authored | Trivial user-level abstraction |
-| akari | External | https://crates.io/crates/akari |
-| akari_lang | External (TBD) | |
-| akari_macro | External | https://crates.io/crates/akari |
-
-### Shared term meanings
-
-| Term | Meaning |
-| --- | --- |
-| **Forbidden** | The intelligence work in this module — design decisions, proof obligations, language semantics, novel logic — is authored by humans. AI is not used for this content (the mechanical/test/doc carve-out in operating rule 2 still applies). Reserved for modules where the work *is* the thinking, not the typing. |
-| **Author-Owned** | AI may assist with drafts and completion, but the committed code reads as the author's own throughout. A reviewer should not be able to tell where AI helped. The module signals "a human owns the design and the prose." |
-| **Human-Led** | The human authored the structure and the load-bearing pieces; AI filled in helpers, repetitive sections, or boilerplate. Some sections may visibly bear AI's hand, but the design choices and non-trivial logic are clearly human. The author can defend every part without re-consulting AI. |
-| **Co-Authored** | AI participated substantively in both design exploration and implementation. The human author has internalized the result and can defend, modify, and debug without re-prompting. Appropriate for well-understood patterns and third-party integrations. |
-
-The understanding requirement is uniform across Author-Owned, Human-Led, and Co-Authored: the author can explain any line, modify surrounding code without AI help, and walk a reviewer through the code on request. The tiers differ only in where AI's voice is allowed to show through, not in what the author owes the team.
-
-### Operating rules
-
-1. **No quantification.** Tiers describe the kind of collaboration, not the amount of AI-authored code. Counting lines is brittle and incentivizes the wrong behavior.
-2. **Tests, documentation, and mechanical typing are permitted in every tier — including Forbidden.** AI assistance is allowed across all modules for: unit tests; doc comments and inline prose; and mechanical typing where the design decision has already been made by a human and AI is only writing it out (e.g., applying a settled pattern across similar cases, expanding hand-authored pseudocode, regenerating a table from a spec). The defining criterion is that no *intelligence work* is delegated to AI — design, proof, and semantics decisions remain with the human. The author remains responsible for understanding what was generated.
-3. **Reviewer-driven understanding check.** Any reviewer may flag a PR with "this doesn't feel author-owned" — regardless of the module's tier. The author clears the flag by demonstrating understanding in PR comments or a short walkthrough. Flags are requests for evidence, not accusations.
-4. **Smell-test threshold scales with tier.** Author-Owned code is flagged if any section visibly reads as AI-generated. Human-Led is flagged if the structural code reads as AI-generated or AI's hand pervades rather than appearing locally. Co-Authored is flagged only if the author cannot defend the code in review.
-5. **Tier reflects the work, not preferences.** Maintainers set tiers based on the nature of the module. If the character of a module changes, the tier is re-set rather than stretched.
-6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked.
-</details>
+Definitions and component declarations are maintained in
+[GOVERNANCE.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/GOVERNANCE.md#3-ai-declarations).
 
 ## 📄 License
 

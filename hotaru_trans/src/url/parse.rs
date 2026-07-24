@@ -1,12 +1,12 @@
-use hotaru_lib::random::random_alpha_string;
-use std::iter::Peekable;
+use core::iter::Peekable;
 
 use proc_macro::{Delimiter, Ident, Span, TokenStream, TokenTree};
 
+use crate::ap::next_anonymous_ident;
+use crate::helper::*;
 use crate::url::url_func::UrlFunc;
 use crate::url::urlargs::UrlArgs;
 use crate::url::urlexpr::UrlExpr;
-use crate::helper::*;
 
 /// Parse the attribute input into UrlAttr
 /// endpoint/outpoint! {
@@ -27,11 +27,11 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
         let attrs = parse_outer_attrs(tokens)?;
         let is_pub = match_ident_consume(tokens, "pub");
         let fn_name = match match_ident_consume(tokens, "_") {
-            true => {
-                let random_name = format!("auto_generated_{}", random_alpha_string(8));
-                Ident::new(&random_name, Span::call_site())
-            }
-            false => expect_any_ident(tokens, "Expected function name, or anonymous function annotation '_'")?,
+            true => next_anonymous_ident(),
+            false => expect_any_ident(
+                tokens,
+                "Expected function name, or anonymous function annotation '_'",
+            )?,
         };
         let _ = expect_punct_consume(tokens, "<", "Expected '<' after function name")?;
         let protocol = expect_any_ident(tokens, "Expected protocol identifier after '<'")?;
@@ -63,24 +63,24 @@ pub fn parse_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
     let mut config = None;
 
     if match_ident_consume(&mut tokens, "middleware") {
-        tokens.next(); // Consume the `=` 
+        tokens.next(); // Consume the `=`
         middlewares = Some(expect_array_consume(
             &mut tokens,
             "Expected an array for middleware",
         )?);
-    } 
+    }
 
-    match_punct_consume(&mut tokens, ","); // Optional separator for better readability between middleware and config 
+    match_punct_consume(&mut tokens, ","); // Optional separator for better readability between middleware and config
 
     if match_ident_consume(&mut tokens, "config") {
-        tokens.next(); // Consume the `=`  
+        tokens.next(); // Consume the `=`
         config = Some(expect_array_consume(
             &mut tokens,
             "Expected an array for config",
         )?);
     }
 
-    match_punct_consume(&mut tokens, ","); // Optional separator for better readability between middleware and config 
+    match_punct_consume(&mut tokens, ","); // Optional separator for better readability between middleware and config
 
     return Ok(UrlArgs::new(
         UrlExpr::from_tokens(url_expr)?,
@@ -135,11 +135,11 @@ pub fn parse_semi_trans(args: TokenStream) -> Result<UrlArgs, TokenStream> {
         "Expected 'fn' keyword for function definition",
     )?;
     let fn_name = match match_ident_consume(&mut tokens, "_") {
-        true => {
-            let random_name = format!("auto_generated_{}", random_alpha_string(8));
-            Ident::new(&random_name, Span::call_site())
-        }
-        false => expect_any_ident(&mut tokens, "Expected function name, or anonymous function annotation '_'")?,
+        true => next_anonymous_ident(),
+        false => expect_any_ident(
+            &mut tokens,
+            "Expected function name, or anonymous function annotation '_'",
+        )?,
     };
     let _ = expect_punct_consume(&mut tokens, "<", "Expected '<' after function name")?;
     let protocol = expect_any_ident(&mut tokens, "Expected protocol identifier after '<'")?;
@@ -193,14 +193,14 @@ pub fn parse_attr(attr: TokenStream, args: TokenStream) -> Result<UrlArgs, Token
     let mut middlewares = None;
     let mut config = None;
     if match_ident_consume(&mut attr, "middleware") {
-        attr.next(); // Consume the `=` 
+        attr.next(); // Consume the `=`
         middlewares = Some(expect_array_consume(
             &mut attr,
             "Expected an array for middleware",
         )?);
     }
     if match_ident_consume(&mut attr, "config") {
-        attr.next(); // Consume the `=`  
+        attr.next(); // Consume the `=`
         config = Some(expect_array_consume(
             &mut attr,
             "Expected an array for config",
@@ -215,11 +215,11 @@ pub fn parse_attr(attr: TokenStream, args: TokenStream) -> Result<UrlArgs, Token
         "Expected 'fn' keyword for function definition",
     )?;
     let fn_name = match match_ident_consume(&mut tokens, "_") {
-        true => {
-            let random_name = format!("auto_generated_{}", random_alpha_string(8));
-            Ident::new(&random_name, Span::call_site())
-        }
-        false => expect_any_ident(&mut tokens, "Expected function name, or anonymous function annotation '_'")?,
+        true => next_anonymous_ident(),
+        false => expect_any_ident(
+            &mut tokens,
+            "Expected function name, or anonymous function annotation '_'",
+        )?,
     };
     let _ = expect_punct_consume(&mut tokens, "<", "Expected '<' after function name")?;
     let protocol = expect_any_ident(&mut tokens, "Expected protocol identifier after '<'")?;

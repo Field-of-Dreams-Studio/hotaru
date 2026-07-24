@@ -1,6 +1,6 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
 use core::slice::Iter;
 
 use akari::extensions::ParamsClone;
@@ -348,6 +348,29 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> UrlRoot<C, TS> {
             Err(e) => Err(e.into()),
         }
     }
+
+    #[av::ver(
+        unstable,
+        since = "0.8.4",
+        note = "Safety proof: src/url/node/COMBINE_SAFETY.md"
+    )]
+    /// Left-biased merge of another URL tree into this one.
+    pub fn combine(&self, other: &UrlRoot<C, TS>) {
+        if Arc::ptr_eq(&self.root, &other.root) {
+            return;
+        }
+        // Endpoint slot: adopt other's only if self's is empty. The clone is
+        // hoisted into a `let` so no two endpoint guards are ever held at once.
+        if self.root.endpoint.read().is_none() {
+            let adopted = other.root.endpoint.read().clone();
+            if adopted.is_some() {
+                *self.root.endpoint.write() = adopted;
+            }
+        }
+        for (a, b) in self.root.children.combine(&other.root.children) {
+            a.combine(&b);
+        }
+    }
 }
 
 impl<C: RequestContext + Send + 'static, TS: TransportSpec> Default for UrlRoot<C, TS> {
@@ -358,7 +381,7 @@ impl<C: RequestContext + Send + 'static, TS: TransportSpec> Default for UrlRoot<
 
 #[cfg(test)]
 mod tests {
-    use alloc::sync::Arc;
+    use crate::prelude::Arc;
 
     use akari::extensions::ParamsClone;
 
@@ -575,5 +598,125 @@ mod tests {
 
         assert_eq!(hits.len(), 3);
         assert_eq!(hits[0], PathPattern::literal_path("literal"));
+    }
+
+    #[tokio::test]
+    async fn combine_unions_disjoint_trees() {
+        let left = TestUrlRoot::new();
+        let right = TestUrlRoot::new();
+        left.literal_url("/a", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+        right
+            .literal_url("/b", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+
+        left.combine(&right);
+
+        assert!(left.walk_str("/a").await.is_some());
+        assert!(left.walk_str("/b").await.is_some());
+        // Other is only read: it must not gain self's routes.
+        assert!(right.walk_str("/a").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn combine_collision_keeps_self_node_whole() {
+        let left = TestUrlRoot::new();
+        let right = TestUrlRoot::new();
+
+        let left_node = match left
+            .literal_url("/users", binding_with_handler(), ParamsClone::default())
+            .unwrap()
+        {
+            UrlRegistration::Node(n) => n,
+            _ => panic!("expected Node"),
+        };
+        right
+            .literal_url("/users", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+
+        left.combine(&right);
+
+        // Self's node Arc survives whole — other's payload is dropped.
+        let walked = left.walk_str("/users").await.unwrap();
+        assert!(Arc::ptr_eq(&walked, &left_node));
+    }
+
+    #[tokio::test]
+    async fn combine_structural_bias_keeps_handlerless_intermediate() {
+        let left = TestUrlRoot::new();
+        let right = TestUrlRoot::new();
+
+        left.literal_url("/api/users", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+        right
+            .literal_url("/api", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+
+        let left_api = left.walk_str("/api").await.unwrap();
+        assert!(!left_api.has_handler());
+
+        left.combine(&right);
+
+        // Strict structural left-bias: the handlerless intermediate wins whole;
+        // other's handler at /api is dropped, not grafted in.
+        let api = left.walk_str("/api").await.unwrap();
+        assert!(Arc::ptr_eq(&api, &left_api));
+        assert!(!api.has_handler());
+        assert!(left.walk_str("/api/users").await.unwrap().has_handler());
+    }
+
+    #[tokio::test]
+    async fn combine_appends_subtree_under_shared_prefix() {
+        let left = TestUrlRoot::new();
+        let right = TestUrlRoot::new();
+
+        left.literal_url("/api/users", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+        let right_orders = match right
+            .literal_url(
+                "/api/orders",
+                binding_with_handler(),
+                ParamsClone::default(),
+            )
+            .unwrap()
+        {
+            UrlRegistration::Node(n) => n,
+            _ => panic!("expected Node"),
+        };
+
+        left.combine(&right);
+
+        assert!(left.walk_str("/api/users").await.is_some());
+        // The missing branch under the shared /api prefix is adopted by Arc.
+        let orders = left.walk_str("/api/orders").await.unwrap();
+        assert!(Arc::ptr_eq(&orders, &right_orders));
+    }
+
+    #[tokio::test]
+    async fn combine_endpoint_adopted_only_when_self_empty() {
+        // Self's endpoint slot empty + other's set → adopted.
+        let left = TestUrlRoot::new();
+        let right = TestUrlRoot::new();
+        right
+            .literal_url("", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+        let right_ep = right.walk_str("").await.unwrap();
+
+        left.combine(&right);
+        let adopted = left.walk_str("").await.expect("endpoint must be adopted");
+        assert!(Arc::ptr_eq(&adopted, &right_ep));
+
+        // Both set → self's kept.
+        let a = TestUrlRoot::new();
+        let b = TestUrlRoot::new();
+        a.literal_url("", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+        b.literal_url("", binding_with_handler(), ParamsClone::default())
+            .unwrap();
+        let a_ep = a.walk_str("").await.unwrap();
+
+        a.combine(&b);
+        let kept = a.walk_str("").await.unwrap();
+        assert!(Arc::ptr_eq(&kept, &a_ep));
     }
 }

@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 ctor = "0.4"
-hotaru = { path = "../hotaru", version = "=0.8.3" }
-hotaru_core = { path = "../hotaru_core", version = "=0.8.3" }
+hotaru = { path = "../hotaru", version = "=0.8.4" }
+hotaru_core = { path = "../hotaru_core", version = "=0.8.4" }
 htmstd = { path = "../htmstd", version = "=0.8.3" }
 h2per = { path = "../h2per", version = "=0.7.0" }
 tokio = { version = "1", features = ["full"] }

@@ -1,6 +1,6 @@
 use core::future::Future;
 
-use crate::marker::MaybeSend;
+use crate::marker::{MaybeSend, MaybeSendSync};
 
 use super::BoxFuture;
 
@@ -28,7 +28,7 @@ use super::BoxFuture;
 /// the lifetime structure into a concrete trait object whose Send-ness
 /// is captured by the type. Cost: one allocation per init, once per
 /// resource lifetime.
-pub trait OnceCellCap<T: MaybeSend + Sync + 'static>: Default + MaybeSend + Sync + 'static {
+pub trait OnceCellCap<T: MaybeSendSync + 'static>: Default + MaybeSendSync + 'static {
     /// Returns the initialised value, or `None` if the cell is empty.
     /// Never triggers init; never awaits.
     fn get(&self) -> Option<&T>;

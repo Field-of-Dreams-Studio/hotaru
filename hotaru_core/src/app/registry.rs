@@ -19,9 +19,9 @@
 //! wrapper should shrink to just the enum + `from`/`into` + the two
 //! dispatchers + `default_connection_timeout`.
 
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
 use core::any::TypeId;
 use core::time::Duration;
 
@@ -30,13 +30,14 @@ use crate::{
     connection::{ConnStream, HotaruRead, HotaruWrite, TransportSpec},
     executable::{
         ExecutableBinding,
+        def::{AccessPointDef, BindError, FinalHandlerDef},
         entry::{ProtocolEntry, ProtocolEntryTrait},
         middleware::{AsyncMiddleware, AsyncMiddlewareChain},
         registry::ProtocolEntryRegistry,
     },
     extensions::ParamsClone,
     protocol::Protocol,
-    url::{PathPattern, UrlError, UrlRegistration, UrlRoot, node::StepName},
+    url::{UrlError, UrlRegistration, UrlRoot},
 };
 
 /// Optimization for single-protocol apps, which are common in practice.
@@ -174,22 +175,27 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
     /// the URL tree and the entry's `AccessPointTable`.
     ///
     /// Both pattern parsing (`url::parser::parse`) and literal splitting
-    /// are wrapper-level concerns done by `Server::url` / `Server::lit_url`
-    /// (and the `Client` mirrors) before reaching here.
-    pub fn register<P, N>(
-        &self,
-        name: N,
-        path: Vec<PathPattern>,
-        step_names: StepName,
-        executable: ExecutableBinding<P::Context>,
-        config: ParamsClone,
-    ) -> Result<UrlRegistration<P::Context, TS>, UrlError>
+    /// are wrapper-level concerns done before reaching here.
+    ///
+    /// Compile one `AccessPointDef` and register it against the matching
+    /// protocol entry. Lookup + delegate only: the real compile/register
+    /// invariant lives on `ProtocolEntry::register`.
+    pub(crate) fn register<P, H>(&self, def: &AccessPointDef<P, H>) -> Result<(), BindError>
     where
         P: Protocol<Wire = TS::Wire, TS = TS> + 'static,
-        N: Into<String>,
+        H: FinalHandlerDef<P>,
     {
-        let entry = self.entry::<P>().ok_or(UrlError::ProtocolNotFound)?;
-        entry.register(name, path, step_names, executable, config)
+        let entry = self
+            .entry::<P>()
+            .ok_or_else(|| BindError::new(def.name(), def.url(), UrlError::ProtocolNotFound))?;
+        entry.register(def)
+    }
+
+    /// Merges two registry wrappers, re-optimizing Single/Multi afterwards.
+    pub fn combine(self, other: Self) -> Self {
+        let mut merged = self.into();
+        merged.combine(other.into());
+        Self::from(merged)
     }
 
     #[av::ver(
@@ -318,5 +324,182 @@ impl<TS: TransportSpec> ProtocolRegistryKind<TS> {
                 vec![]
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::prelude::Arc;
+    use core::convert::Infallible;
+    use core::future::Future;
+
+    use akari::extensions::ParamsClone;
+
+    use crate::{
+        connection::{
+            MaybeSend,
+            test_support::{TestMeta, TestOutbound, TestTransport, TestWire},
+        },
+        executable::middleware::AsyncFinalHandler,
+        protocol::{Channel, DefaultProtocolError, ProtocolFlow, ProtocolRole},
+        url::{PathPattern, UrlRoot, node::StepName},
+    };
+
+    use super::*;
+
+    #[derive(Debug)]
+    struct TestError;
+
+    impl core::fmt::Display for TestError {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.write_str("test error")
+        }
+    }
+
+    impl core::error::Error for TestError {}
+    impl DefaultProtocolError for TestError {}
+
+    impl From<Infallible> for TestError {
+        fn from(x: Infallible) -> Self {
+            match x {}
+        }
+    }
+
+    #[derive(Clone)]
+    enum NoChannel {}
+
+    impl Channel for NoChannel {
+        fn is_open(&self) -> bool {
+            match *self {}
+        }
+        fn close(&self) {}
+    }
+
+    #[derive(Default)]
+    struct TestCtx;
+
+    impl crate::protocol::RequestContext for TestCtx {
+        type Request = ();
+        type Response = ();
+        type Error = TestError;
+        type Channel = NoChannel;
+
+        fn handle_error(&mut self) {}
+        fn role(&self) -> ProtocolRole {
+            ProtocolRole::Server
+        }
+        fn inject_request(&mut self, _: ()) {}
+        fn into_response(self) {}
+    }
+
+    /// Type-only test protocol; `N` distinguishes concrete protocol types.
+    #[derive(Clone)]
+    struct TestProto<const N: u8>;
+
+    impl<const N: u8> Protocol for TestProto<N> {
+        type Wire = TestWire;
+        type TS = TestTransport;
+        type Channel = NoChannel;
+        type Stream = ();
+        type Message = ();
+        type Context = TestCtx;
+
+        fn name(&self) -> &'static str {
+            "test-proto"
+        }
+        fn role(&self) -> ProtocolRole {
+            ProtocolRole::Server
+        }
+        fn detect(_: &[u8]) -> bool {
+            true
+        }
+
+        fn open_channel(self, reader: TestWire, _writer: TestWire, _meta: TestMeta) -> NoChannel {
+            match reader {}
+        }
+
+        fn handle(
+            _channel: &NoChannel,
+            _runtime: Arc<RuntimeConfig>,
+            _root: Arc<UrlRoot<TestCtx, TestTransport>>,
+        ) -> impl Future<Output = Result<ProtocolFlow, TestError>> + MaybeSend {
+            async { Ok(ProtocolFlow::Close) }
+        }
+
+        fn acquire_channel(
+            &self,
+            _runtime: &Arc<RuntimeConfig>,
+            _outbound: Arc<TestOutbound>,
+        ) -> impl Future<Output = Result<NoChannel, TestError>> + MaybeSend {
+            async { Err(TestError) }
+        }
+
+        fn send(ctx: TestCtx) -> impl Future<Output = Result<TestCtx, TestError>> + MaybeSend {
+            async move { Ok(ctx) }
+        }
+
+        fn install_channel(_ctx: &mut TestCtx, channel: NoChannel) {
+            match channel {}
+        }
+    }
+
+    fn binding_with_handler() -> ExecutableBinding<TestCtx> {
+        let handler: Arc<dyn AsyncFinalHandler<TestCtx>> =
+            Arc::new(|ctx: TestCtx| async move { Ok(ctx) });
+        ExecutableBinding::new().with_handler(handler)
+    }
+
+    fn single<const N: u8>(route: &str, ap_name: &str) -> ProtocolRegistryKind<TestTransport> {
+        let kind = ProtocolRegistryKind::single(TestProto::<N>, Arc::new(UrlRoot::new()), vec![]);
+        kind.entry::<TestProto<N>>()
+            .unwrap()
+            .register_internal(
+                ap_name,
+                vec![PathPattern::literal_path(route)],
+                StepName::default(),
+                binding_with_handler(),
+                ParamsClone::default(),
+            )
+            .unwrap();
+        kind
+    }
+
+    /// End-to-end combine through every layer: kind → registry →
+    /// `combine_from` → URL tree + access-point table.
+    #[tokio::test]
+    async fn kind_combine_resolves_same_protocol_and_appends_new() {
+        let left = single::<0>("left", "shared");
+        let right = single::<0>("right", "shared");
+        right
+            .entry::<TestProto<0>>()
+            .unwrap()
+            .register_internal(
+                "extra",
+                vec![PathPattern::literal_path("extra")],
+                StepName::default(),
+                binding_with_handler(),
+                ParamsClone::default(),
+            )
+            .unwrap();
+
+        // Same protocol: stays Single, routes union, APs merge left-biased.
+        let merged = left.combine(right);
+        assert!(matches!(merged, ProtocolRegistryKind::Single(_)));
+
+        let root = merged.url::<TestProto<0>>().unwrap();
+        assert!(root.walk_str("left").await.is_some());
+        assert!(root.walk_str("right").await.is_some());
+
+        let entry = merged.entry::<TestProto<0>>().unwrap();
+        let shared = entry.access_points.get("shared").unwrap();
+        assert_eq!(shared.path, vec![PathPattern::literal_path("left")]);
+        assert!(entry.access_points.contains("extra"));
+        assert_eq!(entry.access_points.len(), 2);
+
+        // Different protocol: appended, re-optimized to Multi.
+        let merged = merged.combine(single::<1>("other", "other"));
+        assert!(matches!(merged, ProtocolRegistryKind::Multi(_)));
+        assert!(merged.url::<TestProto<0>>().is_some());
+        assert!(merged.url::<TestProto<1>>().is_some());
     }
 }

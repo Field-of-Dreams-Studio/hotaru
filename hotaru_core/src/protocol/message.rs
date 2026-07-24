@@ -29,13 +29,7 @@ use core::error::Error;
 /// These bounds keep the buffer fully opaque outside the impl while still
 /// letting the framework feed it and read from it.
 pub trait Message: Send + Sync + 'static {
-    type BytesMut: AsRef<[u8]>
-        + AsMut<[u8]>
-        + Default
-        + Extend<u8>
-        + Send
-        + Sync
-        + 'static;
+    type BytesMut: AsRef<[u8]> + AsMut<[u8]> + Default + Extend<u8> + Send + Sync + 'static;
 
     /// Concrete error returned by `encode`/`decode`. Use `Infallible` if your impl can't fail.
     type Error: Error + Send + Sync + 'static;

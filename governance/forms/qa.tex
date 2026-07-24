@@ -1,0 +1,100 @@
+\documentclass[12pt]{article}
+\usepackage[a4paper,margin=18mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{tabularx}
+
+\setlength{\parindent}{0pt}
+\pagestyle{empty}
+
+\newcommand{\checkbox}{\(\square\)}
+\newcommand{\formsection}[1]{%
+  \vspace{0.65em}\noindent{\large\bfseries #1}\par\vspace{0.35em}}
+\newcommand{\fieldline}[1]{\textbf{#1}\ \hrulefill}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries Project-StarFall Code Quality Assurance Record}\\[0.25em]
+  {\large Cover Sheet}
+\end{center}
+
+The questioner completes one cover sheet for each pull request and attaches
+one or more copies of \texttt{qa\_sup.pdf} to record the questions and
+evaluations.
+
+\begin{enumerate}[leftmargin=*,itemsep=0.15em,topsep=0.4em]
+  \item The questioner must print the form and complete it by hand in ink.
+  \item Conduct the QA live using Zoom or another real-time meeting platform.
+        The PR author must answer each question live and without AI assistance,
+        and must not access or complete this record.
+  \item The questioner must be the next technical authority: Component
+        Maintainer for a Contributor, Family Maintainer for a Component
+        Maintainer, Project Maintainer for a Family Maintainer, or a different
+        qualified Family Maintainer for the Project Maintainer.
+  \item The questioner must keep the original for four months after merge,
+        unless it is sent earlier at the Project Maintainer's request. During
+        the first three months after merge, the Project Maintainer may request
+        delivery. The request must provide the address and required delivery
+        service, and the Hotaru maintenance team will cover the delivery fee.
+        Without such a request, no delivery is required. Failure to retain or
+        produce a requested original may cause the declaration to be treated
+        as unverified or potentially false and referred for governance review.
+  \item Write in English, Japanese, Traditional Chinese, or Simplified Chinese.
+\end{enumerate}
+
+\formsection{I. Pull request details}
+
+\begin{tabularx}{\textwidth}{@{}lX@{\hspace{1.5em}}lX@{}}
+  \textbf{Repository:} & \hrulefill &
+  \textbf{PR number:} & \hrulefill \\[0.9em]
+\end{tabularx}
+
+\begin{tabularx}{\textwidth}{@{}lX@{\hspace{1.5em}}lX@{}}
+  \textbf{PR author:} & \hrulefill & \textbf{Date:} & \hrulefill \\[0.9em]
+  \textbf{Family:} & \hrulefill & \textbf{Component:} & \hrulefill \\[0.9em]
+  \textbf{Questioner:} & \hrulefill & \textbf{Pages attached:} & \hrulefill
+\end{tabularx}
+
+\formsection{II. Review conditions}
+
+Mark every statement that applies.
+
+\begin{itemize}[label={},leftmargin=0pt,itemsep=0.25em,topsep=0.35em]
+  \item \checkbox\ The questioner is the responsible Component, Family, or
+        Project Maintainer.
+  \item \checkbox\ The questioner did not author the code being reviewed.
+  \item \checkbox\ The change introduces or alters a public module, type,
+        trait, function, or other stable API.
+  \item \checkbox\ The PR author's completed Update Report has been received.
+\end{itemize}
+
+\textbf{PR's declared AI tier:}\quad
+\checkbox\ Forbidden \quad
+\checkbox\ Author-Owned \quad
+\checkbox\ Human-Led \quad
+\checkbox\ Co-Authored
+
+\formsection{III. Declarations}
+
+\textbf{Questioner declaration.} I conducted this QA live with the PR author
+using a real-time meeting platform. I reviewed and understand the code covered
+by this record and accept responsibility for the accuracy of my evaluation. I
+accurately recorded the questions, my evaluations, and any supplementary
+clarification. The PR author answered every recorded question live and without
+AI assistance, and did not access or complete this document. I completed this
+record, including every attached page, by hand in ink and without AI
+assistance.
+
+\vspace{0.75em}
+\fieldline{Questioner signature:}
+\hspace{1.5em}
+\fieldline{Date:}
+
+\vfill
+\begin{center}
+  \small Page 1 of \underline{\hspace{1.3cm}}
+\end{center}
+
+\end{document}

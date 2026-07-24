@@ -16,7 +16,10 @@ The name 'Hotaru' comes from the Japanese Character '蛍' represents the firefly
 
 **[Official Website](https://hotaru.rs)**
 
-**[Example Project](https://github.com/Field-of-Dreams-Studio/hotaru-example)**
+**[Example Project](https://github.com/Field-of-Dream-Studio/hotaru-example)**
+
+> Repository transfer notice: the Hotaru repository has moved to
+> `https://github.com/Field-of-Dream-Studio/hotaru`.
 
 MSRV: 1.86
 
@@ -279,7 +282,7 @@ endpoint! {
 
 ## Examples
 
-Check out the [example repository](https://github.com/Field-of-Dreams-Studio/hotaru-example) for:
+Check out the [example repository](https://github.com/Field-of-Dream-Studio/hotaru-example) for:
 - Basic routing and handlers
 - Form processing and file uploads
 - Session management with cookies
@@ -300,14 +303,22 @@ Hotaru is built on a modular architecture:
 
 ## Changelog
 
-### 0.8.3 (Current)
+### 0.8.4 (Current)
+- Replaced old `full` / `lite` regex feature names with additive `full_regex` / `lite_regex`; when neither is enabled, core drops the `regex` dependency and uses its regex-stub path.
+- Made sync primitive selection feature-based: `parking_lot` on `std`, `spin` when enabled, or a `RefCell` fallback otherwise.
+- Added explicit local-executor refinements: `spawn_local_atomic` (spin locks) and `spawn_local_no_atomic` (Rc/RefCell).
+- Removed hidden `target_has_atomic` behavior from core feature selection.
+- Improved embedded / no-atomic CI coverage for `hotaru_core` and the `hotaru` facade, and deduplicated the core feature matrix so each feature combination is compiled once.
+- Updated repository metadata and documentation links for the transfer to `https://github.com/Field-of-Dream-Studio/hotaru`.
+
+### 0.8.3
 - **Protocol-agnostic `endpoint!` via `EndpointOutcome`**: new `EndpointOutcome<C>` trait in `hotaru_core::protocol` (re-exported from `hotaru::prelude`) decouples endpoint return values from the HTTP `response` field. Generated handlers now return `impl EndpointOutcome<Ctx> + 'static`; the wrapper applies the outcome via `EndpointOutcome::apply_to(__outcome, &mut req)?` instead of writing `req.response` directly. Generic impls for `()` (no-op) and `Result<O, C::Error>` (fallible bodies) live in `hotaru_core`; `impl EndpointOutcome<HttpContext<TS>> for HttpResponse` lives in `hotaru_http`. **Existing HTTP endpoint bodies compile unchanged** — bodies that end in `HttpResponse` still land in `ctx.response`. Inbound-only protocols can now use `()`-returning endpoints with no placeholder response.
 - **Per-protocol URL parsing on `Protocol` trait**: new `tokenize_url` (pattern side, default = the framework lexer) and `lit_parser` (literal side, minimal default — HTTP overrides with `/`-split that mirrors `UrlRoot::walk_str` empty-input semantics). `lexer::tokenize` is now fallible (`Result<Vec<RawToken>, PatternError>`); `RawToken`, `TypeKind`, `tokenize`, `tokens_to_patterns` are re-exported from `hotaru_core::url`. `url::parser::parse` signature unchanged.
 - **Preferred-language middleware in `htmstd`**: new `language` module exposing `PreferredLanguageMiddleware` plus the `PreferredLanguage` struct that parses the request `Accept-Language` header into ordered, q-weighted `LanguageRange` entries and stores it in `req.params`. `PreferredLanguage` provides downstream helpers — `preferred()`, `primary()`, `accepts()`, `quality_for()` / `quality_millis_for()` (q-values as `u16` milli-units), and `best_match()` / `best_match_owned()` for negotiating against a supported-language set. Configurable via `PreferredLanguageSettings` (fallback language, etc.) and ergonomic access via the `PreferredLanguageRequestExt` extension trait. All re-exported from `htmstd`.
 - **Framework-owned async IO trait family (`connection::io`)**: HTTP/transport code no longer hardcodes `tokio::io` traits. New `HotaruRead` / `HotaruWrite` / `HotaruBufRead` / `HotaruBufWrite` traits, a concrete `HotaruIOError`, fallback `HotaruBufReader` / `HotaruBufWriter`, and per-backend buffered halves (`HotaruRead::Buffered` / `HotaruWrite::Buffered`, surfaced as `BufferedReadHalf<TS>` / `BufferedWriteHalf<TS>`). Tokio and `embedded-io-async` are bridged via feature-gated blanket impls, so existing Tokio transports keep working unchanged. `ConnStream` now builds on these traits and returns `Option<SocketAddr>` for `peer_addr` / `local_addr`.
 - **`async-trait` dropped for native RPIT**: core async traits (`Protocol`, transport `Inbound` / `Outbound`, `HttpChannel`, etc.) now use return-position `impl Future` instead of the `async-trait` crate, removing a proc-macro dependency and per-call boxing from the trait surface.
-- **no_std / `alloc` plumbing + target-flavour features**: `hotaru_core` is being prepared for `no_std`/embedded targets — `extern crate alloc`, `core::`/`alloc::` imports replacing `std::`, `akari::hash::HashMap`, and associated-type IO errors. New mutually-exclusive `std` (pulls `parking_lot`) and `embedded` (pulls `spin` + `embedded-io-async`) target markers, plus a `tokio` feature (default-on, auto-enables `std`) that gates the Tokio IO blanket impls. `lite` trims the Unicode/regex footprint for small devices.
-- **Akari 0.2.8 alignment**: `hotaru_core` depends on `akari` with `default-features = false` (`dynamic`, `extension`, `object_macro`), with `full` / `lite` features mapping to `akari/full` / `akari/no_std` so embedded builds drop the heavy Unicode tables.
+- **no_std / `alloc` plumbing + target-flavour features**: `hotaru_core` is being prepared for `no_std`/embedded targets — `extern crate alloc`, `core::`/`alloc::` imports replacing `std::`, `akari::hash::HashMap`, and associated-type IO errors. New mutually-exclusive `std` (pulls `parking_lot`) and `embedded` target markers, plus backend crates for Tokio / embedded I/O. `lite_regex` trims the Unicode regex footprint; omitting regex flags drops the regex dependency.
+- **Akari 0.2.8 alignment**: `hotaru_core` depends on `akari` with `default-features = false` (`dynamic`, `extension`, `object_macro`); embedded builds enable `akari/no_std` through the `embedded` feature.
 - **(In progress) `RuntimeSpec` runtime abstraction**: new `hotaru_core::app::runtime` module introducing a `RuntimeSpec` backend trait (spawn / time / `OnceCell` / async `Mutex` / `select2`) with a working `TokioRuntime` impl and a typecheck-only `EmbassyRuntime` stub, laying groundwork for making the Tokio dependency optional on embedded targets.
 
 ### 0.8.2
@@ -358,73 +369,17 @@ Hotaru is built on a modular architecture:
 - **Akari Template Engine**: https://crates.io/crates/akari
 - **Homepage**: https://hotaru.rs 
 - **Documentation Home Page**: https://fds.rs
-- **GitHub**: https://github.com/Field-of-Dreams-Studio/hotaru
+- **GitHub**: https://github.com/Field-of-Dream-Studio/hotaru
 - **Documentation**: https://docs.rs/hotaru 
 
 | Video Resources | URL | 
 | --- | --- | 
 | Quick Tutorial | Youtube: https://www.youtube.com/watch?v=8pV-o04GuKk&t=6s <br> Bilibili: https://www.bilibili.com/video/BV1BamFB7E8n/ | 
 
-## AI Declaration of each Mod
+## AI-assisted development
 
-We believe in transparency about AI-assisted development. The framework is governed jointly by two maintainer groups using a shared four-tier system that prioritizes understanding over line counts.
-
-<details> 
-<summary><b>Click for more details</b></summary> 
-
-### Maintained by: PMINE/Research
-
-| Name | Tier | Comments |
-| --- | --- | --- |
-| hotaru_core/app | Author-Owned | |
-| hotaru_core/connection | Author-Owned | |
-| hotaru_core/executable | Author-Owned | |
-| hotaru_core/url | Author-Owned | |
-| hotaru_core/protocol | Author-Owned | |
-| hotaru_http/trails | Co-Authored | |
-| hotaru_http/* | Human-Led | |
-| hotaru_mqtt/broker | Co-Authored | |
-| hotaru_mqtt/traits | Co-Authored | |
-| hotaru_mqtt/* | Human-Led | |
-| hotaru_lib | Human-Led | Basic API Access |
-| h2per | Co-Authored | Integration of Hyper - Not stable yet |
-| htmstd/cors | Human-Led | |
-| htmstd/session | Human-Led | |
-
-### Maintained by: Project-StarFall
-
-| Name | Tier | Comments |
-| --- | --- | --- |
-| hotaru_trans/endpoint | Author-Owned | Proof and language design must be fully understood by humans |
-| hotaru_trans/outpoint | Author-Owned | Proof and language design must be fully understood by humans |
-| hotaru_trans/middleware | Author-Owned | Proof and language design must be fully understood by humans |
-| hotaru_trans/cors | Co-Authored | Trivial user-level abstraction |
-| ahttpm | Co-Authored | Imports akari_macro plus improvements |
-| SFX | Co-Authored | Trivial user-level abstraction |
-| akari | External | https://crates.io/crates/akari |
-| akari_lang | External (TBD) | |
-| akari_macro | External | https://crates.io/crates/akari |
-
-### Shared term meanings
-
-| Term | Meaning |
-| --- | --- |
-| **Forbidden** | The intelligence work in this module — design decisions, proof obligations, language semantics, novel logic — is authored by humans. AI is not used for this content (the mechanical/test/doc carve-out in operating rule 2 still applies). Reserved for modules where the work *is* the thinking, not the typing. |
-| **Author-Owned** | AI may assist with drafts and completion, but the committed code reads as the author's own throughout. A reviewer should not be able to tell where AI helped. The module signals "a human owns the design and the prose." |
-| **Human-Led** | The human authored the structure and the load-bearing pieces; AI filled in helpers, repetitive sections, or boilerplate. Some sections may visibly bear AI's hand, but the design choices and non-trivial logic are clearly human. The author can defend every part without re-consulting AI. |
-| **Co-Authored** | AI participated substantively in both design exploration and implementation. The human author has internalized the result and can defend, modify, and debug without re-prompting. Appropriate for well-understood patterns and third-party integrations. |
-
-The understanding requirement is uniform across Author-Owned, Human-Led, and Co-Authored: the author can explain any line, modify surrounding code without AI help, and walk a reviewer through the code on request. The tiers differ only in where AI's voice is allowed to show through, not in what the author owes the team.
-
-### Operating rules
-
-1. **No quantification.** Tiers describe the kind of collaboration, not the amount of AI-authored code. Counting lines is brittle and incentivizes the wrong behavior.
-2. **Tests, documentation, and mechanical typing are permitted in every tier — including Forbidden.** AI assistance is allowed across all modules for: unit tests; doc comments and inline prose; and mechanical typing where the design decision has already been made by a human and AI is only writing it out (e.g., applying a settled pattern across similar cases, expanding hand-authored pseudocode, regenerating a table from a spec). The defining criterion is that no *intelligence work* is delegated to AI — design, proof, and semantics decisions remain with the human. The author remains responsible for understanding what was generated.
-3. **Reviewer-driven understanding check.** Any reviewer may flag a PR with "this doesn't feel author-owned" — regardless of the module's tier. The author clears the flag by demonstrating understanding in PR comments or a short walkthrough. Flags are requests for evidence, not accusations.
-4. **Smell-test threshold scales with tier.** Author-Owned code is flagged if any section visibly reads as AI-generated. Human-Led is flagged if the structural code reads as AI-generated or AI's hand pervades rather than appearing locally. Co-Authored is flagged only if the author cannot defend the code in review.
-5. **Tier reflects the work, not preferences.** Maintainers set tiers based on the nature of the module. If the character of a module changes, the tier is re-set rather than stretched.
-6. **External code is outside this policy.** AI-authored code arriving through a third-party crate is governed by that crate's own conventions, transparently linked. 
-</details> 
+Definitions and component declarations are maintained in
+[GOVERNANCE.md](https://github.com/Field-of-Dream-Studio/hotaru/blob/main/GOVERNANCE.md#3-ai-declarations).
 
 ## 📄 License
 

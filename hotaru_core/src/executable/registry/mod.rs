@@ -1,7 +1,7 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
 use core::any::TypeId;
-use alloc::sync::Arc;
 
 use crate::{
     app::common::RuntimeConfig,
@@ -9,8 +9,9 @@ use crate::{
     debug_log,
     executable::{
         ExecutableBinding,
+        def::ProtocolDef,
         entry::{ProtocolEntry, ProtocolEntryTrait},
-        middleware::{AsyncMiddleware, AsyncMiddlewareChain},
+        middleware::AsyncMiddleware,
     },
     extensions::ParamsClone,
     protocol::Protocol,
@@ -37,15 +38,10 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
     /// Register a protocol entry.
     pub fn register<P: Protocol<Wire = TS::Wire, TS = TS> + Clone + 'static>(
         &mut self,
-        protocol: P,
-        root_handler: Arc<UrlRoot<P::Context, TS>>,
-        middleware_chain: AsyncMiddlewareChain<P::Context>,
+        def: &ProtocolDef<P>,
     ) {
-        self.handlers.push(Arc::new(ProtocolEntry::new(
-            protocol,
-            root_handler,
-            middleware_chain,
-        )));
+        self.handlers
+            .push(Arc::new(ProtocolEntry::<P, TS>::from_def(def)));
     }
 
     pub async fn serve(&self, runtime: Arc<RuntimeConfig>, conn: TS::Wire) {
@@ -63,7 +59,9 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         };
 
         if let Some(handler) = selected {
-            handler.serve(runtime, reader, writer.into_buf_write(), meta).await;
+            handler
+                .serve(runtime, reader, writer.into_buf_write(), meta)
+                .await;
         } else {
             let _ = writer.shutdown().await;
         }
@@ -84,7 +82,9 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         };
 
         if let Some(handler) = selected {
-            handler.request(runtime, reader, writer.into_buf_write(), meta).await;
+            handler
+                .request(runtime, reader, writer.into_buf_write(), meta)
+                .await;
         } else {
             let _ = writer.shutdown().await;
         }
@@ -141,6 +141,20 @@ impl<TS: TransportSpec> ProtocolEntryRegistry<TS> {
         {
             Some(result) => result,
             None => Err(UrlError::ProtocolNotFound),
+        }
+    }
+
+    /// Merges `other`'s protocols: unknown protocols are appended; protocols
+    /// already present resolve via `combine_from` (left-biased).
+    pub fn combine(&mut self, other: Self) {
+        for other_handler in other.handlers {
+            let ty = other_handler.as_any().type_id();
+            match self.handlers.iter().find(|h| h.as_any().type_id() == ty) {
+                Some(existing) => {
+                    existing.combine_from(other_handler.as_ref());
+                }
+                None => self.handlers.push(other_handler),
+            }
         }
     }
 

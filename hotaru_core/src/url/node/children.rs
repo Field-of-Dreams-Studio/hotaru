@@ -1,7 +1,7 @@
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
 use akari::hash::HashMap;
-use alloc::sync::Arc;
 use core::marker::PhantomData;
 
 use crate::{
@@ -148,6 +148,24 @@ impl<C: RequestContext, TS: TransportSpec> Children<C, TS> {
     /// Returns all child nodes for traversal or debug use.
     pub fn all_nodes(&self) -> Vec<Arc<UrlNode<C, TS>>> {
         self.inner.read().all_nodes()
+    }
+
+    /// One-level, left-biased merge: adopts other's children whose patterns are
+    /// absent from self; returns the colliding (self, other) pairs only for the
+    /// caller. (Where the resolving policy is in the `UrlNode::combine()`)
+    /// Safety proof: COMBINE_SAFETY.md (this directory).
+    pub fn combine(
+        &self,
+        other: &Children<C, TS>,
+    ) -> Vec<(Arc<UrlNode<C, TS>>, Arc<UrlNode<C, TS>>)> {
+        let mut collisions = Vec::new();
+        for other_child in other.all_nodes() {
+            match self.find(other_child.path()) {
+                None => self.insert(other_child),
+                Some(self_child) => collisions.push((self_child, other_child)),
+            }
+        }
+        collisions
     }
 
     /// Formats the cached children for debug display.
@@ -469,8 +487,8 @@ impl<C: RequestContext, TS: TransportSpec> Clone for RegexChild<C, TS> {
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::Arc;
     use akari::hash::HashMap;
-    use alloc::sync::Arc;
 
     use crate::{
         connection::test_support::TestTransport,

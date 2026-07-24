@@ -55,12 +55,14 @@ impl RuntimeConfig {
         self.statics.get::<T>(key).cloned()
     }
 
-    // /// Merge 2 config into one by. The first config will preserve in case of conflict. 
-    // pub fn merge(&mut self, other: Self) {
-    //     // Merge mode: preserve self.mode
-    //     // Merge config: preserve self.config
-    //     // Merge statics: preserve self.statics
-    //     self.config.combine(other.config);
-    //     self.statics.combine(other.statics);
-    // } 
+    /// Merges `other` into `self`, left-biased: `self` wins on every conflict.
+    ///
+    /// `mode` is kept as-is; `config` and `statics` delegate to akari's
+    /// `combine`, which preserves entries already present in `self` and
+    /// moves in the rest from `other`.
+    pub fn combine(&mut self, other: Self) {
+        // mode: self wins — other.mode drops with `other`.
+        self.config.combine(other.config);
+        self.statics.combine(other.statics);
+    }
 }

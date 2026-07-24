@@ -1,14 +1,12 @@
+#[cfg(any(feature = "full_regex", feature = "lite_regex"))]
+use crate::prelude::Arc;
 #[cfg(not(feature = "std"))]
 use crate::prelude::*;
-use alloc::sync::Arc;
 
 use crate::debug_warn;
 
-// `regex` crate under all flavours. Under `full` the `regex/unicode`
-// feature adds Unicode tables (for `\p{...}` classes etc.); under
-// `lite`/`embedded` those are skipped for a smaller binary. Since
-// `regex` 1.9 the crate compiles as genuine `no_std + alloc` with
-// `default-features = false`, so no cfg-fork is needed.
+// Real regex backend, compiled whenever a regex backend (`full_regex` or `lite_regex`) is enabled.
+#[cfg(any(feature = "full_regex", feature = "lite_regex"))]
 use regex::Regex as CompiledRegex;
 
 /// A regex segment paired with its compiled form.
@@ -24,9 +22,14 @@ use regex::Regex as CompiledRegex;
 /// `re = None`; subsequent matches return `false`. This preserves the
 /// previous "silently never matches" semantics while making the failure
 /// observable in logs.
+///
+/// When the regex backend is unavailable (neither `full_regex` nor
+/// `lite_regex` is enabled), only `src` is stored and the segment never
+/// matches.
 #[derive(Clone, Debug)]
 pub struct RegexSegment {
     src: String,
+    #[cfg(any(feature = "full_regex", feature = "lite_regex"))]
     re: Option<Arc<CompiledRegex>>,
 }
 
@@ -35,19 +38,27 @@ impl RegexSegment {
     /// stores `None` on compile failure.
     pub fn new<T: Into<String>>(src: T) -> Self {
         let src = src.into();
-        let anchored = format!("^(?:{})$", src);
-        let re = match CompiledRegex::new(&anchored) {
-            Ok(re) => Some(Arc::new(re)),
-            Err(_err) => {
-                debug_warn!(
-                    "PathPattern: failed to compile regex {:?}: {}",
-                    src,
-                    _err
-                );
-                None
-            }
-        };
-        Self { src, re }
+        #[cfg(any(feature = "full_regex", feature = "lite_regex"))]
+        {
+            let anchored = format!("^(?:{})$", src);
+            let re = match CompiledRegex::new(&anchored) {
+                Ok(re) => Some(Arc::new(re)),
+                Err(_err) => {
+                    debug_warn!("PathPattern: failed to compile regex {:?}: {}", src, _err);
+                    None
+                }
+            };
+            Self { src, re }
+        }
+        #[cfg(not(any(feature = "full_regex", feature = "lite_regex")))]
+        {
+            debug_warn!(
+                "PathPattern: regex route {:?} registered without a regex backend \
+                 (no regex backend); it will never match",
+                src
+            );
+            Self { src }
+        }
     }
 
     /// Returns the original (unanchored) source string the segment was
@@ -58,15 +69,30 @@ impl RegexSegment {
 
     /// Returns whether this segment matches `text` end-to-end.
     pub fn is_match(&self, text: &str) -> bool {
-        match &self.re {
-            Some(re) => re.is_match(text),
-            None => false,
+        #[cfg(any(feature = "full_regex", feature = "lite_regex"))]
+        {
+            match &self.re {
+                Some(re) => re.is_match(text),
+                None => false,
+            }
+        }
+        #[cfg(not(any(feature = "full_regex", feature = "lite_regex")))]
+        {
+            let _ = text;
+            false
         }
     }
 
     /// Returns whether the pattern compiled successfully.
     pub fn is_compiled(&self) -> bool {
-        self.re.is_some()
+        #[cfg(any(feature = "full_regex", feature = "lite_regex"))]
+        {
+            self.re.is_some()
+        }
+        #[cfg(not(any(feature = "full_regex", feature = "lite_regex")))]
+        {
+            false
+        }
     }
 }
 
@@ -201,7 +227,7 @@ mod tests {
     //! - Regex patterns: identical source-string equality, anchored full-segment matching
     //! - Different variants are never equal
 
-    use super::PathPattern;
+    use super::{PathPattern, RegexSegment};
 
     // ------------------------------------------------------------------
     // Reflexivity — every variant equals itself
@@ -268,10 +294,7 @@ mod tests {
     /// The empty-string literal is the root-endpoint case — important for
     /// `UrlRegistration::Root` / `register_lit_named("", ...)` workflows.
     fn literal_empty_string_is_equal_to_itself() {
-        assert_eq!(
-            PathPattern::literal_path(""),
-            PathPattern::literal_path(""),
-        );
+        assert_eq!(PathPattern::literal_path(""), PathPattern::literal_path(""),);
     }
 
     #[test]
@@ -424,11 +447,12 @@ mod tests {
         assert!(!PathPattern::literal_path("users").matches("users/extra"));
     }
 
+    #[cfg(any(feature = "full_regex", feature = "lite_regex"))]
     #[test]
     /// `[0-9]+` must NOT match `"123abc"` — the segment must consume the
     /// entire string. This is the anchoring fix. (Uses `[0-9]` rather than
-    /// `\d` so the test is portable to the `lite`/`embedded` no_std flavour,
-    /// which builds `regex` without unicode tables.)
+    /// `\d` so the test is portable to `lite_regex` / embedded builds,
+    /// which build `regex` without unicode tables.)
     fn regex_matches_full_segment_only() {
         let p = PathPattern::regex_path(r"[0-9]+");
         assert!(p.matches("123"));
@@ -437,6 +461,7 @@ mod tests {
         assert!(!p.matches(""));
     }
 
+    #[cfg(any(feature = "full_regex", feature = "lite_regex"))]
     #[test]
     /// A pattern that already contains its own anchors must still work
     /// after the framework wraps it with `^(?:...)$`.
@@ -455,6 +480,15 @@ mod tests {
         assert!(!p.matches(""));
     }
 
+    #[cfg(not(any(feature = "full_regex", feature = "lite_regex")))]
+    #[test]
+    /// Without a regex feature, regex segments are accepted but never match.
+    fn no_regex_backend_constructs_but_never_matches() {
+        let p = RegexSegment::new("[0-9]+");
+        assert!(!p.is_compiled());
+        assert!(!p.is_match("123"));
+    }
+
     #[test]
     /// `Any` matches every single segment, including the empty one.
     fn any_matches_any_segment() {
@@ -469,16 +503,17 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // Built-in typed-route regexes — no_std / `lite` regression guard
+    // Built-in typed-route regexes — no_std / `lite_regex` regression guard
     // ------------------------------------------------------------------
 
     /// Every built-in `TypeKind` regex must COMPILE (not degrade to
     /// `re = None`) and match correctly under EVERY feature flavour,
-    /// including `lite`/`embedded` where `regex` is built without its
+    /// including `lite_regex` / embedded where `regex` is built without its
     /// unicode tables. Before the ASCII rewrite of `TypeKind::to_regex`,
-    /// `\d` / `(?i)` failed to compile under `lite`, so `<int>` / `<uint>`
+    /// `\d` / `(?i)` failed to compile under `lite_regex`, so `<int>` / `<uint>`
     /// / `<decimal>` / `<uuid>` routes silently never matched. This test
     /// fails loudly if that regression ever returns.
+    #[cfg(any(feature = "full_regex", feature = "lite_regex"))]
     #[test]
     fn typed_route_regexes_compile_and_match_under_every_flavour() {
         use super::RegexSegment;
